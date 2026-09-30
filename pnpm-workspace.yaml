@@ -1,0 +1,5 @@
+# pnpm 11 blocks dependency install scripts unless explicitly allowed.
+# unrs-resolver (pulled in by eslint-config-next) only uses its script to pick
+# a native binary and falls back to a JS build, so we decline it.
+allowBuilds:
+  unrs-resolver: false

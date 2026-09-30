@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# secrets — never commit real env files (only .env.example is tracked)
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# other lockfiles (this project uses pnpm only)
+package-lock.json
+yarn.lock
+
+# misc
+.DS_Store
+*.log
+coverage/
+.vercel

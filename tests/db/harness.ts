@@ -31,6 +31,7 @@ export const MIGRATION_ORDER = [
   "bible_games_v2_schema.sql",
   "giving_schema.sql",
   "church_os_features_schema.sql",
+  "booking_security_fix.sql",
 ];
 
 const SUPABASE_STUBS = `

@@ -1,50 +1,106 @@
 "use server";
 
-import { generateText } from "@/lib/ai";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentAppUser } from "@/lib/current-user";
+import { checkModuleAccess } from "@/lib/paywall";
+import { generateText, isAiConfigured } from "@/lib/ai";
 import { consumeAiQuota } from "@/lib/ai-quota";
+import { POSTER_FORMATS, POSTER_TEMPLATES, isHexColor, isPosterRole } from "@/lib/posters";
 
-export interface PosterCopy {
-  tagline: string;
+// Server actions are public endpoints, so both actions re-check the role and
+// plan — the page hiding the button isn't enough (anyone could call the AI
+// action directly and spend the church's AI credits).
+async function requirePosterMaker() {
+  const me = await getCurrentAppUser();
+  if (!me || !isPosterRole(me.role)) return null;
+  const access = await checkModuleAccess("ai_poster");
+  return access.allowed ? me : null;
 }
 
-// Generates a short punchy tagline from the event details. Falls back to a
-// simple template if ANTHROPIC_API_KEY isn't set, so the tool still works
-// with zero configuration.
+const FALLBACK_TAGLINE = "Join us — everyone welcome.";
+
+/**
+ * Suggests a short tagline. Returns { tagline } (AI or a fixed fallback), plus
+ * { notice } when the fallback was used for a reason the user should know.
+ */
 export async function generatePosterTagline(params: {
   eventTitle: string;
   speaker?: string;
   eventDate?: string;
-}): Promise<PosterCopy> {
-  const fallback = "Join us — everyone welcome.";
-  if (!(await consumeAiQuota("poster_tagline")).ok) return { tagline: fallback };
+}): Promise<{ tagline?: string; notice?: string }> {
+  const me = await requirePosterMaker();
+  if (!me) return { notice: "Only pastors, admins and department leaders can use the poster tools." };
+  if (!isAiConfigured()) return { tagline: FALLBACK_TAGLINE };
+  if (!(await consumeAiQuota("poster_tagline")).ok) {
+    return { tagline: FALLBACK_TAGLINE, notice: "You've reached the hourly AI limit — here's a standard tagline instead." };
+  }
+
+  // Inputs are capped so a pasted essay can't run up the token bill.
+  const title = params.eventTitle.slice(0, 120);
+  const speaker = params.speaker?.slice(0, 80);
+  const date = params.eventDate?.slice(0, 80);
   const text = await generateText({
     maxTokens: 100,
-    prompt: `Write ONE short, warm, inviting tagline (under 10 words, no quotation marks) for a church event poster. Event: "${params.eventTitle}"${params.speaker ? `, speaker: ${params.speaker}` : ""}${params.eventDate ? `, on ${params.eventDate}` : ""}. Respond with ONLY the tagline text, nothing else.`,
+    prompt: `Write ONE short, warm, inviting tagline (under 10 words, no quotation marks) for a church event poster. Event: "${title}"${speaker ? `, speaker: ${speaker}` : ""}${date ? `, on ${date}` : ""}. Respond with ONLY the tagline text, nothing else.`,
   });
-  return { tagline: text?.replace(/^["']|["']$/g, "") || fallback };
+  if (!text) return { tagline: FALLBACK_TAGLINE, notice: "The AI didn't respond — here's a standard tagline instead." };
+  return { tagline: text.replace(/^["']|["']$/g, "").slice(0, 120) };
 }
 
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentAppUser } from "@/lib/current-user";
+const optionalText = (max: number) => z.string().trim().max(max, `Keep this under ${max} characters.`).optional();
 
-export async function savePoster(formData: FormData) {
-  const me = await getCurrentAppUser();
-  if (!me || !["church_admin", "pastor", "department_leader"].includes(me.role)) return;
+const PosterSchema = z.object({
+  eventTitle: z.string().trim().min(1, "Give the event a title.").max(120, "Keep the title under 120 characters."),
+  tagline: optionalText(120),
+  speaker: optionalText(80),
+  eventDate: optionalText(80),
+  location: optionalText(120),
+  templateKey: z.enum(POSTER_TEMPLATES),
+  themeColor: z.string().refine(isHexColor, "Choose one of the colours."),
+  format: z.enum(POSTER_FORMATS),
+});
+
+/** Form fields: event_title, tagline?, speaker?, event_date?, location?, template_key, theme_color, format */
+export async function savePoster(_prev: { error?: string } | null, formData: FormData): Promise<{ error?: string } | null> {
+  const me = await requirePosterMaker();
+  if (!me) return { error: "Only pastors, admins and department leaders can save posters. If you are one, sign in again." };
+
+  const parsed = PosterSchema.safeParse({
+    eventTitle: formData.get("event_title"),
+    tagline: formData.get("tagline") || undefined,
+    speaker: formData.get("speaker") || undefined,
+    eventDate: formData.get("event_date") || undefined,
+    location: formData.get("location") || undefined,
+    templateKey: formData.get("template_key"),
+    themeColor: formData.get("theme_color"),
+    format: formData.get("format"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Please check the poster details." };
+  const p = parsed.data;
 
   const supabase = createClient();
-  await supabase.from("posters").insert({
-    church_id: me.church_id,
-    created_by: me.id,
-    event_title: String(formData.get("event_title") || ""),
-    tagline: String(formData.get("tagline") || "") || null,
-    speaker: String(formData.get("speaker") || "") || null,
-    event_date: String(formData.get("event_date") || "") || null,
-    location: String(formData.get("location") || "") || null,
-    template_key: String(formData.get("template_key") || "classic"),
-    theme_color: String(formData.get("theme_color") || "#b45309"),
-    format: String(formData.get("format") || "square"),
-  });
+  const { data: poster, error } = await supabase
+    .from("posters")
+    .insert({
+      church_id: me.church_id,
+      created_by: me.id,
+      event_title: p.eventTitle,
+      tagline: p.tagline ?? null,
+      speaker: p.speaker ?? null,
+      event_date: p.eventDate ?? null,
+      location: p.location ?? null,
+      template_key: p.templateKey,
+      theme_color: p.themeColor,
+      format: p.format,
+    })
+    .select("id")
+    .single();
+  if (error || !poster) {
+    console.error("[posters] save failed:", error?.message);
+    return { error: "Couldn't save the poster — please try again. Your design is still here." };
+  }
 
-  redirect("/dashboard/posters");
+  redirect(`/dashboard/posters/${poster.id}`);
 }

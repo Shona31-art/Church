@@ -1,39 +1,32 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { checkModuleAccess } from "@/lib/paywall";
-import { getCurrentAppUser } from "@/lib/current-user";
+import { normalizePosterStyle } from "@/lib/posters";
 import { PosterPreview } from "../PosterCanvas";
 
 export default async function PosterDetailPage({ params }: { params: { id: string } }) {
   const access = await checkModuleAccess("ai_poster");
   if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
 
-  const me = await getCurrentAppUser();
   const supabase = createClient();
-
-  const { data: poster } = await supabase.from("posters").select("*").eq("id", params.id).single();
+  const { data: poster } = await supabase.from("posters").select("*, churches(name)").eq("id", params.id).single();
   if (!poster) notFound();
-
-  const { data: church } = await supabase
-    .from("churches")
-    .select("name")
-    .eq("id", me!.church_id)
-    .single();
 
   return (
     <div className="max-w-md">
-      <h1 className="text-2xl font-semibold mb-4">{poster.event_title}</h1>
+      <Link href="/dashboard/posters" className="text-sm text-ink/50 hover:text-ink">← Posters</Link>
+      <h1 className="text-2xl font-semibold mt-2 mb-4">{poster.event_title}</h1>
       <PosterPreview
         data={{
-          churchName: church?.name || "",
+          // The poster's own church, so it renders correctly for super admins too.
+          churchName: poster.churches?.name ?? "",
           eventTitle: poster.event_title,
-          tagline: poster.tagline,
-          speaker: poster.speaker,
-          eventDate: poster.event_date,
-          location: poster.location,
-          templateKey: poster.template_key,
-          themeColor: poster.theme_color,
-          format: poster.format,
+          tagline: poster.tagline ?? undefined,
+          speaker: poster.speaker ?? undefined,
+          eventDate: poster.event_date ?? undefined,
+          location: poster.location ?? undefined,
+          ...normalizePosterStyle(poster),
         }}
       />
     </div>

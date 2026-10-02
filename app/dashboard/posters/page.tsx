@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { checkModuleAccess } from "@/lib/paywall";
 import { getCurrentAppUser } from "@/lib/current-user";
+import { isPosterRole } from "@/lib/posters";
 
 export default async function PostersPage() {
   const access = await checkModuleAccess("ai_poster");
@@ -10,13 +11,14 @@ export default async function PostersPage() {
   const me = await getCurrentAppUser();
   const supabase = createClient();
 
-  const { data: posters } = await supabase
+  const { data: posters, error } = await supabase
     .from("posters")
     .select("id, event_title, event_date, template_key")
     .eq("church_id", me!.church_id)
     .order("created_at", { ascending: false });
+  if (error) console.error("[posters] list failed:", error.message);
 
-  const canCreate = me && ["church_admin", "pastor", "department_leader"].includes(me.role);
+  const canCreate = isPosterRole(me?.role);
 
   return (
     <div className="max-w-2xl">
@@ -43,7 +45,14 @@ export default async function PostersPage() {
             <p className="text-xs text-ink/40">{p.event_date}</p>
           </Link>
         ))}
-        {!posters?.length && <p className="text-ink/40 text-sm col-span-full">No posters yet.</p>}
+        {error && (
+          <p role="alert" className="text-sm text-red-700 col-span-full">⚠ Couldn't load posters — refresh the page to try again.</p>
+        )}
+        {!error && !posters?.length && (
+          <p className="text-ink/40 text-sm col-span-full">
+            No posters yet.{canCreate && " Use “New poster” to design one for your next event in a couple of minutes."}
+          </p>
+        )}
       </div>
     </div>
   );

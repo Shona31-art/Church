@@ -32,6 +32,7 @@ export const MIGRATION_ORDER = [
   "giving_schema.sql",
   "church_os_features_schema.sql",
   "booking_security_fix.sql",
+  "support_security_fix.sql",
 ];
 
 const SUPABASE_STUBS = `
@@ -44,7 +45,7 @@ const SUPABASE_STUBS = `
   create or replace function auth.jwt() returns jsonb language sql stable as $$ select '{}'::jsonb $$;
 
   create schema if not exists storage;
-  create table storage.buckets (id text primary key, name text, public boolean);
+  create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
   create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text, owner uuid);
   create or replace function storage.foldername(name text) returns text[] language sql immutable as $$
     select string_to_array(name, '/')

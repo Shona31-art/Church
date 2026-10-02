@@ -9,8 +9,9 @@ earlier web build with the features of the Android "Church OS" prototype
 > this app, run `supabase/security_fix_app_users.sql` on it now.** It closes a
 > privilege-escalation hole (any member could make themselves church admin or
 > platform super admin). Then run `supabase/church_os_features_schema.sql`
-> and `supabase/booking_security_fix.sql` (members could submit a booking
-> that was already "approved").
+> `supabase/booking_security_fix.sql` (members could submit a booking that
+> was already "approved") and `supabase/support_security_fix.sql` (anyone could
+> upload any file anywhere in the attachments bucket).
 
 ---
 
@@ -54,10 +55,14 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 17 | `giving_schema.sql` | Giving records (**was missing from the old README**) |
 | 18 | `church_os_features_schema.sql` | Pastoral care log, birthdays, prayer wall, verse puzzle, AI rate limiting, member deletion fixes |
 | 19 | `booking_security_fix.sql` | **Required.** Booking requests must start "pending"; availability blocks locked to your own church and pastors |
+| 20 | `support_security_fix.sql` | **Required.** Support screenshots: own-folder uploads, 5 MB image-only limit, readable only by people on the ticket |
 
 Two manual dashboard steps:
 
-1. **Storage → New bucket** named `attachments`, marked Public — *before* step 14.
+1. **Storage → New bucket** named `attachments` — *before* step 14. Step 20
+   sets its size/type limits. Leave it **private** on a new project: the app
+   shows screenshots through short-lived signed links, so it doesn't need to
+   be public. (Existing projects: see "Known gaps".)
 2. **Database → Replication**: enable `chat_messages` (or run
    `alter publication supabase_realtime add table chat_messages;`). Without it,
    chat works but only updates on refresh.
@@ -190,6 +195,7 @@ Every rule is enforced server-side and in Postgres RLS; menus only hide links.
 | Bible reader / study AI | `app/dashboard/bible/`, `lib/bible.ts` |
 | Games (quiz, word search, verse puzzle) | `app/dashboard/games/`, `lib/verse-puzzle.ts` |
 | Announcement AI writer | `app/dashboard/announcements/new/` |
+| Support desk, screenshot upload rules | `app/dashboard/support/`, `lib/support.ts` (tested), `lib/support-schemas.ts` |
 | Session refresh & login redirects | `middleware.ts`, `app/login/` |
 | Audit logging | `lib/audit.ts` |
 | Crisis keywords & helplines | `lib/crisis-detection.ts` |
@@ -258,8 +264,14 @@ Every rule is enforced server-side and in Postgres RLS; menus only hide links.
 - **Design:** kept the existing navy/gold "Grace-bound" direction agreed in an
   earlier session (not the Aperture default). Older interior pages (booking,
   service planner, support) haven't had a visual pass.
-- **Remaining silent failures:** older forms in service planner, posters,
-  support and super admin still return silently on some errors. Booking is
+- **Attachments bucket is still public on existing projects.** Anyone with a
+  screenshot's link can open it. After deploying this version, run
+  `update storage.buckets set public = false where id = 'attachments';`
+  (nothing in the app breaks — it already uses signed links).
+  `support_ticket_messages.attachment_url` is now unused but kept so no data
+  is lost; drop it once you've confirmed old attachments still show.
+- **Remaining silent failures:** older forms in service planner, posters and
+  super admin still return silently on some errors. Booking is
   done and is the pattern to copy: Zod schema → `useFormState` + `{ error }`
   → audit log for approvals (`app/dashboard/booking/`).
 - **Booking requesters can't cancel** their own request yet (by design in the

@@ -1,39 +1,53 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useFormState } from "react-dom";
 import { FileUpload } from "../FileUpload";
 import { replyToTicket } from "./actions";
+import { PendingButton } from "@/components/ConfirmSubmitButton";
 
 export function ReplyForm({ ticketId }: { ticketId: string }) {
-  const [attachmentUrl, setAttachmentUrl] = useState("");
+  const [state, formAction] = useFormState(replyToTicket, null);
+  const [attachmentPath, setAttachmentPath] = useState("");
   const [showUpload, setShowUpload] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Clear the box after a successful send; on error the text stays put.
+  useEffect(() => {
+    if (state?.ok) {
+      formRef.current?.reset();
+      setAttachmentPath("");
+      setShowUpload(false);
+    }
+  }, [state]);
 
   return (
-    <form action={replyToTicket.bind(null, ticketId)} className="space-y-2 mb-4">
+    <form ref={formRef} action={formAction} className="space-y-2 mb-4">
+      <input type="hidden" name="ticket_id" value={ticketId} />
+      <label htmlFor="reply" className="block text-sm font-medium">Reply</label>
       <div className="flex gap-2">
-        <input
-          name="content"
-          placeholder="Type a reply..."
-          required
-          className="flex-1 border border-ink/20 rounded-lg px-4 py-2 text-sm"
-        />
+        <input id="reply" name="content" required maxLength={5000} className="flex-1 border border-ink/20 rounded-lg px-4 py-2 text-sm" />
         <button
           type="button"
           onClick={() => setShowUpload((s) => !s)}
+          aria-expanded={showUpload}
+          aria-label="Attach a screenshot"
           className="text-xs border border-ink/20 rounded-lg px-3"
         >
           📎
         </button>
-        <button type="submit" className="bg-ember text-white px-4 py-2 rounded-lg text-sm">
+        <PendingButton pendingLabel="Sending…" className="bg-ember text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50">
           Send
-        </button>
+        </PendingButton>
       </div>
       {showUpload && (
         <div>
-          <FileUpload onUploaded={setAttachmentUrl} />
-          <input type="hidden" name="attachment_url" value={attachmentUrl} />
+          <label htmlFor="reply-attachment" className="sr-only">Screenshot</label>
+          <FileUpload id="reply-attachment" onUploaded={setAttachmentPath} />
+          <input type="hidden" name="attachment_path" value={attachmentPath} />
         </div>
       )}
+      {state?.error && <p role="alert" className="text-sm text-red-700">⚠ {state.error}</p>}
     </form>
   );
 }

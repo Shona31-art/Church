@@ -23,7 +23,8 @@ export default async function SupportPage() {
     query = query.eq("created_by", me!.id);
   }
 
-  const { data: tickets } = await query;
+  const { data: tickets, error } = await query;
+  if (error) console.error("[support] list failed:", error.message);
 
   return (
     <div className="max-w-2xl">
@@ -56,7 +57,12 @@ export default async function SupportPage() {
             <StatusBadge status={t.status} />
           </Link>
         ))}
-        {!tickets?.length && <p className="text-ink/40 text-sm">No tickets yet.</p>}
+        {error && (
+          <p role="alert" className="text-sm text-red-700">⚠ Couldn't load tickets — refresh the page to try again.</p>
+        )}
+        {!error && !tickets?.length && (
+          <p className="text-ink/40 text-sm">No tickets yet. If something in the app isn't working, open a ticket and we'll help.</p>
+        )}
       </div>
     </div>
   );

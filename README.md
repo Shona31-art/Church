@@ -8,7 +8,9 @@ earlier web build with the features of the Android "Church OS" prototype
 > ⚠ **If you already have a Supabase database running an earlier version of
 > this app, run `supabase/security_fix_app_users.sql` on it now.** It closes a
 > privilege-escalation hole (any member could make themselves church admin or
-> platform super admin). Then run `supabase/church_os_features_schema.sql`.
+> platform super admin). Then run `supabase/church_os_features_schema.sql`
+> and `supabase/booking_security_fix.sql` (members could submit a booking
+> that was already "approved").
 
 ---
 
@@ -51,6 +53,7 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 16 | `bible_games_v2_schema.sql` | Church-specific questions, game types |
 | 17 | `giving_schema.sql` | Giving records (**was missing from the old README**) |
 | 18 | `church_os_features_schema.sql` | Pastoral care log, birthdays, prayer wall, verse puzzle, AI rate limiting, member deletion fixes |
+| 19 | `booking_security_fix.sql` | **Required.** Booking requests must start "pending"; availability blocks locked to your own church and pastors |
 
 Two manual dashboard steps:
 
@@ -122,7 +125,8 @@ pnpm build       # production build
 Postgres** (PGlite — Postgres compiled to WebAssembly, no Docker needed) and
 then act as real signed-in users with RLS enforced: privilege escalation,
 cross-church access, pastoral-note confidentiality, prayer-wall visibility,
-journal privacy, audit-log integrity and member erasure. GitHub Actions
+journal privacy, audit-log integrity, member erasure, and booking requests
+that can't skip approval. GitHub Actions
 (`.github/workflows/ci.yml`) runs all four checks on every push.
 
 ---
@@ -180,6 +184,7 @@ Every rule is enforced server-side and in Postgres RLS; menus only hide links.
 | Dashboard home | `app/dashboard/page.tsx` |
 | Prayer board / wall / AI prayer drafts | `app/dashboard/prayer-board/` (`actions.ts` holds all server logic) |
 | Pastoral care log | `app/dashboard/pastoral-care/`, types in `lib/pastoral-care.ts` |
+| Pastor booking: types, statuses, allowed approvals | `lib/booking.ts` (tested); input validation `lib/booking-schemas.ts`; actions in `app/dashboard/booking/**/actions.ts` |
 | Birthday reminder logic | `lib/birthdays.ts` (tested) |
 | Member edit, deletion, POPIA export | `app/dashboard/members/[id]/`, `app/api/members/[id]/export/route.ts` |
 | Bible reader / study AI | `app/dashboard/bible/`, `lib/bible.ts` |
@@ -253,9 +258,12 @@ Every rule is enforced server-side and in Postgres RLS; menus only hide links.
 - **Design:** kept the existing navy/gold "Grace-bound" direction agreed in an
   earlier session (not the Aperture default). Older interior pages (booking,
   service planner, support) haven't had a visual pass.
-- **Remaining silent failures:** older forms in booking, service planner,
-  posters, support and super admin still return silently on some errors.
-  The pattern to copy is `useFormState` + `{ error }` (see prayer board).
+- **Remaining silent failures:** older forms in service planner, posters,
+  support and super admin still return silently on some errors. Booking is
+  done and is the pattern to copy: Zod schema → `useFormState` + `{ error }`
+  → audit log for approvals (`app/dashboard/booking/`).
+- **Booking requesters can't cancel** their own request yet (by design in the
+  original schema — it needs its own explicit "cancel" action).
 - **Crisis detection** is keyword matching — a tripwire, not a safety system.
   Review with a mental-health professional; helplines are South African.
 - **Bible text** comes live from bible-api.com (WEB, public domain). If that

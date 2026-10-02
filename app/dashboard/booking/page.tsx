@@ -17,7 +17,7 @@ export default async function BookingPage() {
     .eq("church_id", me!.church_id)
     .order("preferred_date", { ascending: true });
 
-  const { data: bookings } = isPastorOrAdmin ? await query : await query.eq("requested_by", me!.id);
+  const { data: bookings, error } = isPastorOrAdmin ? await query : await query.eq("requested_by", me!.id);
 
   return (
     <div className="max-w-2xl">
@@ -61,7 +61,14 @@ export default async function BookingPage() {
             <StatusBadge status={b.status} />
           </Link>
         ))}
-        {!bookings?.length && <p className="text-ink/40 text-sm">No requests yet.</p>}
+        {error && (
+          <p role="alert" className="text-sm text-red-700">⚠ Couldn't load booking requests — refresh the page to try again.</p>
+        )}
+        {!error && !bookings?.length && (
+          <p className="text-ink/40 text-sm">
+            {isPastorOrAdmin ? "No booking requests yet." : "You haven't requested a booking yet — use “Request booking” to ask a pastor for a wedding, baptism, counselling and more."}
+          </p>
+        )}
       </div>
     </div>
   );

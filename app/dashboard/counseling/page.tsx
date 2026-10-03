@@ -1,78 +1,126 @@
-import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { checkModuleAccess } from "@/lib/paywall";
 import { getCurrentAppUser } from "@/lib/current-user";
+import { moduleGate } from "@/lib/gate";
+import { can } from "@/lib/permissions";
+import { formatDateTime, formatRelative } from "@/lib/format";
+import { PageHeader, Section } from "@/components/ui/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Alert } from "@/components/ui/Alert";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { PendingButton } from "@/components/ConfirmSubmitButton";
+import { startConversation } from "./actions";
 
 export default async function CounselingHome() {
-  const access = await checkModuleAccess("ai_counseling");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+  const gate = await moduleGate("ai_counseling");
+  if (gate) return gate;
 
-  const me = await getCurrentAppUser();
+  const me = (await getCurrentAppUser())!;
+  const reviewer = can(me.role, "reviewCounseling");
   const supabase = createClient();
 
-  const { data: settings } = await supabase
-    .from("counseling_settings")
-    .select("enabled")
-    .eq("church_id", me!.church_id)
-    .maybeSingle();
+  const [{ data: settings }, { data: mine }, review] = await Promise.all([
+    supabase.from("counseling_settings").select("enabled").eq("church_id", me.church_id).maybeSingle(),
+    supabase.from("counseling_conversations").select("id, started_at, last_message_at, flagged, shared_with_pastor").eq("member_id", me.id).order("last_message_at", { ascending: false }).limit(50),
+    reviewer
+      ? supabase
+          .from("counseling_conversations")
+          .select("id, last_message_at, flagged, flagged_at, shared_with_pastor, member:app_users!counseling_conversations_member_id_fkey(name), counseling_escalations(acknowledged_at)")
+          .eq("church_id", me.church_id)
+          .neq("member_id", me.id)
+          .or("flagged.eq.true,shared_with_pastor.eq.true")
+          .order("last_message_at", { ascending: false })
+          .limit(50)
+      : Promise.resolve({ data: null }),
+  ]);
 
-  if (!settings?.enabled) {
-    return (
-      <p className="text-ink/60 max-w-md">
-        AI Counseling hasn't been turned on for your church yet. Ask your
-        church admin to enable it in settings.
-      </p>
-    );
-  }
-
-  const { data: conversations } = await supabase
-    .from("counseling_conversations")
-    .select("id, started_at, last_message_at, flagged")
-    .eq("member_id", me!.id)
-    .order("last_message_at", { ascending: false });
-
-  async function startConversation() {
-    "use server";
-    const me = await getCurrentAppUser();
-    if (!me) return;
-
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("counseling_conversations")
-      .insert({ church_id: me.church_id, member_id: me.id })
-      .select("id")
-      .single();
-
-    if (data) redirect(`/dashboard/counseling/${data.id}`);
-  }
+  const enabled = Boolean(settings?.enabled);
+  const reviewItems: any[] = review.data ?? [];
+  const needsFollowUp = reviewItems.filter((c) => c.flagged && (c.counseling_escalations ?? []).some((e: any) => !e.acknowledged_at));
 
   return (
-    <div className="max-w-lg">
-      <h1 className="text-2xl font-semibold mb-2">Christian Counseling</h1>
-      <p className="text-xs text-ink/50 mb-6 border border-ink/10 rounded-lg p-3 bg-white/60">
-        This isn't a substitute for pastoral care, therapy, or medical help.
-        In a crisis, this chat will point you to a real person immediately,
-        and may notify a pastor so they can follow up with you directly.
-      </p>
+    <div className="max-w-3xl space-y-6">
+      <PageHeader
+        title="Christian counseling"
+        description="A private, scripture-based space to talk things through. Not a substitute for pastoral care, therapy or medical help."
+        actions={
+          <>
+            {can(me.role, "configureCounseling") && (
+              <Link href="/dashboard/counseling/settings" className="btn-secondary">
+                Settings
+              </Link>
+            )}
+            {enabled && (
+              <form action={startConversation}>
+                <PendingButton pendingLabel="Starting…">New conversation</PendingButton>
+              </form>
+            )}
+          </>
+        }
+      />
 
-      <form action={startConversation} className="mb-8">
-        <button type="submit" className="bg-ember text-white px-6 py-3 rounded-lg font-medium">
-          Start a new conversation
-        </button>
-      </form>
+      {reviewer && (
+        <Section title="Pastoral review" description="Conversations members shared with you, and ones flagged for safety. Others stay private.">
+          {needsFollowUp.length > 0 && (
+            <Alert tone="error" title={`${needsFollowUp.length} flagged conversation${needsFollowUp.length === 1 ? "" : "s"} need follow-up`} className="mb-4">
+              Crisis language was detected. Reach out to the member, then mark it followed up.
+            </Alert>
+          )}
+          {reviewItems.length === 0 ? (
+            <p className="text-sm text-ink/60">Nothing to review. Members&apos; conversations are private unless they share them or a safety flag is raised.</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {reviewItems.map((c) => {
+                const open = c.flagged && (c.counseling_escalations ?? []).some((e: any) => !e.acknowledged_at);
+                return (
+                  <li key={c.id}>
+                    <Link href={`/dashboard/counseling/${c.id}`} className="flex flex-wrap items-center justify-between gap-2 py-3 hover:bg-ink/[0.02] -mx-2 px-2 rounded-lg">
+                      <span className="font-medium">{c.member?.name ?? "Former member"}</span>
+                      <span className="flex flex-wrap items-center gap-2">
+                        {open ? <StatusBadge tone="danger">Needs follow-up</StatusBadge> : c.flagged ? <StatusBadge tone="neutral">Followed up</StatusBadge> : null}
+                        {c.shared_with_pastor && <StatusBadge tone="info">Shared</StatusBadge>}
+                        <span className="text-xs text-ink/50">{formatRelative(c.last_message_at)}</span>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Section>
+      )}
 
-      <div className="space-y-2">
-        {conversations?.map((c) => (
-          <a
-            key={c.id}
-            href={`/dashboard/counseling/${c.id}`}
-            className="block border border-ink/10 rounded-lg p-3 bg-white/60 hover:bg-white text-sm"
-          >
-            {new Date(c.started_at).toLocaleDateString()}
-            {c.flagged && <span className="ml-2 text-xs text-red-600">flagged</span>}
-          </a>
-        ))}
-      </div>
+      {!enabled ? (
+        <EmptyState
+          icon="🤝"
+          title="AI counseling isn't turned on for your church"
+          description={can(me.role, "configureCounseling") ? "Turn it on in Settings when you're ready." : "Ask your church admin or pastor if they plan to enable it."}
+          action={
+            can(me.role, "configureCounseling") ? (
+              <Link href="/dashboard/counseling/settings" className="btn-primary">
+                Open settings
+              </Link>
+            ) : undefined
+          }
+        />
+      ) : (
+        <Section title="My conversations" description="🔒 Only you can read these unless you choose to share one with a pastor.">
+          {!mine?.length ? (
+            <p className="text-sm text-ink/60">You haven&apos;t started a conversation yet. Use “New conversation” whenever you&apos;re ready.</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {mine.map((c) => (
+                <li key={c.id}>
+                  <Link href={`/dashboard/counseling/${c.id}`} className="flex flex-wrap items-center justify-between gap-2 py-3 hover:bg-ink/[0.02] -mx-2 px-2 rounded-lg">
+                    <span className="text-sm">Started {formatDateTime(c.started_at)}</span>
+                    <span className="flex gap-2">{c.shared_with_pastor && <StatusBadge tone="info">Shared with pastors</StatusBadge>}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+      )}
     </div>
   );
 }

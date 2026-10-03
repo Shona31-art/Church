@@ -1,149 +1,119 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { checkModuleAccess } from "@/lib/paywall";
 import { getCurrentAppUser } from "@/lib/current-user";
-import { getCounselingReply } from "../actions";
+import { moduleGate } from "@/lib/gate";
+import { can } from "@/lib/permissions";
+import { formatDateTime } from "@/lib/format";
+import { SA_CRISIS_RESOURCES } from "@/lib/crisis-detection";
+import { PageHeader, Section } from "@/components/ui/PageHeader";
+import { Alert } from "@/components/ui/Alert";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { AcknowledgeForm, MessageComposer, ShareToggle } from "../CounselingForms";
 
-export default async function CounselingChatPage({ params }: { params: { id: string } }) {
-  const access = await checkModuleAccess("ai_counseling");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+export default async function CounselingConversationPage({ params }: { params: { id: string } }) {
+  const gate = await moduleGate("ai_counseling");
+  if (gate) return gate;
+  if (!z.string().uuid().safeParse(params.id).success) notFound();
 
-  const me = await getCurrentAppUser();
+  const me = (await getCurrentAppUser())!;
   const supabase = createClient();
-
+  // RLS returns this only to the member, or to a pastor/admin if it was
+  // shared or flagged. Anyone else gets "not found".
   const { data: conversation } = await supabase
     .from("counseling_conversations")
-    .select("*")
+    .select("*, member:app_users!counseling_conversations_member_id_fkey(name)")
     .eq("id", params.id)
-    .eq("member_id", me!.id) // extra guard on top of RLS: this page only ever renders the member's own chat
-    .single();
-
+    .eq("church_id", me.church_id)
+    .maybeSingle();
   if (!conversation) notFound();
 
-  const { data: messages } = await supabase
-    .from("counseling_messages")
-    .select("*")
-    .eq("conversation_id", params.id)
-    .order("created_at");
+  const isOwner = conversation.member_id === me.id;
+  const [{ data: messages, error }, { data: escalations }, { data: settings }] = await Promise.all([
+    supabase.from("counseling_messages").select("id, sender, content, created_at").eq("conversation_id", params.id).order("created_at").limit(500),
+    !isOwner && can(me.role, "reviewCounseling")
+      ? supabase.from("counseling_escalations").select("id, acknowledged_at, outcome_notes, notified:app_users!counseling_escalations_notified_user_id_fkey(name)").eq("conversation_id", params.id)
+      : Promise.resolve({ data: null }),
+    supabase.from("counseling_settings").select("enabled").eq("church_id", me.church_id).maybeSingle(),
+  ]);
 
-  const { data: settings } = await supabase
-    .from("counseling_settings")
-    .select("*")
-    .eq("church_id", me!.church_id)
-    .maybeSingle();
-
-  async function sendMessage(formData: FormData) {
-    "use server";
-    const me = await getCurrentAppUser();
-    if (!me) return;
-
-    const content = String(formData.get("content") || "").trim();
-    if (!content) return;
-
-    const supabase = createClient();
-
-    await supabase.from("counseling_messages").insert({
-      conversation_id: params.id,
-      sender: "member",
-      content,
-    });
-
-    const { data: history } = await supabase
-      .from("counseling_messages")
-      .select("sender, content")
-      .eq("conversation_id", params.id)
-      .order("created_at");
-
-    const { data: settings } = await supabase
-      .from("counseling_settings")
-      .select("*")
-      .eq("church_id", me.church_id)
-      .maybeSingle();
-
-    const { reply, isCrisis } = await getCounselingReply({
-      history: (history || []) as any,
-      theologicalStance: settings?.theological_stance,
-    });
-
-    await supabase.from("counseling_messages").insert({
-      conversation_id: params.id,
-      sender: "assistant",
-      content: reply,
-    });
-
-    if (isCrisis) {
-      await supabase
-        .from("counseling_conversations")
-        .update({ flagged: true, flagged_at: new Date().toISOString(), flagged_reason: "crisis_language_detected" })
-        .eq("id", params.id);
-
-      // Resolve who to notify: configured pastor, or fall back to any pastor/church_admin
-      let notifyId = settings?.escalation_pastor_id;
-      if (!notifyId) {
-        const { data: fallback } = await supabase
-          .from("app_users")
-          .select("id")
-          .eq("church_id", me.church_id)
-          .in("role", ["pastor", "church_admin"])
-          .limit(1)
-          .maybeSingle();
-        notifyId = fallback?.id;
-      }
-
-      await supabase.from("counseling_escalations").insert({
-        conversation_id: params.id,
-        notified_user_id: notifyId,
-      });
-      // In production: also send an actual notification (email/push) to
-      // notifyId here — this insert alone doesn't page anyone yet.
-    }
-
-    redirect(`/dashboard/counseling/${params.id}`);
-  }
+  const openEscalation = (escalations ?? []).some((e: any) => !e.acknowledged_at);
+  const acknowledged = (escalations ?? []).find((e: any) => e.acknowledged_at);
 
   return (
-    <div className="max-w-lg flex flex-col h-[80vh]">
-      <h1 className="text-xl font-semibold mb-1">Conversation</h1>
-      {conversation.flagged && (
-        <p className="text-xs text-red-600 mb-2">
-          A pastor has been notified about this conversation.
-        </p>
+    <div className="max-w-3xl space-y-6">
+      <PageHeader
+        back={{ href: "/dashboard/counseling", label: "Counseling" }}
+        title={isOwner ? "Conversation" : `Conversation with ${conversation.member?.name ?? "a member"}`}
+        description={`Started ${formatDateTime(conversation.started_at)}`}
+        meta={
+          <>
+            {conversation.flagged && <StatusBadge tone="danger">Safety flag</StatusBadge>}
+            {conversation.shared_with_pastor && <StatusBadge tone="info">Shared with pastors</StatusBadge>}
+          </>
+        }
+        actions={isOwner ? <ShareToggle conversationId={conversation.id} shared={conversation.shared_with_pastor} /> : null}
+      />
+
+      {isOwner && conversation.flagged && (
+        <Alert tone="warning" title="A pastor has been told about this conversation">
+          <p className="whitespace-pre-line">{SA_CRISIS_RESOURCES}</p>
+        </Alert>
       )}
-      <p className="text-xs text-ink/40 mb-4">
-        Not a substitute for pastoral care or professional help.
-      </p>
 
-      <div className="flex-1 overflow-y-auto space-y-3 mb-4">
-        {messages?.map((m) => (
-          <div
-            key={m.id}
-            className={`rounded-xl p-3 text-sm max-w-[85%] whitespace-pre-wrap ${
-              m.sender === "member"
-                ? "bg-ember text-white ml-auto"
-                : "bg-white/70 border border-ink/10"
-            }`}
-          >
-            {m.content}
-          </div>
-        ))}
-        {!messages?.length && (
-          <p className="text-ink/40 text-sm">
-            Share what's on your mind — this is a safe place to start.
-          </p>
+      {!isOwner && (
+        <Alert tone="info">
+          {conversation.flagged
+            ? "You can see this conversation because crisis language was detected. Please reach out to the member directly."
+            : "The member chose to share this conversation with their pastors."}
+        </Alert>
+      )}
+
+      <section aria-label="Messages" className="card-elevated rounded-2xl p-4 sm:p-5">
+        {error ? (
+          <Alert tone="error">Couldn&apos;t load the messages — refresh the page to try again.</Alert>
+        ) : !messages?.length ? (
+          <p className="text-sm text-ink/60">Share what&apos;s on your mind — this is a safe place to start.</p>
+        ) : (
+          <ol className="space-y-3">
+            {messages.map((m) => {
+              const fromMember = m.sender === "member";
+              return (
+                <li key={m.id} className={`flex ${fromMember ? "justify-end" : "justify-start"}`}>
+                  <div className={`rounded-2xl px-4 py-3 text-sm max-w-[85%] whitespace-pre-wrap ${fromMember ? "bg-ember text-white" : "bg-parchment border border-line"}`}>
+                    <span className="sr-only">{fromMember ? (isOwner ? "You" : "Member") : "Assistant"}: </span>
+                    {m.content}
+                    <time className={`block mt-1 text-[11px] ${fromMember ? "text-white/70" : "text-ink/50"}`} dateTime={m.created_at}>
+                      {formatDateTime(m.created_at, { weekday: undefined })}
+                    </time>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
         )}
-      </div>
+        {isOwner && settings?.enabled && (
+          <div className="mt-5 border-t border-line pt-4">
+            <MessageComposer conversationId={conversation.id} />
+            <p className="text-xs text-ink/50 mt-2">Not a substitute for pastoral care or professional help. In an emergency call 10111 or SADAG on 0800 567 567.</p>
+          </div>
+        )}
+      </section>
 
-      <form action={sendMessage} className="flex gap-2">
-        <input
-          name="content"
-          placeholder="Type your message..."
-          required
-          className="flex-1 border border-ink/20 rounded-lg px-4 py-3"
-        />
-        <button type="submit" className="bg-ember text-white px-5 py-3 rounded-lg font-medium">
-          Send
-        </button>
-      </form>
+      {!isOwner && conversation.flagged && (
+        <Section title="Pastoral follow-up">
+          {openEscalation ? (
+            <AcknowledgeForm conversationId={conversation.id} />
+          ) : acknowledged ? (
+            <div className="text-sm">
+              <p>Followed up {formatDateTime(acknowledged.acknowledged_at)}.</p>
+              {acknowledged.outcome_notes && <p className="mt-2 text-ink/70 whitespace-pre-line">{acknowledged.outcome_notes}</p>}
+            </div>
+          ) : (
+            <p className="text-sm text-ink/60">No escalation was recorded.</p>
+          )}
+        </Section>
+      )}
     </div>
   );
 }

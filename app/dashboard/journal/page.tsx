@@ -1,63 +1,75 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { decryptJournalContent } from "@/lib/encryption";
+import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
+import { readJournalRow, isJournalEncryptionConfigured } from "@/lib/encryption";
+import { formatDate } from "@/lib/format";
+import { PAGE_SIZE, buildQuery, pageFrom } from "@/lib/list";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Alert } from "@/components/ui/Alert";
+import { Pagination } from "@/components/ui/Pagination";
+import { DeleteEntry } from "./JournalForms";
 
-export default async function JournalPage() {
+export default async function JournalPage({ searchParams }: { searchParams: { page?: string } }) {
   const gate = await moduleGate("journal");
   if (gate) return gate;
 
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const me = (await getCurrentAppUser())!;
+  const page = pageFrom(searchParams.page);
+  const configured = isJournalEncryptionConfigured();
 
-  // RLS already restricts this to rows where user_id = auth.uid() — this
-  // query cannot return anyone else's entries even if the code had a bug,
-  // because the database itself enforces it.
-  const { data: entries } = await supabase
+  // RLS restricts this to the author's own rows — no admin can read them.
+  const { data, error } = await createClient()
     .from("journal_entries")
-    .select("*")
-    .eq("user_id", user!.id)
-    .order("entry_date", { ascending: false });
+    .select("id, encrypted_content, iv, auth_tag, entry_date, created_at")
+    .eq("user_id", me.id)
+    .order("created_at", { ascending: false })
+    .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  if (error) console.error("[journal] load failed:", error.message);
 
-  const decrypted = (entries || []).map((e) => ({
-    ...e,
-    content: decryptJournalContent({
-      encrypted_content: Buffer.from(e.encrypted_content),
-      iv: Buffer.from(e.iv),
-      auth_tag: Buffer.from(e.auth_tag),
-    }),
-  }));
+  const entries = (data ?? []).slice(0, PAGE_SIZE).map((e) => ({ id: e.id, date: e.entry_date ?? e.created_at, content: configured ? readJournalRow(e) : null }));
+  const newButton = (
+    <Link href="/dashboard/journal/new" className="btn-primary">
+      New entry
+    </Link>
+  );
 
   return (
-    <div className="max-w-2xl">
-      <div className="flex items-center justify-between mb-2">
-        <h1 className="text-2xl font-semibold">My Journal</h1>
-        <Link
-          href="/dashboard/journal/new"
-          className="bg-ember text-white px-4 py-2 rounded-lg text-sm font-medium"
-        >
-          + New entry
-        </Link>
-      </div>
-      <p className="text-xs text-ink/40 mb-6">
-        🔒 Private by default. Only you can read these — not your pastor, not
-        your church admin, not the platform owner.
-      </p>
+    <div className="max-w-3xl">
+      <PageHeader
+        title="My journal"
+        description="🔒 Private and encrypted. Only you can read these — not your pastor, not your church admin, not the platform owner."
+        actions={configured ? newButton : null}
+      />
 
-      {!decrypted.length && (
-        <p className="text-ink/40 text-sm">No entries yet. Start writing whenever you're ready.</p>
+      {!configured && (
+        <Alert tone="warning" title="The journal isn't set up yet" className="mb-4">
+          The app is missing its journal encryption key, so entries can&apos;t be written or read. Your church admin should contact support.
+        </Alert>
       )}
-
-      <div className="space-y-4">
-        {decrypted.map((entry) => (
-          <div key={entry.id} className="border border-ink/10 rounded-xl p-4 bg-white/60">
-            <p className="text-xs text-ink/40 mb-1">{entry.entry_date}</p>
-            <p className="whitespace-pre-wrap">{entry.content}</p>
-          </div>
-        ))}
-      </div>
+      {error ? (
+        <Alert tone="error">Couldn&apos;t load your journal — refresh the page to try again.</Alert>
+      ) : entries.length === 0 ? (
+        <EmptyState icon="📝" title="No entries yet" description="Start writing whenever you're ready. This is just between you and God." action={configured ? newButton : undefined} />
+      ) : (
+        <ul className="space-y-3">
+          {entries.map((entry) => (
+            <li key={entry.id} className="card-elevated rounded-2xl p-5">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <p className="text-xs font-semibold text-ink/60">{formatDate(entry.date)}</p>
+                <DeleteEntry id={entry.id} />
+              </div>
+              {entry.content !== null ? (
+                <p className="whitespace-pre-wrap leading-relaxed">{entry.content}</p>
+              ) : (
+                <p className="text-sm text-ink/60">This entry couldn&apos;t be unlocked. It may have been written with a different encryption key.</p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <Pagination page={page} hasMore={(data?.length ?? 0) > PAGE_SIZE} hrefFor={(p) => buildQuery({ page: p })} />
     </div>
   );
 }

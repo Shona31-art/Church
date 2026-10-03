@@ -1,85 +1,55 @@
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
+import { roleLabel } from "@/lib/permissions";
+import { likePattern } from "@/lib/list";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { FilterBar } from "@/components/ui/FilterBar";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PendingButton } from "@/components/ConfirmSubmitButton";
+import { startDirectMessage } from "../../actions";
 
-export default async function NewDirectMessagePage() {
+export default async function NewDirectMessagePage({ searchParams }: { searchParams: { q?: string } }) {
   const gate = await moduleGate("dept_chats");
   if (gate) return gate;
 
-  const me = await getCurrentAppUser();
-  const supabase = createClient();
-
-  const { data: members } = await supabase
+  const me = (await getCurrentAppUser())!;
+  const q = (searchParams.q ?? "").trim().slice(0, 80);
+  let query = createClient()
     .from("app_users")
     .select("id, name, role")
-    .eq("church_id", me!.church_id)
-    .neq("id", me!.id)
-    .order("name");
-
-  async function startDm(formData: FormData) {
-    "use server";
-    const me = await getCurrentAppUser();
-    if (!me) return;
-
-    const otherUserId = String(formData.get("user_id") || "");
-    if (!otherUserId) return;
-
-    const supabase = createClient();
-
-    // Reuse an existing DM if these two already have one — check every DM
-    // channel I'm a member of, and see if the other person is also a member.
-    const { data: myDmChannels } = await supabase
-      .from("chat_channel_members")
-      .select("channel_id, chat_channels!inner(is_dm)")
-      .eq("user_id", me.id)
-      .eq("chat_channels.is_dm", true);
-
-    for (const row of myDmChannels || []) {
-      const { data: otherMember } = await supabase
-        .from("chat_channel_members")
-        .select("user_id")
-        .eq("channel_id", row.channel_id)
-        .eq("user_id", otherUserId)
-        .maybeSingle();
-      if (otherMember) {
-        redirect(`/dashboard/chat/${row.channel_id}`);
-      }
-    }
-
-    // No existing thread — create one.
-    const { data: channel } = await supabase
-      .from("chat_channels")
-      .insert({ church_id: me.church_id, is_dm: true, name: "Direct message" })
-      .select("id")
-      .single();
-
-    if (channel) {
-      await supabase.from("chat_channel_members").insert([
-        { channel_id: channel.id, user_id: me.id },
-        { channel_id: channel.id, user_id: otherUserId },
-      ]);
-      redirect(`/dashboard/chat/${channel.id}`);
-    }
-  }
+    .eq("church_id", me.church_id)
+    .neq("id", me.id)
+    .neq("status", "disabled")
+    .order("name")
+    .limit(50);
+  if (q) query = query.ilike("name", likePattern(q));
+  const { data: members } = await query;
 
   return (
-    <div className="max-w-sm">
-      <h1 className="text-2xl font-semibold mb-6">New message</h1>
-      <div className="space-y-2">
-        {members?.map((m) => (
-          <form key={m.id} action={startDm}>
-            <input type="hidden" name="user_id" value={m.id} />
-            <button
-              type="submit"
-              className="w-full text-left border border-ink/10 rounded-lg px-4 py-3 bg-white/60 hover:bg-white text-sm"
-            >
-              {m.name} <span className="text-xs text-ink/40 capitalize">· {m.role.replace("_", " ")}</span>
-            </button>
-          </form>
-        ))}
-        {!members?.length && <p className="text-ink/40 text-sm">No other members yet.</p>}
-      </div>
+    <div className="max-w-xl">
+      <PageHeader back={{ href: "/dashboard/chat", label: "Chats" }} title="New message" description="Direct messages are private between the two of you." />
+      <FilterBar query={q} placeholder="Search by name…" label="Search people" resetHref="/dashboard/chat/dm/new" active={Boolean(q)} />
+      {!members?.length ? (
+        <EmptyState title={q ? "Nobody matches that name" : "No one else is here yet"} description={q ? undefined : "Once other members join your church, you can message them here."} />
+      ) : (
+        <ul className="card-elevated rounded-2xl divide-y divide-line">
+          {members.map((m) => (
+            <li key={m.id}>
+              <form action={startDirectMessage} className="flex items-center justify-between gap-3 px-4 py-3">
+                <input type="hidden" name="user_id" value={m.id} />
+                <div>
+                  <p className="text-sm font-medium">{m.name}</p>
+                  <p className="text-xs text-ink/60">{roleLabel(m.role)}</p>
+                </div>
+                <PendingButton className="btn-secondary btn-sm" pendingLabel="Opening…">
+                  Message<span className="sr-only"> {m.name}</span>
+                </PendingButton>
+              </form>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

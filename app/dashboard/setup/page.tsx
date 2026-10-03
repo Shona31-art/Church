@@ -1,132 +1,85 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
+import { getChurchAccess } from "@/lib/paywall";
+import { can } from "@/lib/permissions";
+import { MODULE_LABELS, PLAN_LABELS, MODULE_KEYS } from "@/lib/subscription";
+import { PageHeader, Section } from "@/components/ui/PageHeader";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { PermissionDenied } from "@/components/ui/Gates";
 
-export default async function SetupWizardPage() {
+export default async function ChurchSettingsPage() {
   const me = await getCurrentAppUser();
-  if (!me || me.role !== "church_admin") {
-    return <p className="text-ink/60">Only church admins can access setup.</p>;
+  if (!me || !can(me.role, "manageChurchProfile")) {
+    return <PermissionDenied message="Only church admins can open church settings." />;
   }
 
   const supabase = createClient();
+  const [access, { data: church }, { count: departments }, { count: members }, { data: counseling }] = await Promise.all([
+    getChurchAccess(),
+    supabase.from("churches").select("name, address, phone, email").eq("id", me.church_id).maybeSingle(),
+    supabase.from("departments").select("id", { count: "exact", head: true }).eq("church_id", me.church_id),
+    supabase.from("app_users").select("id", { count: "exact", head: true }).eq("church_id", me.church_id),
+    supabase.from("counseling_settings").select("enabled").eq("church_id", me.church_id).maybeSingle(),
+  ]);
 
-  const { data: church } = await supabase
-    .from("churches")
-    .select("logo_url, address, phone, email")
-    .eq("id", me.church_id)
-    .single();
-
-  const { data: subscription } = await supabase
-    .from("church_subscriptions")
-    .select("plan_key")
-    .eq("church_id", me.church_id)
-    .single();
-
-  const { data: planModules } = await supabase
-    .from("plan_modules")
-    .select("module_key, modules(name)")
-    .eq("plan_key", subscription?.plan_key ?? "free_trial");
-
-  const { count: departmentCount } = await supabase
-    .from("departments")
-    .select("*", { count: "exact", head: true })
-    .eq("church_id", me.church_id);
-
-  const { count: memberCount } = await supabase
-    .from("app_users")
-    .select("*", { count: "exact", head: true })
-    .eq("church_id", me.church_id);
-
-  const profileComplete = Boolean(church?.address || church?.phone);
+  const steps = [
+    { title: "Church profile", description: "Name, contact details and logo", done: Boolean(church?.address || church?.phone), href: "/dashboard/setup/profile" },
+    { title: "Create departments", description: `${departments ?? 0} created — e.g. Worship, Youth, Ushers`, done: (departments ?? 0) > 0, href: "/dashboard/departments" },
+    { title: "Invite your members", description: `${members ?? 0} people so far`, done: (members ?? 0) > 1, href: "/dashboard/members/new" },
+    ...(access?.modules.has("ai_counseling")
+      ? [{ title: "Decide on AI counseling", description: counseling?.enabled ? "Turned on" : "Off until you turn it on", done: counseling !== null, href: "/dashboard/counseling/settings" }]
+      : []),
+  ];
+  const remaining = steps.filter((s) => !s.done).length;
 
   return (
-    <div className="max-w-lg">
-      <h1 className="text-2xl font-semibold mb-2">Set up your church</h1>
-      <p className="text-ink/50 text-sm mb-8">
-        A few quick steps to get your church ready. You can always come back
-        and change these later.
-      </p>
+    <div className="max-w-3xl space-y-6">
+      <PageHeader
+        title="Church settings"
+        description={remaining ? `${remaining} step${remaining === 1 ? "" : "s"} left to get your church ready. You can change any of these later.` : "Your church is set up. Change anything here at any time."}
+      />
 
-      <div className="space-y-4">
-        <StepCard
-          number={1}
-          title="Church profile"
-          done={profileComplete}
-          description="Logo, address, and contact details"
-          href="/dashboard/setup/profile"
-        />
+      <ol className="space-y-2">
+        {steps.map((s, i) => (
+          <li key={s.title}>
+            <Link href={s.href} className="card-elevated rounded-xl p-4 flex items-center justify-between gap-3 hover:border-gold/60">
+              <div>
+                <p className="font-medium">
+                  {i + 1}. {s.title}
+                </p>
+                <p className="text-xs text-ink/60">{s.description}</p>
+              </div>
+              {s.done ? <StatusBadge tone="success">Done</StatusBadge> : <StatusBadge tone="warning">To do</StatusBadge>}
+            </Link>
+          </li>
+        ))}
+      </ol>
 
-        <div className="border border-ink/10 rounded-xl p-4 bg-white/60">
-          <p className="text-sm font-medium mb-2">Step 2 · Your plan's modules</p>
-          <p className="text-xs text-ink/40 mb-3">
-            You're on the <span className="capitalize">{subscription?.plan_key?.replace("_", " ")}</span> plan.
-            These modules are included — module access is tied to your plan
-            rather than manually toggled, so upgrading unlocks more
-            automatically.
-          </p>
-          <ul className="text-sm text-ink/70 flex flex-wrap gap-2">
-            {planModules?.map((m: any) => (
-              <li key={m.module_key} className="bg-ink/5 px-2 py-1 rounded">
-                {m.modules?.name}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <StepCard
-          number={3}
-          title="Create departments"
-          done={(departmentCount ?? 0) > 0}
-          description={`${departmentCount ?? 0} department(s) created`}
-          href="/dashboard/departments"
-        />
-
-        <StepCard
-          number={4}
-          title="Invite members"
-          done={(memberCount ?? 0) > 1}
-          description={`${memberCount ?? 0} member(s) so far`}
-          href="/dashboard/members/new"
-        />
-      </div>
-
-      <Link
-        href="/dashboard"
-        className="inline-block mt-8 text-sm text-ember"
+      <Section
+        title="Features on your plan"
+        description={access?.planKey ? `You're on the ${PLAN_LABELS[access.planKey] ?? access.planKey} plan.` : undefined}
+        actions={
+          <Link href="/dashboard/billing" className="btn-secondary btn-sm">
+            Billing & plans
+          </Link>
+        }
       >
-        Skip for now → go to dashboard
-      </Link>
+        <ul className="grid gap-2 sm:grid-cols-2 text-sm">
+          {MODULE_KEYS.filter((k) => !["analytics", "multi_campus"].includes(k)).map((k) => {
+            const on = access?.modules.has(k);
+            return (
+              <li key={k} className="flex items-center gap-2">
+                <span aria-hidden className={on ? "text-success" : "text-ink/30"}>
+                  {on ? "✓" : "○"}
+                </span>
+                <span className={on ? "" : "text-ink/50"}>{MODULE_LABELS[k]}</span>
+                <span className="sr-only">{on ? "(included)" : "(not on your plan)"}</span>
+              </li>
+            );
+          })}
+        </ul>
+      </Section>
     </div>
-  );
-}
-
-function StepCard({
-  number,
-  title,
-  description,
-  href,
-  done,
-}: {
-  number: number;
-  title: string;
-  description: string;
-  href: string;
-  done: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center justify-between border border-ink/10 rounded-xl p-4 bg-white/60 hover:bg-white"
-    >
-      <div>
-        <p className="text-sm font-medium">
-          Step {number} · {title}
-        </p>
-        <p className="text-xs text-ink/40">{description}</p>
-      </div>
-      <span className={done ? "text-green-700 text-sm" : "text-ink/30 text-sm"}>
-        {done ? "✓ Done" : "→"}
-      </span>
-    </Link>
   );
 }

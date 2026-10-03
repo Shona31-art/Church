@@ -1,0 +1,242 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentAppUser, type AppUser } from "@/lib/current-user";
+import { checkModuleAccess } from "@/lib/paywall";
+import { flash } from "@/lib/flash";
+import { can } from "@/lib/permissions";
+import { generateJson, isAiConfigured } from "@/lib/ai";
+import { consumeAiQuota } from "@/lib/ai-quota";
+import { FormState, SESSION_EXPIRED, formValues, invalid, optionalField } from "@/lib/forms";
+
+// Sermons: pastors and church admins publish; everyone in the church reads
+// and keeps private notes (sermon_notes RLS: author only, no admin bypass).
+
+// Only http(s) links are accepted — a "javascript:" URL in a media tag or
+// link is a classic XSS vector.
+const mediaUrl = z
+  .string()
+  .trim()
+  .max(500, "That link is too long.")
+  .url("Paste a full link starting with https://")
+  .refine((u) => /^https?:\/\//i.test(u), "Links must start with https://")
+  .optional();
+
+const lines = (max: number) =>
+  z
+    .string()
+    .max(5000)
+    .optional()
+    .transform((v) =>
+      (v ?? "")
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .slice(0, max)
+    );
+
+const SermonSchema = z.object({
+  title: z.string().trim().min(2, "Give the sermon a title.").max(200, "Keep the title under 200 characters."),
+  speaker: z.string().trim().max(120).optional(),
+  sermonDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose the date it was preached."),
+  audioUrl: mediaUrl,
+  videoUrl: mediaUrl,
+  transcript: z.string().max(100_000, "That transcript is very long — trim it to under 100,000 characters.").optional(),
+  summary: z.string().trim().max(3000).optional(),
+  scriptureRefs: lines(10),
+  discussionQuestions: lines(10),
+  prayerPoints: lines(10),
+  useAi: z.boolean(),
+});
+
+async function requireSermonEditor(): Promise<AppUser | null> {
+  const me = await getCurrentAppUser();
+  if (!me || !me.church_id || !can(me.role, "manageSermons")) return null;
+  return (await checkModuleAccess("sermon_ai")).allowed ? me : null;
+}
+
+interface SermonAnalysis {
+  summary: string;
+  scriptureRefs: string[];
+  discussionQuestions: string[];
+  prayerPoints: string[];
+}
+
+/**
+ * AI summary, scripture references, discussion questions and prayer points
+ * from a transcript. Returns null when AI is off, over quota, or fails — the
+ * sermon still saves and the fields can be filled in by hand.
+ * The transcript is capped at ~30k characters to keep each call's cost bounded.
+ */
+async function analyseTranscript(transcript: string): Promise<SermonAnalysis | null> {
+  if (!transcript.trim() || !isAiConfigured()) return null;
+  if (!(await consumeAiQuota("sermon_analysis")).ok) return null;
+
+  const parsed = await generateJson<Partial<SermonAnalysis>>({
+    maxTokens: 1500,
+    prompt: `Here is a sermon transcript:
+
+${transcript.slice(0, 30_000)}
+
+Respond with ONLY valid JSON, no other text, in this exact shape:
+{"summary": "2-3 sentence summary", "scriptureRefs": ["Book Chapter:Verse", ...up to 5], "discussionQuestions": ["...", ...3-5 questions for small groups], "prayerPoints": ["...", ...3-5 short prayer points]}
+
+For scriptureRefs, give references only (e.g. "Romans 8:28"), never the verse text itself.`,
+  });
+  if (!parsed) return null;
+  const strings = (v: unknown, max: number) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").map((s) => s.slice(0, 300)).slice(0, max) : []);
+  return {
+    summary: typeof parsed.summary === "string" ? parsed.summary.slice(0, 3000) : "",
+    scriptureRefs: strings(parsed.scriptureRefs, 10),
+    discussionQuestions: strings(parsed.discussionQuestions, 10),
+    prayerPoints: strings(parsed.prayerPoints, 10),
+  };
+}
+
+/**
+ * Create or edit. Form fields: sermon_id? + updated_at? (edit), title,
+ * speaker?, sermon_date, audio_url?, video_url?, transcript?, summary?,
+ * scripture_refs?, discussion_questions?, prayer_points? (one per line),
+ * use_ai ("on" = generate the study fields from the transcript).
+ */
+export async function saveSermon(_prev: FormState, formData: FormData): Promise<FormState> {
+  const me = await requireSermonEditor();
+  if (!me) return { error: "Only pastors and church admins can publish sermons. If you are one, sign in again." };
+
+  const parsed = SermonSchema.safeParse({
+    title: formData.get("title"),
+    speaker: optionalField(formData, "speaker"),
+    sermonDate: formData.get("sermon_date"),
+    audioUrl: optionalField(formData, "audio_url"),
+    videoUrl: optionalField(formData, "video_url"),
+    transcript: optionalField(formData, "transcript"),
+    summary: optionalField(formData, "summary"),
+    scriptureRefs: formData.get("scripture_refs") ?? "",
+    discussionQuestions: formData.get("discussion_questions") ?? "",
+    prayerPoints: formData.get("prayer_points") ?? "",
+    useAi: formData.get("use_ai") === "on",
+  });
+  if (!parsed.success) {
+    const result = invalid(parsed.error, formData);
+    const map: Record<string, string> = { sermonDate: "sermon_date", audioUrl: "audio_url", videoUrl: "video_url" };
+    if (result?.fieldErrors) result.fieldErrors = Object.fromEntries(Object.entries(result.fieldErrors).map(([k, v]) => [map[k] ?? k, v]));
+    return result;
+  }
+  const input = parsed.data;
+  const values = formValues(formData);
+
+  const ai = input.useAi && input.transcript ? await analyseTranscript(input.transcript) : null;
+  const aiFailed = input.useAi && Boolean(input.transcript) && !ai;
+
+  const row = {
+    title: input.title,
+    speaker: input.speaker ?? null,
+    sermon_date: input.sermonDate,
+    audio_url: input.audioUrl ?? null,
+    video_url: input.videoUrl ?? null,
+    transcript: input.transcript ?? null,
+    // AI output fills the study fields; otherwise keep what the pastor typed.
+    ai_summary: ai?.summary || input.summary || null,
+    scripture_refs: ai?.scriptureRefs.length ? ai.scriptureRefs : input.scriptureRefs,
+    discussion_questions: ai?.discussionQuestions.length ? ai.discussionQuestions : input.discussionQuestions,
+    prayer_points: ai?.prayerPoints.length ? ai.prayerPoints : input.prayerPoints,
+  };
+
+  const supabase = createClient();
+  const existingId = formData.get("sermon_id");
+  let id: string;
+
+  if (existingId) {
+    const parsedId = z.string().uuid().safeParse(existingId);
+    const updatedAt = String(formData.get("updated_at") ?? "");
+    if (!parsedId.success || !updatedAt) return { error: "That sermon couldn't be found.", values };
+    const { data: updated, error } = await supabase
+      .from("sermons")
+      .update(row)
+      .eq("id", parsedId.data)
+      .eq("church_id", me.church_id)
+      .eq("updated_at", updatedAt)
+      .select("id");
+    if (error) {
+      console.error("[sermons] update failed:", error.message);
+      return { error: "Couldn't save the sermon — please try again.", values };
+    }
+    if (!updated?.length) return { error: "Someone else changed this sermon while you were editing. Reload to see the latest.", values };
+    id = parsedId.data;
+  } else {
+    const { data: created, error } = await supabase
+      .from("sermons")
+      .insert({ ...row, church_id: me.church_id, created_by: me.id })
+      .select("id")
+      .single();
+    if (error || !created) {
+      console.error("[sermons] create failed:", error?.message);
+      return { error: "Couldn't save the sermon — please try again.", values };
+    }
+    id = created.id;
+  }
+
+  revalidatePath("/dashboard/sermons");
+  revalidatePath(`/dashboard/sermons/${id}`);
+  flash(
+    aiFailed ? "Sermon saved. The AI summary couldn't be generated right now — you can add study notes by hand or try again." : existingId ? "Sermon updated." : "Sermon published.",
+    aiFailed ? "info" : "success"
+  );
+  redirect(`/dashboard/sermons/${id}`);
+}
+
+/** Form fields: sermon_id */
+export async function deleteSermon(_prev: FormState, formData: FormData): Promise<FormState> {
+  const me = await requireSermonEditor();
+  if (!me) return { error: SESSION_EXPIRED };
+  const id = z.string().uuid().safeParse(formData.get("sermon_id"));
+  if (!id.success) return { error: "That sermon couldn't be found." };
+
+  const { data: deleted, error } = await createClient().from("sermons").delete().eq("id", id.data).eq("church_id", me.church_id).select("id");
+  if (error || !deleted?.length) {
+    if (error) console.error("[sermons] delete failed:", error.message);
+    return { error: "Couldn't delete the sermon — please try again." };
+  }
+  revalidatePath("/dashboard/sermons");
+  flash("Sermon deleted.");
+  redirect("/dashboard/sermons");
+}
+
+/** Anyone in the church, on their own notes. Form fields: sermon_id, note */
+export async function addSermonNote(_prev: FormState, formData: FormData): Promise<FormState> {
+  const me = await getCurrentAppUser();
+  if (!me || !me.church_id) return { error: SESSION_EXPIRED };
+  const parsed = z
+    .object({ sermonId: z.string().uuid(), note: z.string().trim().min(1, "Write a note first.").max(5000, "Keep notes under 5,000 characters.") })
+    .safeParse({ sermonId: formData.get("sermon_id"), note: formData.get("note") });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message, values: formValues(formData) };
+
+  const supabase = createClient();
+  // Make sure the sermon is one this person can see (their church).
+  const { data: sermon } = await supabase.from("sermons").select("id").eq("id", parsed.data.sermonId).eq("church_id", me.church_id).maybeSingle();
+  if (!sermon) return { error: "That sermon couldn't be found." };
+
+  const { error } = await supabase.from("sermon_notes").insert({ sermon_id: parsed.data.sermonId, user_id: me.id, note: parsed.data.note });
+  if (error) {
+    console.error("[sermons] note failed:", error.message);
+    return { error: "Couldn't save your note — please try again.", values: formValues(formData) };
+  }
+  revalidatePath(`/dashboard/sermons/${parsed.data.sermonId}`);
+  return { ok: true };
+}
+
+/** Form fields: note_id, sermon_id */
+export async function deleteSermonNote(_prev: FormState, formData: FormData): Promise<FormState> {
+  const me = await getCurrentAppUser();
+  if (!me) return { error: SESSION_EXPIRED };
+  const id = z.string().uuid().safeParse(formData.get("note_id"));
+  const sermonId = z.string().uuid().safeParse(formData.get("sermon_id"));
+  if (!id.success || !sermonId.success) return { error: "That note couldn't be found." };
+  const { error } = await createClient().from("sermon_notes").delete().eq("id", id.data).eq("user_id", me.id);
+  if (error) return { error: "Couldn't delete the note — please try again." };
+  revalidatePath(`/dashboard/sermons/${sermonId.data}`);
+  return { ok: true };
+}

@@ -1,28 +1,27 @@
 import { createClient } from "@/lib/supabase/server";
-import { checkModuleAccess } from "@/lib/paywall";
 import { getCurrentAppUser } from "@/lib/current-user";
-import { AnnouncementForm } from "./AnnouncementForm";
+import { moduleGate } from "@/lib/gate";
+import { can } from "@/lib/permissions";
+import { isAiConfigured } from "@/lib/ai";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { PermissionDenied } from "@/components/ui/Gates";
+import { AnnouncementForm } from "../AnnouncementForm";
 
 export default async function NewAnnouncementPage() {
-  const access = await checkModuleAccess("announcements");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+  const gate = await moduleGate("announcements");
+  if (gate) return gate;
 
   const me = await getCurrentAppUser();
-  if (!me || !["church_admin", "pastor", "department_leader"].includes(me.role)) {
-    return <p className="text-ink/60">You don&apos;t have permission to post announcements.</p>;
+  if (!me || !can(me.role, "postAnnouncements")) {
+    return <PermissionDenied message="Only pastors, church admins and department leaders can post announcements." backHref="/dashboard/announcements" />;
   }
 
-  const supabase = createClient();
-  const { data: departments } = await supabase
-    .from("departments")
-    .select("id, name")
-    .eq("church_id", me.church_id)
-    .order("name");
+  const { data: departments } = await createClient().from("departments").select("id, name").eq("church_id", me.church_id).order("name");
 
   return (
-    <AnnouncementForm
-      departments={departments ?? []}
-      canPostChurchWide={["church_admin", "pastor"].includes(me.role)}
-    />
+    <div>
+      <PageHeader back={{ href: "/dashboard/announcements", label: "Announcements" }} title="New announcement" />
+      <AnnouncementForm departments={departments ?? []} canPostChurchWide={can(me.role, "postChurchWide")} aiAvailable={isAiConfigured()} />
+    </div>
   );
 }

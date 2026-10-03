@@ -1,131 +1,96 @@
+import "server-only";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentAppUser } from "@/lib/current-user";
+import {
+  EffectiveStatus,
+  ModuleKey,
+  MODULE_KEYS,
+  enabledModules,
+  resolveAccountStatus,
+  daysUntil,
+} from "@/lib/subscription";
 
-export type ModuleKey =
-  | "members"
-  | "announcements"
-  | "calendar"
-  | "service_planner"
-  | "pastor_booking"
-  | "ai_poster"
-  | "sermon_ai"
-  | "dept_chats"
-  | "bible"
-  | "analytics"
-  | "multi_campus"
-  | "ai_counseling"
-  | "prayer_board"
-  | "journal"
-  | "support"
-  | "bible_games"
-  | "giving"
-  | "pastoral_care"
-  | "bible_study_ai";
+export type { ModuleKey } from "@/lib/subscription";
 
 export interface AccessCheckResult {
   allowed: boolean;
+  /** Why not, in words safe to show the user. */
   reason?: string;
+  /** "plan" = upgrade would help; "suspended" = renew; "account" = sign-in/profile problem. */
+  kind?: "plan" | "suspended" | "account";
+}
+
+export interface ChurchAccess {
+  status: EffectiveStatus | "none";
+  planKey: string | null;
+  modules: Set<ModuleKey>;
+  trialDaysLeft: number | null;
+  graceDaysLeft: number | null;
 }
 
 /**
- * Server-side check: is the current logged-in user allowed to use this module?
- * Call this at the top of any server action / route handler that touches a
- * gated module, before doing any reads or writes.
- *
- * Note: this is a *defense-in-depth* check, not the only line of defense —
- * RLS policies in Postgres are the actual hard boundary. This check exists
- * so the app can show a friendly "upgrade to unlock" message instead of a
- * raw database permission error.
+ * The current church's subscription and enabled modules, read once per
+ * request (React `cache`) and shared by the navigation, every page gate and
+ * every server action. Reads go through the user's own session, so RLS
+ * guarantees a church can only ever see its own subscription.
  */
-export async function checkModuleAccess(moduleKey: ModuleKey): Promise<AccessCheckResult> {
+export const getChurchAccess = cache(async (): Promise<ChurchAccess | null> => {
+  const me = await getCurrentAppUser();
+  if (!me) return null;
+
+  if (me.role === "super_admin") {
+    return { status: "active", planKey: null, modules: new Set(MODULE_KEYS), trialDaysLeft: null, graceDaysLeft: null };
+  }
+  if (!me.church_id) return null;
+
   const supabase = createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { allowed: false, reason: "Not signed in." };
-  }
-
-  const { data: appUser } = await supabase
-    .from("app_users")
-    .select("role, church_id")
-    .eq("id", user.id)
-    .single();
-
-  if (!appUser) {
-    return { allowed: false, reason: "User profile not found." };
-  }
-
-  if (appUser.role === "super_admin") {
-    return { allowed: true };
-  }
-
-  if (!appUser.church_id) {
-    return { allowed: false, reason: "No church associated with this account." };
-  }
-
   const { data: subscription } = await supabase
     .from("church_subscriptions")
-    .select("*")
-    .eq("church_id", appUser.church_id)
-    .single();
+    .select("plan_key, status, is_lifetime, trial_expires_at, grace_period_end")
+    .eq("church_id", me.church_id)
+    .maybeSingle();
 
   if (!subscription) {
-    return { allowed: false, reason: "No subscription found for this church." };
+    return { status: "none", planKey: null, modules: new Set(), trialDaysLeft: null, graceDaysLeft: null };
   }
+
+  const [{ data: planModules }, { data: overrides }] = await Promise.all([
+    supabase.from("plan_modules").select("module_key").eq("plan_key", subscription.plan_key),
+    supabase.from("church_modules").select("module_key, enabled").eq("church_id", me.church_id),
+  ]);
 
   const status = resolveAccountStatus(subscription);
-  if (status === "suspended") {
+  return {
+    status,
+    planKey: subscription.plan_key,
+    modules: status === "suspended" ? new Set() : enabledModules((planModules ?? []).map((m) => m.module_key), overrides ?? []),
+    trialDaysLeft: status === "trial" ? daysUntil(subscription.trial_expires_at) : null,
+    graceDaysLeft: status === "grace" ? daysUntil(subscription.grace_period_end) : null,
+  };
+});
+
+/**
+ * Server-side check: may the current user use this module? Call at the top
+ * of every page and server action for a gated module, before any reads or
+ * writes. RLS remains the hard boundary; this turns "not on your plan" into a
+ * clear message instead of an empty page or a raw database error.
+ */
+export async function checkModuleAccess(moduleKey: ModuleKey): Promise<AccessCheckResult> {
+  const access = await getChurchAccess();
+  if (!access) return { allowed: false, kind: "account", reason: "Your session has expired — please sign in again." };
+  if (access.status === "none") {
+    return { allowed: false, kind: "account", reason: "Your church doesn't have a subscription set up yet. Contact support." };
+  }
+  if (access.status === "suspended") {
     return {
       allowed: false,
-      reason: "Your church's subscription has expired. Renew to restore access.",
+      kind: "suspended",
+      reason: "Your church's subscription has ended. A church admin can renew it from Billing to restore access.",
     };
   }
-
-  // Check plan_modules for default availability
-  const { data: planModule } = await supabase
-    .from("plan_modules")
-    .select("module_key")
-    .eq("plan_key", subscription.plan_key)
-    .eq("module_key", moduleKey)
-    .maybeSingle();
-
-  // Check church_modules for a manual override (takes precedence either direction)
-  const { data: override } = await supabase
-    .from("church_modules")
-    .select("enabled")
-    .eq("church_id", appUser.church_id)
-    .eq("module_key", moduleKey)
-    .maybeSingle();
-
-  const enabled = override ? override.enabled : Boolean(planModule);
-
-  if (!enabled) {
-    return {
-      allowed: false,
-      reason: "This feature is not included in your church's current plan.",
-    };
+  if (!access.modules.has(moduleKey)) {
+    return { allowed: false, kind: "plan", reason: "This feature isn't included in your church's current plan." };
   }
-
   return { allowed: true };
-}
-
-function resolveAccountStatus(sub: any): "active" | "trial" | "grace" | "suspended" | "payment_pending" {
-  const now = new Date();
-  if (sub.is_lifetime) return "active";
-  if (sub.status === "suspended") return "suspended";
-
-  if (sub.plan_key === "free_trial") {
-    if (sub.trial_expires_at && now > new Date(sub.trial_expires_at)) return "suspended";
-    return "trial";
-  }
-
-  if (sub.status === "grace") {
-    if (sub.grace_period_end && now > new Date(sub.grace_period_end)) return "suspended";
-    return "grace";
-  }
-
-  if (sub.status === "payment_pending") return "payment_pending";
-  return "active";
 }

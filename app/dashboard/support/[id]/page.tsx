@@ -1,19 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { checkModuleAccess } from "@/lib/paywall";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { ATTACHMENT_BUCKET } from "@/lib/support";
 import { ReplyForm } from "./ReplyForm";
 import { StatusButtons } from "./StatusButtons";
+import { moduleGate } from "@/lib/gate";
 
 // Signed links last an hour — long enough to read a ticket, short enough that
 // a copied link stops working. Works whether the bucket is public or private.
 const SIGNED_LINK_SECONDS = 60 * 60;
 
 export default async function TicketDetailPage({ params }: { params: { id: string } }) {
-  const access = await checkModuleAccess("support");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+  const gate = await moduleGate("support");
+  if (gate) return gate;
 
   const me = await getCurrentAppUser();
   const supabase = createClient();

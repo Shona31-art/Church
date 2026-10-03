@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { checkModuleAccess } from "@/lib/paywall";
 import { getCurrentAppUser } from "@/lib/current-user";
+import { moduleGate } from "@/lib/gate";
 
 const GAMES = [
   { href: "/dashboard/games/quiz", title: "Bible quiz", body: "10 questions — answers are checked on the server, no peeking." },
@@ -16,8 +16,8 @@ const GAME_LABEL: Record<string, string> = { quiz: "Quiz", word_search: "Word se
 const WINDOW_DAYS = 90;
 
 export default async function GamesHubPage() {
-  const access = await checkModuleAccess("bible_games");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+  const gate = await moduleGate("bible_games");
+  if (gate) return gate;
 
   const me = await getCurrentAppUser();
   const supabase = createClient();

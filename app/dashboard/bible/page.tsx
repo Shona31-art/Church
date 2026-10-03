@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { checkModuleAccess } from "@/lib/paywall";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { BIBLE_BOOKS } from "@/lib/bible";
+import { moduleGate } from "@/lib/gate";
 
 export default async function BibleHomePage() {
-  const access = await checkModuleAccess("bible");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+  const gate = await moduleGate("bible");
+  if (gate) return gate;
 
   const me = await getCurrentAppUser();
   const supabase = createClient();

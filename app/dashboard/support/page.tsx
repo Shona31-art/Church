@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { checkModuleAccess } from "@/lib/paywall";
 import { getCurrentAppUser } from "@/lib/current-user";
+import { moduleGate } from "@/lib/gate";
 
 export default async function SupportPage() {
-  const access = await checkModuleAccess("support");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+  const gate = await moduleGate("support");
+  if (gate) return gate;
 
   const me = await getCurrentAppUser();
   const supabase = createClient();

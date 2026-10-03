@@ -1,12 +1,12 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { checkModuleAccess } from "@/lib/paywall";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { ChatThread } from "./ChatThread";
+import { moduleGate } from "@/lib/gate";
 
 export default async function ChatChannelPage({ params }: { params: { id: string } }) {
-  const access = await checkModuleAccess("dept_chats");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+  const gate = await moduleGate("dept_chats");
+  if (gate) return gate;
 
   const me = await getCurrentAppUser();
   const supabase = createClient();

@@ -1,16 +1,16 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { checkModuleAccess } from "@/lib/paywall";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { GivingForm } from "./GivingForm";
+import { moduleGate } from "@/lib/gate";
 
 export default async function GivingPage({
   searchParams,
 }: {
   searchParams: { given?: string };
 }) {
-  const access = await checkModuleAccess("giving");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+  const gate = await moduleGate("giving");
+  if (gate) return gate;
 
   const me = await getCurrentAppUser();
   const supabase = createClient();

@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { checkModuleAccess } from "@/lib/paywall";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { isPosterRole } from "@/lib/posters";
+import { moduleGate } from "@/lib/gate";
 
 export default async function PostersPage() {
-  const access = await checkModuleAccess("ai_poster");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+  const gate = await moduleGate("ai_poster");
+  if (gate) return gate;
 
   const me = await getCurrentAppUser();
   const supabase = createClient();

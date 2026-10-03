@@ -1,73 +1,72 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentAppUser } from "@/lib/current-user";
-import { DashboardChrome, NavItem } from "./DashboardChrome";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getSessionState } from "@/lib/current-user";
+import { getChurchAccess } from "@/lib/paywall";
+import { buildNavigation } from "@/lib/navigation";
+import { can, roleLabel } from "@/lib/permissions";
+import { DashboardChrome, type AccountBanner } from "./DashboardChrome";
 
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const session = await getSessionState();
+
+  if (session.kind === "signed_out") redirect("/login");
+  // A deactivated account (or a login with no church profile) is signed out
+  // with an explanation rather than shown an empty dashboard. RLS already
+  // blocks their data; this is the human-facing half.
+  if (session.kind === "disabled") redirect("/auth/signout?reason=disabled");
+  if (session.kind === "no_profile") redirect("/auth/signout?reason=no_profile");
+
+  const me = session.user;
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
-
-  const me = await getCurrentAppUser();
-  if (!me) redirect("/login");
-
-  let churchName = "Grace-bound";
-  if (me.church_id) {
-    const { data: church } = await supabase.from("churches").select("name").eq("id", me.church_id).single();
-    if (church?.name) churchName = church.name;
-  } else if (me.role === "super_admin") {
-    churchName = "Platform Admin";
+  // An invited member who reached the dashboard has set their password and
+  // signed in, so the invite is accepted. Service role: members can't change
+  // their own status (security_fix_app_users.sql trigger), by design.
+  if (me.status === "invited") {
+    const { error } = await createAdminClient().from("app_users").update({ status: "active" }).eq("id", me.id).eq("status", "invited");
+    if (error) console.error("[dashboard] couldn't mark invite accepted:", error.message);
   }
 
-  // Who sees which link. This only tidies the menu — every page and action
-  // re-checks the role server-side, and RLS is the real boundary.
-  const isShepherd = ["church_admin", "pastor"].includes(me.role);
-  const allItems: (NavItem & { show?: boolean })[] = [
-    { href: "/dashboard", label: "Home", icon: "🏠" },
-    { href: "/dashboard/prayer-board", label: "Prayer Board", icon: "🙏" },
-    { href: "/dashboard/journal", label: "Journal", icon: "📝" },
-    { href: "/dashboard/announcements", label: "Announcements", icon: "📢" },
-    { href: "/dashboard/calendar", label: "Calendar", icon: "📅" },
-    { href: "/dashboard/sermons", label: "Sermons", icon: "🎤" },
-    { href: "/dashboard/bible", label: "Bible", icon: "📖" },
-    { href: "/dashboard/chat", label: "Chats", icon: "💬" },
-    { href: "/dashboard/counseling", label: "Counseling", icon: "🤝" },
-    { href: "/dashboard/booking", label: "Pastor Booking", icon: "📋" },
-    { href: "/dashboard/games", label: "Games", icon: "🎮" },
-    { href: "/dashboard/giving", label: "Giving", icon: "💝" },
-    { href: "/dashboard/pastoral-care", label: "Pastoral Care", icon: "🕊️", show: isShepherd },
-    { href: "/dashboard/members", label: "Members", icon: "👥", show: isShepherd },
-    { href: "/dashboard/departments", label: "Departments", icon: "🗂️", show: isShepherd },
-    { href: "/dashboard/service-planner", label: "Service Planner", icon: "🗓️" }, // volunteers see published plans
-    { href: "/dashboard/posters", label: "Posters", icon: "🖼️", show: isShepherd || me.role === "department_leader" },
-    { href: "/dashboard/support", label: "Support", icon: "🛟" },
-  ];
-  const navItems: NavItem[] =
-    me.role === "super_admin"
-      ? [
-          { href: "/dashboard/support", label: "Support", icon: "🛟" },
-          { href: "/dashboard/super-admin", label: "Super Admin", icon: "⚙️" },
-          { href: "/dashboard/super-admin/churches", label: "Churches", icon: "⛪" },
-          { href: "/dashboard/super-admin/users", label: "Users", icon: "👥" },
-        ]
-      : allItems.filter((item) => item.show !== false).map(({ show: _show, ...item }) => item);
+  const [access, churchRes] = await Promise.all([
+    getChurchAccess(),
+    me.church_id ? supabase.from("churches").select("name").eq("id", me.church_id).maybeSingle() : Promise.resolve(null),
+  ]);
 
-  if (me.role === "church_admin") {
-    navItems.push({ href: "/dashboard/billing", label: "Billing", icon: "💳" });
+  const churchName = me.role === "super_admin" ? "Platform administration" : churchRes?.data?.name ?? "Your church";
+  const navGroups = buildNavigation(me.role, access?.modules ?? new Set());
+
+  let banner: AccountBanner | null = null;
+  if (access && me.role !== "super_admin") {
+    const admin = can(me.role, "manageBilling");
+    if (access.status === "trial" && access.trialDaysLeft !== null && access.trialDaysLeft <= 7) {
+      banner = {
+        tone: "info",
+        message: `Your free trial ends in ${access.trialDaysLeft} day${access.trialDaysLeft === 1 ? "" : "s"}.`,
+        action: admin ? { href: "/dashboard/billing", label: "Choose a plan" } : undefined,
+      };
+    } else if (access.status === "grace") {
+      banner = {
+        tone: "warning",
+        message: `A payment didn't go through. Access continues for ${access.graceDaysLeft ?? 0} more day(s).`,
+        action: admin ? { href: "/dashboard/billing", label: "Update payment" } : undefined,
+      };
+    } else if (access.status === "suspended") {
+      banner = {
+        tone: "error",
+        message: "Your church's subscription has ended, so most features are paused. Your data is safe.",
+        action: admin ? { href: "/dashboard/billing", label: "Renew" } : undefined,
+      };
+    }
   }
+
   return (
     <DashboardChrome
-      navItems={navItems}
+      navGroups={navGroups}
       churchName={churchName}
       userName={me.name}
-      userRole={me.role}
+      userRole={roleLabel(me.role)}
+      banner={banner}
     >
       {children}
     </DashboardChrome>

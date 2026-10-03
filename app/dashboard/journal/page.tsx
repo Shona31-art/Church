@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { checkModuleAccess } from "@/lib/paywall";
 import { decryptJournalContent } from "@/lib/encryption";
+import { moduleGate } from "@/lib/gate";
 
 export default async function JournalPage() {
-  const access = await checkModuleAccess("journal");
-  if (!access.allowed) {
-    return <p className="text-red-600">{access.reason}</p>;
-  }
+  const gate = await moduleGate("journal");
+  if (gate) return gate;
 
   const supabase = createClient();
   const {

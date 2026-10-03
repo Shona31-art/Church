@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { checkModuleAccess } from "@/lib/paywall";
 import { isAiConfigured } from "@/lib/ai";
 import { StudyTool } from "./StudyTool";
+import { moduleGate } from "@/lib/gate";
 
 export default async function BibleStudyPage({ searchParams }: { searchParams: { ref?: string } }) {
-  const access = await checkModuleAccess("bible_study_ai");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+  const gate = await moduleGate("bible_study_ai");
+  if (gate) return gate;
 
   return (
     <div className="max-w-2xl">

@@ -1,0 +1,112 @@
+// Subscription and plan rules, kept free of database/server imports so they
+// can be unit-tested and shared with the billing and super-admin screens.
+
+export const MODULE_KEYS = [
+  "members",
+  "announcements",
+  "calendar",
+  "service_planner",
+  "pastor_booking",
+  "ai_poster",
+  "sermon_ai",
+  "dept_chats",
+  "bible",
+  "analytics",
+  "multi_campus",
+  "ai_counseling",
+  "prayer_board",
+  "journal",
+  "support",
+  "bible_games",
+  "giving",
+  "pastoral_care",
+  "bible_study_ai",
+] as const;
+export type ModuleKey = (typeof MODULE_KEYS)[number];
+
+/** Names people see. The `modules` table holds the same list for super admins. */
+export const MODULE_LABELS: Record<ModuleKey, string> = {
+  members: "Member management",
+  announcements: "Announcements",
+  calendar: "Calendar",
+  service_planner: "Service Planner",
+  pastor_booking: "Pastor Booking",
+  ai_poster: "Poster Studio",
+  sermon_ai: "Sermons",
+  dept_chats: "Chats",
+  bible: "Bible reader",
+  analytics: "Analytics",
+  multi_campus: "Multiple campuses",
+  ai_counseling: "AI Counseling",
+  prayer_board: "Prayer Board",
+  journal: "Journal",
+  support: "Support",
+  bible_games: "Bible Games",
+  giving: "Giving",
+  pastoral_care: "Pastoral Care",
+  bible_study_ai: "Bible Study AI",
+};
+
+export const PLAN_LABELS: Record<string, string> = {
+  free_trial: "Free trial",
+  basic: "Basic",
+  premium: "Premium",
+  enterprise: "Enterprise",
+  sponsored: "Sponsored",
+};
+
+export type EffectiveStatus = "active" | "trial" | "grace" | "suspended" | "payment_pending";
+
+export interface SubscriptionRow {
+  plan_key: string;
+  status: string;
+  is_lifetime?: boolean | null;
+  trial_expires_at?: string | null;
+  grace_period_end?: string | null;
+}
+
+/**
+ * What a church's subscription means *right now*. The stored status can lag
+ * behind reality (nothing flips a trial to suspended at midnight), so expiry
+ * dates are checked here on every request instead of trusting the column.
+ */
+export function resolveAccountStatus(sub: SubscriptionRow, now: Date = new Date()): EffectiveStatus {
+  if (sub.is_lifetime) return "active";
+  if (sub.status === "suspended") return "suspended";
+
+  if (sub.plan_key === "free_trial") {
+    if (sub.trial_expires_at && now > new Date(sub.trial_expires_at)) return "suspended";
+    return "trial";
+  }
+
+  if (sub.status === "grace") {
+    if (sub.grace_period_end && now > new Date(sub.grace_period_end)) return "suspended";
+    return "grace";
+  }
+
+  if (sub.status === "payment_pending") return "payment_pending";
+  return "active";
+}
+
+/** Whole days left before `iso` (0 on the last day), or null if no date. */
+export function daysUntil(iso: string | null | undefined, now: Date = new Date()): number | null {
+  if (!iso) return null;
+  return Math.max(0, Math.ceil((new Date(iso).getTime() - now.getTime()) / 86_400_000));
+}
+
+/**
+ * Modules enabled for a church: the plan's defaults, then per-church
+ * overrides from a super admin (which win in either direction).
+ */
+export function enabledModules(
+  planModules: readonly string[],
+  overrides: readonly { module_key: string; enabled: boolean }[]
+): Set<ModuleKey> {
+  const enabled = new Set(planModules.filter((k): k is ModuleKey => (MODULE_KEYS as readonly string[]).includes(k)));
+  for (const o of overrides) {
+    if (!(MODULE_KEYS as readonly string[]).includes(o.module_key)) continue;
+    if (o.enabled) enabled.add(o.module_key as ModuleKey);
+    else enabled.delete(o.module_key as ModuleKey);
+  }
+  return enabled;
+}

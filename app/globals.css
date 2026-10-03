@@ -19,35 +19,69 @@ h1, h2, h3 {
   letter-spacing: -0.01em;
 }
 
-/* Accessibility: visible focus ring on every interactive element, not just
-   the browser default — easy to lose track of when styling with custom
-   classes everywhere, so set it once, globally, rather than per-component. */
+/* Accessibility: visible focus ring on every interactive element, set once
+   globally rather than per component. */
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+summary:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
 
 button, a {
-  transition: opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+  transition: opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-/* The one signature motif for this direction: a restrained brass hairline
-   under page titles and the brand mark — letterhead, not liturgy. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* The one signature motif: a restrained brass hairline under page titles and
+   the brand mark — letterhead, not liturgy. */
 .rule-gold {
   width: 32px;
   height: 2px;
   background-color: var(--gold);
 }
 
-/* "Posh" reads through subtle elevation rather than heavy borders — a thin
-   border plus a soft shadow. Apply wherever the old bg-white/60 + border
-   card pattern shows up, in place of a flat fill. */
+/* Cards: a thin border plus a soft shadow rather than a heavy fill. */
 .card-elevated {
   background: #FFFFFF;
   border: 1px solid #ECEAE4;
   box-shadow: 0 1px 2px rgba(20, 22, 31, 0.04), 0 2px 8px rgba(20, 22, 31, 0.03);
+}
+
+@layer components {
+  /* Buttons. One primary action per screen; secondary for cancel/back/view;
+     danger only for destructive actions. Min height 40px (44px on touch
+     screens) so they're easy to tap. */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 min-h-[40px] text-sm font-medium whitespace-nowrap
+      disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  @media (pointer: coarse) {
+    .btn { min-height: 44px; }
+  }
+  .btn-primary { @apply btn bg-ember text-white hover:bg-ember/90; }
+  .btn-secondary { @apply btn border border-ink/15 bg-white text-ink hover:bg-ink/5; }
+  .btn-danger { @apply btn bg-danger text-white hover:bg-danger/90; }
+  .btn-danger-outline { @apply btn border border-danger-line text-danger bg-white hover:bg-danger-tint; }
+  .btn-ghost { @apply btn text-ink/70 hover:bg-ink/5 hover:text-ink; }
+  .btn-sm { @apply px-3 min-h-[32px] text-xs; }
+
+  /* Form controls */
+  .input {
+    @apply w-full rounded-lg border border-ink/20 bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-ink/40
+      disabled:bg-ink/5 disabled:text-ink/50 aria-[invalid=true]:border-danger;
+  }
+  .label { @apply block text-sm font-medium mb-1; }
+  .hint { @apply text-xs text-ink/50 mt-1; }
+
+  .link { @apply text-ember underline-offset-2 hover:underline; }
 }

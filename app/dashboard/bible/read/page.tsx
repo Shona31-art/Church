@@ -1,17 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { checkModuleAccess } from "@/lib/paywall";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { fetchChapter, BIBLE_BOOKS } from "@/lib/bible";
+import { moduleGate } from "@/lib/gate";
 
 export default async function BibleReaderPage({
   searchParams,
 }: {
   searchParams: { book?: string; chapter?: string };
 }) {
-  const access = await checkModuleAccess("bible");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+  const gate = await moduleGate("bible");
+  if (gate) return gate;
 
   const book = searchParams.book || "John";
   const chapter = parseInt(searchParams.chapter || "1", 10);

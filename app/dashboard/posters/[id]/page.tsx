@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { checkModuleAccess } from "@/lib/paywall";
 import { normalizePosterStyle } from "@/lib/posters";
 import { PosterPreview } from "../PosterCanvas";
+import { moduleGate } from "@/lib/gate";
 
 export default async function PosterDetailPage({ params }: { params: { id: string } }) {
-  const access = await checkModuleAccess("ai_poster");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+  const gate = await moduleGate("ai_poster");
+  if (gate) return gate;
 
   const supabase = createClient();
   const { data: poster } = await supabase.from("posters").select("*, churches(name)").eq("id", params.id).single();

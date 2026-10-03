@@ -1,9 +1,9 @@
-import { checkModuleAccess } from "@/lib/paywall";
 import { VersePuzzlePlayer } from "./VersePuzzlePlayer";
+import { moduleGate } from "@/lib/gate";
 
 export default async function VersePuzzlePage() {
-  const access = await checkModuleAccess("bible_games");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+  const gate = await moduleGate("bible_games");
+  if (gate) return gate;
 
   return (
     <div className="max-w-2xl">

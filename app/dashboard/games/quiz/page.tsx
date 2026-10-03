@@ -1,10 +1,10 @@
-import { checkModuleAccess } from "@/lib/paywall";
 import { getQuizQuestions } from "./actions";
 import { QuizPlayer } from "./QuizPlayer";
+import { moduleGate } from "@/lib/gate";
 
 export default async function QuizPage() {
-  const access = await checkModuleAccess("bible_games");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+  const gate = await moduleGate("bible_games");
+  if (gate) return gate;
 
   const questions = await getQuizQuestions(10);
 

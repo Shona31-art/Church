@@ -33,6 +33,7 @@ export const MIGRATION_ORDER = [
   "church_os_features_schema.sql",
   "booking_security_fix.sql",
   "support_security_fix.sql",
+  "platform_hardening.sql",
 ];
 
 const SUPABASE_STUBS = `

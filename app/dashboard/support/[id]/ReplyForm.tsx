@@ -24,19 +24,20 @@ export function ReplyForm({ ticketId }: { ticketId: string }) {
   return (
     <form ref={formRef} action={formAction} className="space-y-2 mb-4">
       <input type="hidden" name="ticket_id" value={ticketId} />
-      <label htmlFor="reply" className="block text-sm font-medium">Reply</label>
-      <div className="flex gap-2">
-        <input id="reply" name="content" required maxLength={5000} className="flex-1 border border-ink/20 rounded-lg px-4 py-2 text-sm" />
+      <label htmlFor="reply" className="sr-only">Your reply</label>
+      <div className="flex gap-2 items-end">
+        <textarea id="reply" name="content" required rows={2} maxLength={5000} placeholder="Write a reply…" className="input flex-1" />
         <button
           type="button"
           onClick={() => setShowUpload((s) => !s)}
           aria-expanded={showUpload}
           aria-label="Attach a screenshot"
-          className="text-xs border border-ink/20 rounded-lg px-3"
+          title="Attach a screenshot"
+          className="btn-secondary px-3"
         >
           📎
         </button>
-        <PendingButton pendingLabel="Sending…" className="bg-ember text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50">
+        <PendingButton pendingLabel="Sending…">
           Send
         </PendingButton>
       </div>
@@ -47,7 +48,7 @@ export function ReplyForm({ ticketId }: { ticketId: string }) {
           <input type="hidden" name="attachment_path" value={attachmentPath} />
         </div>
       )}
-      {state?.error && <p role="alert" className="text-sm text-red-700">⚠ {state.error}</p>}
+      {state?.error && <p role="alert" className="text-sm text-danger">⚠ {state.error}</p>}
     </form>
   );
 }

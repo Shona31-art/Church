@@ -1,12 +1,14 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { checkModuleAccess } from "@/lib/paywall";
 import { generateText, isAiConfigured } from "@/lib/ai";
 import { consumeAiQuota } from "@/lib/ai-quota";
+import { flash } from "@/lib/flash";
 import { POSTER_FORMATS, POSTER_TEMPLATES, isHexColor, isPosterRole } from "@/lib/posters";
 
 // Server actions are public endpoints, so both actions re-check the role and
@@ -62,7 +64,10 @@ const PosterSchema = z.object({
   format: z.enum(POSTER_FORMATS),
 });
 
-/** Form fields: event_title, tagline?, speaker?, event_date?, location?, template_key, theme_color, format */
+/**
+ * Create or edit. Form fields: poster_id? (edit), event_title, tagline?,
+ * speaker?, event_date?, location?, template_key, theme_color, format
+ */
 export async function savePoster(_prev: { error?: string } | null, formData: FormData): Promise<{ error?: string } | null> {
   const me = await requirePosterMaker();
   if (!me) return { error: "Only pastors, admins and department leaders can save posters. If you are one, sign in again." };
@@ -79,28 +84,57 @@ export async function savePoster(_prev: { error?: string } | null, formData: For
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Please check the poster details." };
   const p = parsed.data;
+  const row = {
+    event_title: p.eventTitle,
+    tagline: p.tagline ?? null,
+    speaker: p.speaker ?? null,
+    event_date: p.eventDate ?? null,
+    location: p.location ?? null,
+    template_key: p.templateKey,
+    theme_color: p.themeColor,
+    format: p.format,
+  };
 
   const supabase = createClient();
+  const existingId = formData.get("poster_id");
+  if (existingId) {
+    const id = z.string().uuid().safeParse(existingId);
+    if (!id.success) return { error: "That poster couldn't be found." };
+    // RLS: the poster's creator, or a pastor/church admin.
+    const { data: updated, error } = await supabase.from("posters").update(row).eq("id", id.data).eq("church_id", me.church_id).select("id");
+    if (error || !updated?.length) {
+      if (error) console.error("[posters] update failed:", error.message);
+      return { error: "Couldn't save the poster. Only its creator, pastors and church admins can edit it." };
+    }
+    revalidatePath("/dashboard/posters");
+    revalidatePath(`/dashboard/posters/${id.data}`);
+    flash("Poster saved.");
+    redirect(`/dashboard/posters/${id.data}`);
+  }
+
   const { data: poster, error } = await supabase
     .from("posters")
-    .insert({
-      church_id: me.church_id,
-      created_by: me.id,
-      event_title: p.eventTitle,
-      tagline: p.tagline ?? null,
-      speaker: p.speaker ?? null,
-      event_date: p.eventDate ?? null,
-      location: p.location ?? null,
-      template_key: p.templateKey,
-      theme_color: p.themeColor,
-      format: p.format,
-    })
+    .insert({ ...row, church_id: me.church_id, created_by: me.id })
     .select("id")
     .single();
   if (error || !poster) {
     console.error("[posters] save failed:", error?.message);
     return { error: "Couldn't save the poster — please try again. Your design is still here." };
   }
-
+  revalidatePath("/dashboard/posters");
+  flash("Poster saved. Download it as an image below.");
   redirect(`/dashboard/posters/${poster.id}`);
+}
+
+/** Form fields: poster_id */
+export async function deletePoster(_prev: { error?: string } | null, formData: FormData): Promise<{ error?: string } | null> {
+  const me = await requirePosterMaker();
+  if (!me) return { error: "Your session has expired — sign in again." };
+  const id = z.string().uuid().safeParse(formData.get("poster_id"));
+  if (!id.success) return { error: "That poster couldn't be found." };
+  const { data: deleted, error } = await createClient().from("posters").delete().eq("id", id.data).eq("church_id", me.church_id).select("id");
+  if (error || !deleted?.length) return { error: "Couldn't delete the poster. Only its creator, pastors and church admins can delete it." };
+  revalidatePath("/dashboard/posters");
+  flash("Poster deleted.");
+  redirect("/dashboard/posters");
 }

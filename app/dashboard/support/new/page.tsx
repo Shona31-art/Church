@@ -2,27 +2,31 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Alert } from "@/components/ui/Alert";
+import { FormActions, RequiredNote } from "@/components/ui/FormField";
 import { useFormState } from "react-dom";
 import { FileUpload } from "../FileUpload";
 import { createTicket } from "./actions";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
 
-const field = "w-full border border-ink/20 rounded-lg px-4 py-3";
+const field = "input";
 
 export default function NewTicketPage() {
   const [state, formAction] = useFormState(createTicket, null);
   const [attachmentPath, setAttachmentPath] = useState("");
 
   return (
-    <form action={formAction} className="max-w-md space-y-4">
-      <Link href="/dashboard/support" className="text-sm text-ink/50 hover:text-ink">← Support</Link>
+    <div>
+    <div className="mb-6">
+      <Link href="/dashboard/support" className="inline-flex items-center gap-1 text-sm text-ink/60 hover:text-ink mb-2"><span aria-hidden>←</span> Support</Link>
       <h1 className="text-2xl font-semibold">New support ticket</h1>
+      <div className="rule-gold mt-2" />
+      <p className="mt-2 text-sm text-ink/60">The platform team usually replies within one working day. Your church admin can see tickets from your church.</p>
+    </div>
+    <form action={formAction} className="card-elevated rounded-2xl p-5 sm:p-6 max-w-xl space-y-5">
+      <RequiredNote />
 
-      {state?.error && (
-        <p role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
-          ⚠ {state.error}
-        </p>
-      )}
+      {state?.error && <Alert tone="error">{state.error}</Alert>}
 
       <div>
         <label htmlFor="subject" className="block text-sm font-medium mb-1">Subject</label>
@@ -59,9 +63,11 @@ export default function NewTicketPage() {
         <input type="hidden" name="attachment_path" value={attachmentPath} />
       </div>
 
-      <PendingButton pendingLabel="Submitting…" className="bg-ember text-white px-6 py-3 rounded-lg font-medium disabled:opacity-50">
-        Submit ticket
-      </PendingButton>
+      <FormActions>
+        <PendingButton pendingLabel="Submitting…">Submit ticket</PendingButton>
+        <Link href="/dashboard/support" className="btn-secondary">Cancel</Link>
+      </FormActions>
     </form>
+    </div>
   );
 }

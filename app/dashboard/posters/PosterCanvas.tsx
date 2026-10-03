@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { showToast } from "@/components/ui/Toaster";
 
 export interface PosterData {
   churchName: string;
@@ -51,6 +52,10 @@ export function PosterPreview({ data, showDownload = true }: { data: PosterData;
       link.href = canvas.toDataURL("image/png");
       link.click();
     };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      showToast("Your browser couldn't create the image. Try a different browser, or take a screenshot of the preview.", "error");
+    };
     img.src = url;
   }
 
@@ -60,7 +65,9 @@ export function PosterPreview({ data, showDownload = true }: { data: PosterData;
         ref={svgRef}
         viewBox={`0 0 ${w} ${h}`}
         xmlns="http://www.w3.org/2000/svg"
-        className="w-full h-auto rounded-lg border border-ink/10"
+        role="img"
+        aria-label={`Poster preview: ${data.eventTitle}${data.eventDate ? `, ${data.eventDate}` : ""}`}
+        className="w-full h-auto rounded-lg border border-line"
       >
         <rect width={w} height={h} fill="#faf7f2" />
 
@@ -121,7 +128,7 @@ export function PosterPreview({ data, showDownload = true }: { data: PosterData;
         <button
           onClick={downloadPng}
           type="button"
-          className="mt-3 bg-ember text-white px-4 py-2 rounded-lg text-sm font-medium"
+          className="mt-3 btn-primary"
         >
           Download PNG
         </button>

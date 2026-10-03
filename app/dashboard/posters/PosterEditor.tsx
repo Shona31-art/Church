@@ -1,27 +1,43 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useFormState } from "react-dom";
-import { PosterPreview, PosterData } from "../PosterCanvas";
+import { PosterPreview, PosterData } from "./PosterCanvas";
 import { generatePosterTagline, savePoster } from "./actions";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { POSTER_COLORS, POSTER_TEMPLATES } from "@/lib/posters";
+import { Alert } from "@/components/ui/Alert";
 
-const field = "w-full border border-ink/20 rounded-lg px-4 py-2 text-sm";
+export interface PosterValues {
+  id: string;
+  eventTitle: string;
+  tagline: string;
+  speaker: string;
+  eventDate: string;
+  location: string;
+  templateKey: PosterData["templateKey"];
+  themeColor: string;
+  format: PosterData["format"];
+}
 
-export function PosterEditor({ churchName }: { churchName: string }) {
+const field = "input";
+
+export function PosterEditor({ churchName, poster }: { churchName: string; poster?: PosterValues }) {
   const [state, formAction] = useFormState(savePoster, null);
-  const [form, setForm] = useState({
-    eventTitle: "Sunday Service",
-    tagline: "",
-    speaker: "",
-    eventDate: "",
-    location: "",
-    templateKey: "classic" as PosterData["templateKey"],
-    themeColor: POSTER_COLORS[0].hex as string,
-    format: "square" as PosterData["format"],
-  });
+  const [form, setForm] = useState(
+    poster
+      ? { ...poster }
+      : {
+          eventTitle: "Sunday Service",
+          tagline: "",
+          speaker: "",
+          eventDate: "",
+          location: "",
+          templateKey: "classic" as PosterData["templateKey"],
+          themeColor: POSTER_COLORS[0].hex as string,
+          format: "square" as PosterData["format"],
+        }
+  );
   const [generating, setGenerating] = useState(false);
   const [aiNotice, setAiNotice] = useState<string | null>(null);
 
@@ -45,22 +61,13 @@ export function PosterEditor({ churchName }: { churchName: string }) {
 
   return (
     <div className="max-w-3xl">
-      <Link href="/dashboard/posters" className="text-sm text-ink/50 hover:text-ink">← Posters</Link>
-      <h1 className="text-2xl font-semibold mt-2 mb-1">Poster Studio</h1>
-      <p className="text-xs text-ink/40 mb-6">
-        AI can suggest the tagline; the design comes from the template you pick.
-      </p>
-
       <div className="grid md:grid-cols-2 gap-8">
         <form action={formAction} className="space-y-3">
+          {poster && <input type="hidden" name="poster_id" value={poster.id} />}
           <input type="hidden" name="template_key" value={form.templateKey} />
           <input type="hidden" name="theme_color" value={form.themeColor} />
 
-          {state?.error && (
-            <p role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
-              ⚠ {state.error}
-            </p>
-          )}
+          {state?.error && <Alert tone="error">{state.error}</Alert>}
 
           <div>
             <label htmlFor="event_title" className="block text-sm font-medium mb-1">Event title</label>
@@ -77,7 +84,7 @@ export function PosterEditor({ churchName }: { churchName: string }) {
                 type="button"
                 onClick={handleGenerateTagline}
                 disabled={generating || !form.eventTitle.trim()}
-                className="text-xs bg-ink/5 px-3 py-2 rounded-lg whitespace-nowrap disabled:opacity-40"
+                className="btn-secondary whitespace-nowrap"
               >
                 {generating ? "Thinking…" : "✨ AI suggest"}
               </button>
@@ -115,7 +122,7 @@ export function PosterEditor({ churchName }: { churchName: string }) {
                   type="button"
                   aria-pressed={form.templateKey === t}
                   onClick={() => update("templateKey", t)}
-                  className={`text-xs px-3 py-2 rounded-lg capitalize ${form.templateKey === t ? "bg-ember text-white" : "border border-ink/20"}`}
+                  className={`${form.templateKey === t ? "btn-primary" : "btn-secondary"} btn-sm capitalize`}
                 >
                   {t}
                 </button>
@@ -134,7 +141,7 @@ export function PosterEditor({ churchName }: { churchName: string }) {
                   aria-pressed={form.themeColor === c.hex}
                   title={c.name}
                   onClick={() => update("themeColor", c.hex)}
-                  className="w-7 h-7 rounded-full border-2"
+                  className="w-9 h-9 rounded-full border-2"
                   // Swatch colours are the poster's own palette, not app UI colours.
                   style={{ backgroundColor: c.hex, borderColor: form.themeColor === c.hex ? "#1c1917" : "transparent" }}
                 />
@@ -151,8 +158,8 @@ export function PosterEditor({ churchName }: { churchName: string }) {
             </select>
           </div>
 
-          <PendingButton pendingLabel="Saving…" className="w-full bg-ember text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50">
-            Save poster
+          <PendingButton pendingLabel="Saving…" className="btn-primary w-full">
+            {poster ? "Save changes" : "Save poster"}
           </PendingButton>
         </form>
 

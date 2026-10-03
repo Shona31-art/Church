@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createQuestion } from "./actions";
+import Link from "next/link";
+import { ManualQuestionForm } from "./ManualQuestionForm";
 import { generateQuestionsWithAI, saveGeneratedQuestions, GeneratedQuestion } from "../ai-actions";
 
 export default function NewQuestionPage() {
@@ -46,89 +47,62 @@ export default function NewQuestionPage() {
 
   return (
     <div className="max-w-lg">
-      <h1 className="text-2xl font-semibold mb-4">Add questions</h1>
+      <Link href="/dashboard/games/questions" className="inline-flex items-center gap-1 text-sm text-ink/60 hover:text-ink mb-2"><span aria-hidden>←</span> Quiz questions</Link>
+      <h1 className="text-2xl font-semibold">Add questions</h1>
+      <div className="rule-gold mt-2 mb-6" />
 
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6" role="group" aria-label="How to add questions">
         <button
+          type="button"
+          aria-pressed={mode === "manual"}
           onClick={() => setMode("manual")}
-          className={`text-sm px-4 py-2 rounded-lg ${mode === "manual" ? "bg-ember text-white" : "border border-ink/20"}`}
+          className={mode === "manual" ? "btn-primary" : "btn-secondary"}
         >
           Write manually
         </button>
         <button
+          type="button"
+          aria-pressed={mode === "ai"}
           onClick={() => setMode("ai")}
-          className={`text-sm px-4 py-2 rounded-lg ${mode === "ai" ? "bg-ember text-white" : "border border-ink/20"}`}
+          className={mode === "ai" ? "btn-primary" : "btn-secondary"}
         >
           ✨ Generate with AI
         </button>
       </div>
 
       {mode === "manual" && (
-        <form action={createQuestion} className="space-y-3">
-          <textarea
-            name="question"
-            placeholder="Question"
-            required
-            rows={2}
-            className="w-full border border-ink/20 rounded-lg px-4 py-3"
-          />
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="flex items-center gap-2">
-              <input type="radio" name="correct_index" value={i} defaultChecked={i === 0} />
-              <input
-                name={`choice_${i}`}
-                placeholder={`Choice ${i + 1}${i === 0 ? " (mark the radio button for the correct one)" : ""}`}
-                required
-                className="flex-1 border border-ink/20 rounded-lg px-3 py-2 text-sm"
-              />
-            </div>
-          ))}
-          <div className="flex gap-2">
-            <select name="category" className="flex-1 border border-ink/20 rounded-lg px-3 py-2 text-sm">
-              <option value="old_testament">Old Testament</option>
-              <option value="new_testament">New Testament</option>
-              <option value="people">People</option>
-              <option value="numbers">Numbers</option>
-              <option value="general">General</option>
-            </select>
-            <select name="difficulty" defaultValue="medium" className="flex-1 border border-ink/20 rounded-lg px-3 py-2 text-sm">
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
-          </div>
-          <button type="submit" className="bg-ember text-white px-6 py-3 rounded-lg font-medium">
-            Save question
-          </button>
-        </form>
+        <ManualQuestionForm />
       )}
 
       {mode === "ai" && (
         <div>
           {!generated.length && (
             <div className="space-y-3">
+              <label htmlFor="ai-topic" className="label">Topic <span className="font-normal text-ink/50">(optional)</span></label>
               <input
+                id="ai-topic"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 placeholder="Topic (optional), e.g. 'the Exodus' or 'Paul's journeys'"
-                className="w-full border border-ink/20 rounded-lg px-4 py-3 text-sm"
+                className="input"
               />
               <div className="flex items-center gap-2">
-                <label className="text-sm text-ink/50">How many?</label>
+                <label htmlFor="ai-count" className="text-sm text-ink/60">How many?</label>
                 <input
+                  id="ai-count"
                   type="number"
                   min={1}
                   max={15}
                   value={count}
                   onChange={(e) => setCount(parseInt(e.target.value) || 5)}
-                  className="w-20 border border-ink/20 rounded-lg px-3 py-2 text-sm"
+                  className="input w-20"
                 />
               </div>
-              {error && <p className="text-red-600 text-sm">{error}</p>}
+              {error && <p role="alert" className="text-danger text-sm">⚠ {error}</p>}
               <button
                 onClick={handleGenerate}
                 disabled={generating}
-                className="bg-ember text-white px-6 py-3 rounded-lg font-medium disabled:opacity-50"
+                className="btn-primary"
               >
                 {generating ? "Generating..." : "Generate"}
               </button>
@@ -164,7 +138,7 @@ export default function NewQuestionPage() {
                 <button
                   onClick={handleSaveGenerated}
                   disabled={saving || !generated.length}
-                  className="bg-ember text-white px-6 py-3 rounded-lg font-medium disabled:opacity-50"
+                  className="btn-primary"
                 >
                   {saving ? "Saving..." : `Save ${generated.length} question(s)`}
                 </button>

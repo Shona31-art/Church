@@ -33,12 +33,20 @@ export default async function SuperAdminHome() {
         <StatCard label="Suspended" value={statusCounts["suspended"] ?? 0} />
       </div>
 
-      <Link
-        href="/dashboard/super-admin/churches"
-        className="bg-ember text-white px-4 py-2 rounded-lg text-sm font-medium"
-      >
-        Manage all churches →
-      </Link>
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href="/dashboard/super-admin/churches"
+          className="bg-ember text-white px-4 py-2 rounded-lg text-sm font-medium"
+        >
+          Manage all churches →
+        </Link>
+        <Link
+          href="/dashboard/super-admin/users"
+          className="border border-ink/15 px-4 py-2 rounded-lg text-sm font-medium hover:bg-ink/5"
+        >
+          Manage users →
+        </Link>
+      </div>
     </div>
   );
 }

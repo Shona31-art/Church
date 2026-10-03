@@ -26,7 +26,12 @@ export async function addMember(
   // Creating another person's login requires the admin (service role)
   // client — a regular user can never do this for someone else, by design.
   const admin = createAdminClient();
-  const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(email);
+  const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(email, {
+    redirectTo: new URL(
+      "/reset-password",
+      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    ).toString(),
+  });
 
   if (error || !invited.user) {
     return { error: error?.message || "Could not send invite — check the email address and try again." };

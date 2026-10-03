@@ -146,11 +146,16 @@ that can't skip approval. GitHub Actions
 3. Branches: work on `dev` (each push gets a Vercel Preview URL); merge
    `dev` → `main` only when a change is approved for Production.
 4. Supabase → Authentication → URL Configuration: set the Site URL and add the
-   Vercel URLs to Redirect URLs (needed for invite and password-reset emails).
+   app URLs plus `/reset-password` to Redirect URLs (needed for invite and
+   password-reset emails). Locally, allow `http://localhost:3000/reset-password`.
 5. Before real users: configure custom SMTP (Supabase's built-in email is
    heavily rate-limited), confirm backups (Pro plan has daily backups; the free
    plan has none you can restore yourself), and set up a log drain / error
    tracking (see Known gaps).
+
+Platform super admins can manage churches and users from **Dashboard → Super
+Admin**. Creating a user sets their initial Supabase Auth password immediately;
+the password is not stored in `app_users`. Share it with the user securely.
 
 **Environments:** I couldn't check whether your Preview and Production point at
 the same Supabase project. If they do, any test (including `pnpm seed`) touches

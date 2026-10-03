@@ -10,11 +10,12 @@ export default async function ServicePlannerPage() {
   const me = await getCurrentAppUser();
   const supabase = createClient();
 
-  const { data: plans } = await supabase
+  const { data: plans, error } = await supabase
     .from("service_plans")
     .select("id, title, service_date, status")
     .eq("church_id", me!.church_id)
     .order("service_date", { ascending: false });
+  if (error) console.error("[service-planner] list failed:", error.message);
 
   const canManage = me && ["pastor", "church_admin"].includes(me.role);
 
@@ -54,7 +55,14 @@ export default async function ServicePlannerPage() {
             </span>
           </Link>
         ))}
-        {!plans?.length && <p className="text-ink/40 text-sm">No service plans yet.</p>}
+        {error && (
+          <p role="alert" className="text-sm text-red-700">⚠ Couldn't load service plans — refresh the page to try again.</p>
+        )}
+        {!error && !plans?.length && (
+          <p className="text-ink/40 text-sm">
+            {canManage ? "No service plans yet. Create one to share the running order with your team." : "No published service plans yet."}
+          </p>
+        )}
       </div>
     </div>
   );

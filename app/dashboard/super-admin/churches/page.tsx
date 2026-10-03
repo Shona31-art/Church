@@ -16,7 +16,15 @@ export default async function AllChurchesPage() {
 
   return (
     <div className="max-w-3xl">
-      <h1 className="text-2xl font-semibold mb-6">All churches</h1>
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold">All churches</h1>
+        <Link
+          href="/dashboard/super-admin/churches/new"
+          className="bg-ember text-white px-4 py-2 rounded-lg text-sm font-medium"
+        >
+          Add church
+        </Link>
+      </div>
 
       <div className="border border-ink/10 rounded-xl overflow-hidden">
         <table className="w-full text-sm">

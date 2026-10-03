@@ -51,16 +51,17 @@ export default async function DashboardLayout({
   ];
   const navItems: NavItem[] =
     me.role === "super_admin"
-      ? [{ href: "/dashboard/support", label: "Support", icon: "🛟" }]
+      ? [
+          { href: "/dashboard/support", label: "Support", icon: "🛟" },
+          { href: "/dashboard/super-admin", label: "Super Admin", icon: "⚙️" },
+          { href: "/dashboard/super-admin/churches", label: "Churches", icon: "⛪" },
+          { href: "/dashboard/super-admin/users", label: "Users", icon: "👥" },
+        ]
       : allItems.filter((item) => item.show !== false).map(({ show: _show, ...item }) => item);
 
   if (me.role === "church_admin") {
     navItems.push({ href: "/dashboard/billing", label: "Billing", icon: "💳" });
   }
-  if (me.role === "super_admin") {
-    navItems.push({ href: "/dashboard/super-admin", label: "Super Admin", icon: "⚙️" });
-  }
-
   return (
     <DashboardChrome
       navItems={navItems}

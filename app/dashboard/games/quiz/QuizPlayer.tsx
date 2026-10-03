@@ -85,8 +85,8 @@ export function QuizPlayer({ questions }: { questions: QuizQuestion[] }) {
         {current.choices.map((choice, i) => {
           let style = "border-ink/20";
           if (selected !== null) {
-            if (i === correctIndex) style = "border-green-500 bg-green-50";
-            else if (i === selected) style = "border-red-400 bg-red-50";
+            if (i === correctIndex) style = "border-success-line bg-success-tint";
+            else if (i === selected) style = "border-danger-line bg-danger-tint";
           }
           return (
             <button

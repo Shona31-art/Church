@@ -78,7 +78,7 @@ export function VersePuzzlePlayer() {
         <p className="text-sm text-ink/50">Round complete</p>
         <p className="text-4xl font-semibold mt-2">{score} / {round.length}</p>
         {saveError ? (
-          <p className="text-sm text-red-700 mt-3" role="alert">⚠ {saveError}</p>
+          <p className="text-sm text-danger mt-3" role="alert">⚠ {saveError}</p>
         ) : (
           <p className="text-xs text-ink/40 mt-2">Your score was added to the church scoreboard.</p>
         )}
@@ -135,9 +135,9 @@ export function VersePuzzlePlayer() {
         ))}
       </div>
 
-      {status === "correct" && <p className="mt-4 text-sm text-green-800" role="status">✓ Correct — well done!</p>}
+      {status === "correct" && <p className="mt-4 text-sm text-success" role="status">✓ Correct — well done!</p>}
       {status === "wrong" && (
-        <p className="mt-4 text-sm text-red-700" role="status">
+        <p className="mt-4 text-sm text-danger" role="status">
           ✗ Not quite. Reset and try again, or reveal the answer.
         </p>
       )}

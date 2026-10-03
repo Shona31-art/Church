@@ -34,7 +34,7 @@ export function CommentForm({ prayerId }: { prayerId: string }) {
         </PendingButton>
       </div>
       {state?.error && (
-        <p role="alert" className="text-xs text-red-700 mt-1">
+        <p role="alert" className="text-xs text-danger mt-1">
           ⚠ {state.error}
         </p>
       )}

@@ -119,13 +119,13 @@ export default function NewQuestionPage() {
                   <div key={i} className="border border-ink/10 rounded-lg p-3 bg-white/60 text-sm">
                     <div className="flex justify-between gap-2">
                       <p className="font-medium">{q.question}</p>
-                      <button onClick={() => removeGenerated(i)} className="text-xs text-red-700 shrink-0">
+                      <button onClick={() => removeGenerated(i)} className="text-xs text-danger shrink-0">
                         Remove
                       </button>
                     </div>
                     <ul className="text-xs text-ink/60 mt-1">
                       {q.choices.map((c, ci) => (
-                        <li key={ci} className={ci === q.correctIndex ? "text-green-700" : ""}>
+                        <li key={ci} className={ci === q.correctIndex ? "text-success" : ""}>
                           {ci === q.correctIndex ? "✓ " : "— "}
                           {c}
                         </li>

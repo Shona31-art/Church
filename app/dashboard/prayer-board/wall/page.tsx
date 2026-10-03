@@ -65,7 +65,7 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
       </p>
 
       {error && (
-        <p role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 mb-6">
+        <p role="alert" className="text-sm text-danger bg-danger-tint border border-danger-line rounded-lg p-3 mb-6">
           ⚠ Couldn&apos;t load the prayer wall — refresh to try again.
         </p>
       )}
@@ -96,7 +96,7 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
                   <span className="font-semibold text-ink">{p.app_users?.name ?? "A member"}</span>
                   {p.category ? ` · ${p.category}` : ""}
                 </span>
-                <span className={isTestimony ? "text-green-800 font-semibold" : ""}>
+                <span className={isTestimony ? "text-success font-semibold" : ""}>
                   {isTestimony ? "⭐ Answered prayer" : new Date(p.created_at).toLocaleDateString()}
                 </span>
               </div>

@@ -76,7 +76,7 @@ export function StudyTool({ initialQuery }: { initialQuery: string }) {
         </section>
       )}
       {result?.error && (
-        <p role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">⚠ {result.error}</p>
+        <p role="alert" className="text-sm text-danger bg-danger-tint border border-danger-line rounded-lg p-3">⚠ {result.error}</p>
       )}
       {result?.text && (
         <section className="card-elevated rounded-2xl p-5" aria-live="polite">

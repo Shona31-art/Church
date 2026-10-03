@@ -60,7 +60,7 @@ export function FileUpload({ id, onUploaded }: { id: string; onUploaded: (path: 
       <input id={id} type="file" accept={ATTACHMENT_ACCEPT} onChange={handleFile} disabled={uploading} className="text-sm" />
       <p className="text-xs text-ink/40 mt-1">PNG, JPEG, WebP or GIF, up to 5 MB.</p>
       {uploading && <p role="status" className="text-xs text-ink/50 mt-1">Uploading…</p>}
-      {error && <p role="alert" className="text-xs text-red-700 mt-1">⚠ {error}</p>}
+      {error && <p role="alert" className="text-xs text-danger mt-1">⚠ {error}</p>}
       {preview && !uploading && (
         // Local blob preview — next/image can't optimise blob: URLs.
         <img src={preview} alt="Attachment preview" className="mt-2 max-h-32 rounded-lg border border-ink/10" />

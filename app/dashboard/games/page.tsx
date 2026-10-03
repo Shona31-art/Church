@@ -72,7 +72,7 @@ export default async function GamesHubPage() {
           <h2 id="board-heading" className="text-lg font-semibold">Church scoreboard</h2>
           <p className="text-xs text-ink/40 mb-3">Total points, last {WINDOW_DAYS} days</p>
           {error ? (
-            <p className="text-sm text-red-700" role="alert">⚠ Couldn't load the scoreboard — refresh to try again.</p>
+            <p className="text-sm text-danger" role="alert">⚠ Couldn't load the scoreboard — refresh to try again.</p>
           ) : leaderboard.length === 0 ? (
             <p className="text-sm text-ink/50">No games played yet — be the first on the board!</p>
           ) : (

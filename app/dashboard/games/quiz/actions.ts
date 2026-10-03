@@ -37,6 +37,9 @@ export async function checkAnswer(
   questionId: string,
   choiceIndex: number
 ): Promise<{ correct: boolean; correctIndex: number }> {
+  // A server action is a public endpoint: only signed-in members may check answers.
+  const me = await getCurrentAppUser();
+  if (!me || typeof questionId !== "string" || !Number.isInteger(choiceIndex)) return { correct: false, correctIndex: -1 };
   const supabase = createClient();
   const { data } = await supabase
     .from("bible_quiz_questions")

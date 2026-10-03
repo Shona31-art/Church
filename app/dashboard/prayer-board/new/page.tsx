@@ -28,7 +28,7 @@ export default function NewPrayerPage() {
       <h1 className="text-2xl font-semibold">Add a prayer</h1>
 
       {state?.error && (
-        <p role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+        <p role="alert" className="text-sm text-danger bg-danger-tint border border-danger-line rounded-lg p-3">
           ⚠ {state.error}
         </p>
       )}
@@ -59,7 +59,7 @@ export default function NewPrayerPage() {
             {drafting ? "Drafting…" : "✨ Help me write it"}
           </button>
         </div>
-        {aiError && <p role="alert" className="text-xs text-red-700 mt-1">⚠ {aiError}</p>}
+        {aiError && <p role="alert" className="text-xs text-danger mt-1">⚠ {aiError}</p>}
       </div>
 
       <div>

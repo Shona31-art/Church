@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
+import { checkModuleAccess } from "@/lib/paywall";
 import { generateText } from "@/lib/ai";
 import { consumeAiQuota } from "@/lib/ai-quota";
 import { logAudit } from "@/lib/audit";
@@ -179,6 +180,9 @@ export async function draftPrayerWithAi(
   topic: string,
   category: string
 ): Promise<{ text?: string; error?: string }> {
+  const me = await getCurrentAppUser();
+  if (!me) return { error: "Your session has expired — please sign in again." };
+  if (!(await checkModuleAccess("prayer_board")).allowed) return { error: "The prayer board isn't available on your church's plan." };
   const parsed = z
     .object({ topic: z.string().trim().min(3, "Tell us a little about what to pray for.").max(500), category: z.string().max(40) })
     .safeParse({ topic, category });

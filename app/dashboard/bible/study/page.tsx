@@ -13,7 +13,7 @@ export default async function BibleStudyPage({ searchParams }: { searchParams: {
       <h1 className="text-2xl font-semibold mt-2">Bible study</h1>
       <p className="text-sm text-ink/50 mt-1 mb-6">Explanations, devotionals, cross-references and reading plans for any passage or topic.</p>
       {!isAiConfigured() && (
-        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-6">
+        <p className="text-sm text-warning bg-warning-tint border border-warning-line rounded-lg p-3 mb-6">
           ⚠ AI isn&apos;t configured on this server yet (ANTHROPIC_API_KEY), so study notes won&apos;t generate. You can still read any passage in the Bible reader.
         </p>
       )}

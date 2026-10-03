@@ -28,7 +28,8 @@ const KEYWORD_MAP: Record<string, string[]> = {
   gratitude: ["1 Thessalonians 5:18", "Psalm 100:4"],
 };
 
-export async function suggestScriptureForPrayer(prayerText: string): Promise<string[]> {
+// Not exported: an exported function in a "use server" file is a public endpoint.
+async function suggestScriptureForPrayer(prayerText: string): Promise<string[]> {
   const refs =
     isAiConfigured() && (await consumeAiQuota("prayer_scripture")).ok
       ? await generateJson<unknown>({

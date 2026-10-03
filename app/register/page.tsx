@@ -1,146 +1,80 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { provisionChurch } from "./actions";
+import Link from "next/link";
+import { useFormState } from "react-dom";
+import { registerChurch } from "./actions";
+import { PendingButton } from "@/components/ConfirmSubmitButton";
+import { Alert } from "@/components/ui/Alert";
+import { FormField, RequiredNote } from "@/components/ui/FormField";
 
 export default function RegisterPage() {
-  const router = useRouter();
-  const supabase = createClient();
+  const [state, action] = useFormState(registerChurch, null);
+  const fe = state?.fieldErrors ?? {};
+  const v = state?.values ?? {};
 
-  const [form, setForm] = useState({
-    churchName: "",
-    adminName: "",
-    email: "",
-    phone: "",
-    password: "",
-  });
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [needsEmailConfirm, setNeedsEmailConfirm] = useState(false);
-
-  function update(field: string, value: string) {
-    setForm((f) => ({ ...f, [field]: value }));
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-    });
-
-    if (signUpError || !data.user) {
-      setLoading(false);
-      setError(signUpError?.message || "Could not create your account.");
-      return;
-    }
-
-    // If email confirmation is required (default on a fresh Supabase
-    // project), there's no session yet — the church still gets provisioned,
-    // but the admin needs to confirm their email before they can log in.
-    const result = await provisionChurch({
-      userId: data.user.id,
-      churchName: form.churchName,
-      adminName: form.adminName,
-      email: form.email,
-      phone: form.phone,
-    });
-
-    setLoading(false);
-
-    if (!result.success) {
-      setError(result.error || "Something went wrong setting up your church.");
-      return;
-    }
-
-    if (!data.session) {
-      setNeedsEmailConfirm(true);
-      return;
-    }
-
-    router.push("/dashboard/setup");
-    router.refresh();
-  }
-
-  if (needsEmailConfirm) {
+  if (state?.ok) {
     return (
-      <main className="min-h-screen flex items-center justify-center px-6 text-center">
-        <div className="max-w-sm">
-          <h1 className="text-xl font-semibold mb-2">Almost there</h1>
-          <p className="text-ink/60">
-            Your church account has been created. Check your email to confirm
-            your address, then sign in to get started.
+      <main className="min-h-screen flex items-center justify-center px-4">
+        <div className="card-elevated rounded-2xl p-8 max-w-md text-center" role="status">
+          <h1 className="text-2xl font-semibold">Check your email</h1>
+          <div className="rule-gold mx-auto mt-2" />
+          <p className="text-ink/70 mt-4">
+            Your church is set up. We&apos;ve sent a confirmation link{v.email ? ` to ${v.email}` : ""} — open it, then sign in to get started.
           </p>
+          <Link href="/login" className="btn-primary mt-6">
+            Go to sign in
+          </Link>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-6 py-12">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
-        <h1 className="text-2xl font-semibold text-center mb-6">
-          Create your church account
-        </h1>
+    <main className="min-h-screen flex items-center justify-center px-4 py-10">
+      <form key={JSON.stringify(v)} action={action} className="w-full max-w-md card-elevated rounded-2xl p-6 sm:p-8 space-y-5" noValidate>
+        <div className="text-center">
+          <h1 className="text-2xl font-semibold">Start your free trial</h1>
+          <div className="rule-gold mx-auto mt-2" />
+          <p className="text-sm text-ink/60 mt-3">30 days, every core feature, no card required.</p>
+        </div>
 
-        <input
-          placeholder="Church name"
-          required
-          value={form.churchName}
-          onChange={(e) => update("churchName", e.target.value)}
-          className="w-full border border-ink/20 rounded-lg px-4 py-3"
-        />
-        <input
-          placeholder="Your name (admin)"
-          required
-          value={form.adminName}
-          onChange={(e) => update("adminName", e.target.value)}
-          className="w-full border border-ink/20 rounded-lg px-4 py-3"
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          required
-          value={form.email}
-          onChange={(e) => update("email", e.target.value)}
-          className="w-full border border-ink/20 rounded-lg px-4 py-3"
-        />
-        <input
-          placeholder="Phone (optional)"
-          value={form.phone}
-          onChange={(e) => update("phone", e.target.value)}
-          className="w-full border border-ink/20 rounded-lg px-4 py-3"
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          required
-          minLength={6}
-          value={form.password}
-          onChange={(e) => update("password", e.target.value)}
-          className="w-full border border-ink/20 rounded-lg px-4 py-3"
-        />
+        {state?.error && <Alert tone="error">{state.error}</Alert>}
+        <RequiredNote />
 
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        <FormField label="Church name" htmlFor="church_name" required error={fe.church_name}>
+          <input id="church_name" name="church_name" autoComplete="organization" required maxLength={200} defaultValue={v.church_name} className="input" aria-invalid={Boolean(fe.church_name)} />
+        </FormField>
+        <FormField label="Your name" htmlFor="admin_name" required error={fe.admin_name} hint="You'll be the church admin.">
+          <input id="admin_name" name="admin_name" autoComplete="name" required maxLength={120} defaultValue={v.admin_name} className="input" aria-invalid={Boolean(fe.admin_name)} />
+        </FormField>
+        <FormField label="Email" htmlFor="email" required error={fe.email}>
+          <input id="email" name="email" type="email" autoComplete="email" required maxLength={254} defaultValue={v.email} className="input" aria-invalid={Boolean(fe.email)} />
+        </FormField>
+        <FormField label="Phone" htmlFor="phone" optional error={fe.phone}>
+          <input id="phone" name="phone" type="tel" autoComplete="tel" maxLength={20} defaultValue={v.phone} className="input" aria-invalid={Boolean(fe.phone)} />
+        </FormField>
+        <FormField label="Password" htmlFor="password" required error={fe.password} hint="At least 8 characters, with letters and numbers.">
+          <input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} className="input" aria-invalid={Boolean(fe.password)} />
+        </FormField>
+        <FormField label="Confirm password" htmlFor="confirm_password" required error={fe.confirm_password}>
+          <input id="confirm_password" name="confirm_password" type="password" autoComplete="new-password" required className="input" aria-invalid={Boolean(fe.confirm_password)} />
+        </FormField>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-ember text-white rounded-lg py-3 font-medium disabled:opacity-50"
-        >
-          {loading ? "Creating..." : "Start free trial"}
-        </button>
+        {/* Honeypot: hidden from people and screen readers; bots fill it in. */}
+        <div aria-hidden="true" className="hidden">
+          <label htmlFor="website">Website</label>
+          <input id="website" name="website" tabIndex={-1} autoComplete="off" />
+        </div>
 
-        <p className="text-xs text-ink/40 text-center">
-          30-day free trial, no card required. Already have an account?{" "}
-          <a href="/login" className="text-ember">
+        <PendingButton className="btn-primary w-full" pendingLabel="Creating your church…">
+          Create church account
+        </PendingButton>
+
+        <p className="text-center text-sm text-ink/60">
+          Already have an account?{" "}
+          <Link href="/login" className="link">
             Sign in
-          </a>
+          </Link>
         </p>
       </form>
     </main>

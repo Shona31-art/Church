@@ -1,22 +1,30 @@
 import { createClient } from "@/lib/supabase/server";
-import { checkModuleAccess } from "@/lib/paywall";
 import { getCurrentAppUser } from "@/lib/current-user";
-import { MemberForm } from "./MemberForm";
+import { moduleGate } from "@/lib/gate";
+import { assignableRoles, can } from "@/lib/permissions";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { PermissionDenied } from "@/components/ui/Gates";
+import { MemberForm } from "../MemberForm";
 
 export default async function NewMemberPage() {
-  const access = await checkModuleAccess("members");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+  const gate = await moduleGate("members");
+  if (gate) return gate;
 
   const me = await getCurrentAppUser();
-  if (!me || !["church_admin", "pastor", "super_admin"].includes(me.role)) {
-    return <p className="text-ink/60">Only church admins and pastors can add members.</p>;
+  if (!me || !can(me.role, "manageMembers")) {
+    return <PermissionDenied message="Only pastors and church admins can add members." backHref="/dashboard/members" />;
   }
 
-  const supabase = createClient();
-  const { data: departments } = await supabase
-    .from("departments")
-    .select("id, name")
-    .eq("church_id", me.church_id);
+  const { data: departments } = await createClient().from("departments").select("id, name").eq("church_id", me.church_id).order("name");
 
-  return <MemberForm departments={departments || []} canGrantAdmin={me.role === "church_admin"} />;
+  return (
+    <div>
+      <PageHeader
+        back={{ href: "/dashboard/members", label: "Members" }}
+        title="Add member"
+        description="Creates their member record and emails them an invite to set up their login."
+      />
+      <MemberForm mode="create" departments={departments ?? []} roles={assignableRoles(me.role)} />
+    </div>
+  );
 }

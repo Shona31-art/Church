@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { checkModuleAccess } from "@/lib/paywall";
+import { flash } from "@/lib/flash";
 
 // All service-planner writes. Pastors and church admins only — re-checked in
 // every action (server actions are callable directly) and again by RLS
@@ -192,5 +193,104 @@ export async function setPlanStatus(_prev: FormResult, formData: FormData): Prom
   revalidatePath(`/dashboard/service-planner/${planId}`);
   revalidatePath("/dashboard/service-planner");
   if (!updated?.length) return { error: "Someone else changed this plan's status just now. The page shows the latest." };
+  flash(to === "published" ? "Plan published — volunteers can now see it." : "Plan unpublished.");
+  return { ok: true };
+}
+
+/** Form fields: plan_id, title, service_date */
+export async function updatePlan(_prev: FormResult, formData: FormData): Promise<FormResult> {
+  const me = await requirePlanner();
+  if (!me) return NOT_ALLOWED;
+
+  const parsed = z
+    .object({
+      planId: uuid,
+      title: z.string().trim().min(1, "Give the service a name.").max(120, "Keep the name under 120 characters."),
+      serviceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose the service date."),
+    })
+    .safeParse({ planId: formData.get("plan_id"), title: formData.get("title"), serviceDate: formData.get("service_date") });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Please check the form." };
+
+  const supabase = createClient();
+  const { data: updated, error } = await supabase
+    .from("service_plans")
+    .update({ title: parsed.data.title, service_date: parsed.data.serviceDate })
+    .eq("id", parsed.data.planId)
+    .eq("church_id", me.church_id)
+    .select("id");
+  if (error) {
+    console.error("[service-planner] update failed:", error.message);
+    return { error: "Couldn't save the changes — please try again." };
+  }
+  if (!updated?.length) return { error: "That service plan couldn't be found — it may have been deleted." };
+
+  revalidatePath(`/dashboard/service-planner/${parsed.data.planId}`);
+  revalidatePath("/dashboard/service-planner");
+  flash("Service details saved.");
+  return { ok: true };
+}
+
+/** Form fields: plan_id. Deletes the plan and its running order. */
+export async function deletePlan(_prev: FormResult, formData: FormData): Promise<FormResult> {
+  const me = await requirePlanner();
+  if (!me) return NOT_ALLOWED;
+  const planId = uuid.safeParse(formData.get("plan_id"));
+  if (!planId.success) return { error: "That service plan couldn't be found." };
+
+  const { data: deleted, error } = await createClient()
+    .from("service_plans")
+    .delete()
+    .eq("id", planId.data)
+    .eq("church_id", me.church_id)
+    .select("id, title");
+  if (error || !deleted?.length) {
+    if (error) console.error("[service-planner] delete failed:", error.message);
+    return { error: "Couldn't delete the plan — please try again." };
+  }
+  revalidatePath("/dashboard/service-planner");
+  flash(`“${deleted[0].title}” was deleted.`);
+  redirect("/dashboard/service-planner");
+}
+
+/**
+ * Form fields: plan_id, item_id, direction ("up" | "down"). Swaps the item
+ * with its neighbour. Two small updates rather than a transaction: if the
+ * second fails the order may show a duplicate position, which the next move
+ * corrects — no data is lost.
+ */
+export async function moveItem(_prev: FormResult, formData: FormData): Promise<FormResult> {
+  const me = await requirePlanner();
+  if (!me) return NOT_ALLOWED;
+  const planId = uuid.safeParse(formData.get("plan_id"));
+  const itemId = uuid.safeParse(formData.get("item_id"));
+  const direction = z.enum(["up", "down"]).safeParse(formData.get("direction"));
+  if (!planId.success || !itemId.success || !direction.success) return { error: "That item couldn't be moved." };
+
+  const supabase = createClient();
+  const { data: items, error } = await supabase
+    .from("service_plan_items")
+    .select("id, order_index")
+    .eq("service_plan_id", planId.data)
+    .order("order_index")
+    .order("created_at");
+  if (error || !items) return { error: "Couldn't load the running order — refresh and try again." };
+
+  const index = items.findIndex((i) => i.id === itemId.data);
+  const swapWith = direction.data === "up" ? index - 1 : index + 1;
+  if (index === -1 || swapWith < 0 || swapWith >= items.length) return { ok: true };
+
+  // Normalise positions to 0..n-1 first so gaps or duplicates can't stall a move.
+  const ordered = items.map((i) => i.id);
+  [ordered[index], ordered[swapWith]] = [ordered[swapWith], ordered[index]];
+  const results = await Promise.all(
+    ordered.map((id, position) =>
+      items.find((i) => i.id === id)!.order_index === position
+        ? Promise.resolve({ error: null })
+        : supabase.from("service_plan_items").update({ order_index: position }).eq("id", id).eq("service_plan_id", planId.data)
+    )
+  );
+  if (results.some((r) => r.error)) return { error: "Couldn't move that item — please try again." };
+
+  revalidatePath(`/dashboard/service-planner/${planId.data}`);
   return { ok: true };
 }

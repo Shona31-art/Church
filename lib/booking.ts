@@ -5,17 +5,19 @@
 // — keep them in sync.
 
 export const BOOKING_TYPES = ["wedding", "funeral", "thanksgiving", "baptism", "counselling", "other"] as const;
-export const BOOKING_STATUSES = ["pending", "approved", "declined", "completed"] as const;
+export const BOOKING_STATUSES = ["pending", "approved", "declined", "completed", "cancelled"] as const;
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 
-// The only status changes a pastor can make. Declined and completed are
-// final, so a decision can't be quietly reversed after the requester has
-// been told.
+// The only status changes a pastor can make. Declined, completed and
+// cancelled are final, so a decision can't be quietly reversed after the
+// requester has been told. (Requesters withdraw their own request through the
+// cancel_booking_request() database function instead.)
 const ALLOWED_TRANSITIONS: Record<BookingStatus, readonly BookingStatus[]> = {
   pending: ["approved", "declined"],
-  approved: ["completed"],
+  approved: ["completed", "cancelled"],
   declined: [],
   completed: [],
+  cancelled: [],
 };
 
 export function canTransition(from: BookingStatus, to: BookingStatus): boolean {
@@ -26,3 +28,20 @@ export function canTransition(from: BookingStatus, to: BookingStatus): boolean {
 export function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
+
+export const BOOKING_STATUS_LABELS: Record<BookingStatus, string> = {
+  pending: "Waiting for a pastor",
+  approved: "Approved",
+  declined: "Declined",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+export const BOOKING_TYPE_LABELS: Record<(typeof BOOKING_TYPES)[number], string> = {
+  wedding: "Wedding",
+  funeral: "Funeral",
+  thanksgiving: "Thanksgiving",
+  baptism: "Baptism",
+  counselling: "Counselling",
+  other: "Other",
+};

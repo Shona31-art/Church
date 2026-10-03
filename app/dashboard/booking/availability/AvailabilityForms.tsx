@@ -3,7 +3,10 @@
 import { useEffect, useRef } from "react";
 import { useFormState } from "react-dom";
 import { addAvailabilityBlock, removeAvailabilityBlock } from "./actions";
-import { PendingButton } from "@/components/ConfirmSubmitButton";
+import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
+import { Alert } from "@/components/ui/Alert";
+import { FormField } from "@/components/ui/FormField";
+import { showToast } from "@/components/ui/Toaster";
 
 export function AddBlockForm({ pastors, today }: { pastors: { id: string; name: string }[] | null; today: string }) {
   const [state, formAction] = useFormState(addAvailabilityBlock, null);
@@ -11,51 +14,54 @@ export function AddBlockForm({ pastors, today }: { pastors: { id: string; name: 
 
   // Clear the inputs after a successful save so the next date starts fresh.
   useEffect(() => {
-    if (state?.ok) formRef.current?.reset();
+    if (state?.ok) {
+      formRef.current?.reset();
+      showToast("Date blocked.");
+    }
   }, [state]);
 
   return (
-    <form ref={formRef} action={formAction} className="mb-8 space-y-2">
-      <div className="flex flex-wrap items-end gap-2">
+    <form ref={formRef} action={formAction} className="card-elevated rounded-2xl p-5 space-y-4">
+      <div className="grid gap-4 sm:grid-cols-[auto_auto_1fr] sm:items-end">
         {pastors && (
-          <div>
-            <label htmlFor="pastor_id" className="block text-xs font-medium mb-1">Pastor</label>
-            <select id="pastor_id" name="pastor_id" className="border border-ink/20 rounded-lg px-3 py-2 text-sm">
+          <FormField label="Pastor" htmlFor="pastor_id">
+            <select id="pastor_id" name="pastor_id" className="input">
               {pastors.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
               ))}
             </select>
-          </div>
+          </FormField>
         )}
-        <div>
-          <label htmlFor="blocked_date" className="block text-xs font-medium mb-1">Date</label>
-          <input id="blocked_date" type="date" name="blocked_date" min={today} required className="border border-ink/20 rounded-lg px-3 py-2 text-sm" />
-        </div>
-        <div className="flex-1 min-w-[160px]">
-          <label htmlFor="note" className="block text-xs font-medium mb-1">
-            Note <span className="font-normal text-ink/40">(optional)</span>
-          </label>
-          <input id="note" name="note" maxLength={200} placeholder="e.g. Vacation" className="w-full border border-ink/20 rounded-lg px-3 py-2 text-sm" />
-        </div>
-        <PendingButton pendingLabel="Saving…" className="bg-ember text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50">
-          Block date
-        </PendingButton>
+        <FormField label="Date" htmlFor="blocked_date" required>
+          <input id="blocked_date" type="date" name="blocked_date" min={today} required className="input" />
+        </FormField>
+        <FormField label="Note" htmlFor="note" optional>
+          <input id="note" name="note" maxLength={200} placeholder="e.g. On leave" className="input" />
+        </FormField>
       </div>
-      {state?.error && <p role="alert" className="text-sm text-red-700">⚠ {state.error}</p>}
-      {state?.ok && <p role="status" className="text-sm text-green-800">✓ Date blocked.</p>}
+      {state?.error && <Alert tone="error">{state.error}</Alert>}
+      <PendingButton pendingLabel="Saving…">Block date</PendingButton>
     </form>
   );
 }
 
-export function RemoveBlockForm({ id }: { id: string }) {
+export function RemoveBlockForm({ id, label }: { id: string; label: string }) {
   const [state, formAction] = useFormState(removeAvailabilityBlock, null);
   return (
     <form action={formAction} className="text-right">
       <input type="hidden" name="id" value={id} />
-      <PendingButton pendingLabel="Removing…" className="text-xs text-red-700 disabled:opacity-50">
-        Remove
-      </PendingButton>
-      {state?.error && <p role="alert" className="text-xs text-red-700 mt-1">⚠ {state.error}</p>}
+      <ConfirmSubmitButton
+        title="Remove this blocked date?"
+        message={`${label} will show as available again for booking requests.`}
+        confirmLabel="Remove"
+        pendingLabel="Removing…"
+        className="btn-ghost btn-sm text-danger"
+      >
+        Remove<span className="sr-only"> {label}</span>
+      </ConfirmSubmitButton>
+      {state?.error && <p role="alert" className="text-xs text-danger mt-1">{state.error}</p>}
     </form>
   );
 }

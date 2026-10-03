@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { checkModuleAccess } from "@/lib/paywall";
 import { logAudit } from "@/lib/audit";
+import { flash } from "@/lib/flash";
 import { canTransition } from "@/lib/booking";
 import { statusChangeSchema } from "@/lib/booking-schemas";
 
@@ -66,5 +68,31 @@ export async function updateBookingStatus(_prev: FormResult, formData: FormData)
 
   revalidatePath(`/dashboard/booking/${bookingId}`);
   revalidatePath("/dashboard/booking");
+  flash(to === "approved" ? "Booking approved. The requester will see it on their request." : to === "declined" ? "Booking declined." : to === "cancelled" ? "Booking cancelled." : "Marked as completed.");
+  return { ok: true };
+}
+
+/**
+ * The requester withdraws their own pending or approved request.
+ * Form fields: booking_id. Runs through the cancel_booking_request() database
+ * function, which only lets the original requester cancel (platform_hardening.sql).
+ */
+export async function cancelMyBooking(_prev: FormResult, formData: FormData): Promise<FormResult> {
+  const me = await getCurrentAppUser();
+  if (!me) return { error: "Your session has expired — sign in again to continue." };
+  const bookingId = z.string().uuid().safeParse(formData.get("booking_id"));
+  if (!bookingId.success) return { error: "That request couldn't be found." };
+
+  const { data: cancelled, error } = await createClient().rpc("cancel_booking_request", { target_booking: bookingId.data });
+  if (error) {
+    console.error("[booking] cancel failed:", error.message);
+    return { error: "Couldn't cancel your request — please try again." };
+  }
+  if (cancelled !== true) return { error: "This request can't be cancelled any more — a pastor may have already responded. Refresh to see its status." };
+
+  await logAudit({ churchId: me.church_id, actorId: me.id, action: "booking_cancelled_by_requester", targetTable: "pastor_bookings", targetId: bookingId.data });
+  revalidatePath(`/dashboard/booking/${bookingId.data}`);
+  revalidatePath("/dashboard/booking");
+  flash("Your request was cancelled. The pastors can see it's been withdrawn.");
   return { ok: true };
 }

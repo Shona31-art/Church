@@ -1,87 +1,116 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { checkModuleAccess } from "@/lib/paywall";
 import { getCurrentAppUser } from "@/lib/current-user";
+import { moduleGate } from "@/lib/gate";
+import { can } from "@/lib/permissions";
+import { BOOKING_TYPE_LABELS, type BookingStatus } from "@/lib/booking";
+import { formatDate } from "@/lib/format";
+import { PAGE_SIZE, buildQuery, pageFrom } from "@/lib/list";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Pagination } from "@/components/ui/Pagination";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Alert } from "@/components/ui/Alert";
+import { BookingBadge } from "./BookingBadge";
 
-export default async function BookingPage() {
-  const access = await checkModuleAccess("pastor_booking");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+const SHEPHERD_TABS = [
+  { key: "pending", label: "Needs a decision" },
+  { key: "approved", label: "Approved" },
+  { key: "closed", label: "Closed" },
+] as const;
 
-  const me = await getCurrentAppUser();
-  const supabase = createClient();
-  const isPastorOrAdmin = me && ["pastor", "church_admin"].includes(me.role);
+export default async function BookingPage({ searchParams }: { searchParams: { status?: string; page?: string } }) {
+  const gate = await moduleGate("pastor_booking");
+  if (gate) return gate;
 
-  const query = supabase
+  const me = (await getCurrentAppUser())!;
+  const shepherd = can(me.role, "manageBookings");
+  const tab = shepherd ? (SHEPHERD_TABS.some((t) => t.key === searchParams.status) ? searchParams.status! : "pending") : "mine";
+  const page = pageFrom(searchParams.page);
+
+  let query = createClient()
     .from("pastor_bookings")
-    .select("*, app_users!pastor_bookings_requested_by_fkey(name)")
-    .eq("church_id", me!.church_id)
-    .order("preferred_date", { ascending: true });
+    .select("id, booking_type, preferred_date, preferred_time, status, requester:app_users!pastor_bookings_requested_by_fkey(name), pastor:app_users!pastor_bookings_pastor_id_fkey(name)")
+    .eq("church_id", me.church_id)
+    .order("preferred_date", { ascending: tab !== "closed" })
+    .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  if (tab === "mine") query = query.eq("requested_by", me.id);
+  else if (tab === "closed") query = query.in("status", ["declined", "completed", "cancelled"]);
+  else query = query.eq("status", tab);
+  const { data, error } = await query;
+  if (error) console.error("[booking] list failed:", error.message);
 
-  const { data: bookings, error } = isPastorOrAdmin ? await query : await query.eq("requested_by", me!.id);
+  const bookings: any[] = (data ?? []).slice(0, PAGE_SIZE);
+  const requestButton = (
+    <Link href="/dashboard/booking/new" className="btn-primary">
+      Request a pastor
+    </Link>
+  );
 
   return (
-    <div className="max-w-2xl">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">
-          {isPastorOrAdmin ? "Booking requests" : "My requests"}
-        </h1>
-        <div className="flex gap-2">
-          {isPastorOrAdmin && (
-            <Link
-              href="/dashboard/booking/availability"
-              className="border border-ink/20 px-4 py-2 rounded-lg text-sm font-medium"
-            >
-              My availability
-            </Link>
-          )}
-          <Link
-            href="/dashboard/booking/new"
-            className="bg-ember text-white px-4 py-2 rounded-lg text-sm font-medium"
-          >
-            + Request booking
-          </Link>
-        </div>
-      </div>
+    <div className="max-w-3xl">
+      <PageHeader
+        title={shepherd ? "Booking requests" : "My booking requests"}
+        description={
+          shepherd
+            ? "Requests from your church for weddings, funerals, baptisms, counselling and more."
+            : "Ask a pastor for a wedding, funeral, baptism, counselling and more. You'll see their answer here."
+        }
+        actions={
+          <>
+            {shepherd && (
+              <Link href="/dashboard/booking/availability" className="btn-secondary">
+                Availability
+              </Link>
+            )}
+            {requestButton}
+          </>
+        }
+      />
 
-      <div className="space-y-3">
-        {bookings?.map((b: any) => (
-          <Link
-            key={b.id}
-            href={`/dashboard/booking/${b.id}`}
-            className="flex items-center justify-between border border-ink/10 rounded-xl p-4 bg-white/60 hover:bg-white"
-          >
-            <div>
-              <p className="font-semibold capitalize">{b.booking_type}</p>
-              <p className="text-sm text-ink/50">
-                {new Date(b.preferred_date).toLocaleDateString()}
-                {b.preferred_time && ` at ${b.preferred_time}`}
-                {isPastorOrAdmin && ` · requested by ${b.app_users?.name}`}
-              </p>
-            </div>
-            <StatusBadge status={b.status} />
-          </Link>
-        ))}
-        {error && (
-          <p role="alert" className="text-sm text-red-700">⚠ Couldn't load booking requests — refresh the page to try again.</p>
-        )}
-        {!error && !bookings?.length && (
-          <p className="text-ink/40 text-sm">
-            {isPastorOrAdmin ? "No booking requests yet." : "You haven't requested a booking yet — use “Request booking” to ask a pastor for a wedding, baptism, counselling and more."}
-          </p>
-        )}
-      </div>
+      {shepherd && (
+        <nav aria-label="Request status" className="mb-4 flex gap-1 border-b border-line overflow-x-auto">
+          {SHEPHERD_TABS.map((t) => (
+            <Link
+              key={t.key}
+              href={buildQuery({ status: t.key === "pending" ? undefined : t.key })}
+              aria-current={tab === t.key ? "page" : undefined}
+              className={`px-3 py-2 text-sm -mb-px border-b-2 whitespace-nowrap ${tab === t.key ? "border-ember font-semibold" : "border-transparent text-ink/60 hover:text-ink"}`}
+            >
+              {t.label}
+            </Link>
+          ))}
+        </nav>
+      )}
+
+      {error ? (
+        <Alert tone="error" title="Couldn't load booking requests">Refresh the page to try again.</Alert>
+      ) : bookings.length === 0 ? (
+        shepherd ? (
+          <EmptyState title={tab === "pending" ? "No requests waiting" : "Nothing here yet"} description={tab === "pending" ? "New requests from members will appear here." : undefined} />
+        ) : (
+          <EmptyState icon="📋" title="You haven't requested a booking yet" description="Ask a pastor for a wedding, baptism, counselling and more." action={requestButton} />
+        )
+      ) : (
+        <ul className="space-y-2">
+          {bookings.map((b) => (
+            <li key={b.id}>
+              <Link href={`/dashboard/booking/${b.id}`} className="card-elevated rounded-xl p-4 flex items-center justify-between gap-3 hover:border-gold/60">
+                <div className="min-w-0">
+                  <p className="font-semibold">{BOOKING_TYPE_LABELS[b.booking_type as keyof typeof BOOKING_TYPE_LABELS] ?? b.booking_type}</p>
+                  <p className="text-sm text-ink/60">
+                    {formatDate(b.preferred_date)}
+                    {b.preferred_time ? ` at ${String(b.preferred_time).slice(0, 5)}` : ""}
+                    {shepherd ? ` · from ${b.requester?.name ?? "former member"}` : ""}
+                    {b.pastor?.name ? ` · with ${b.pastor.name}` : ""}
+                  </p>
+                </div>
+                <BookingBadge status={b.status as BookingStatus} />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Pagination page={page} hasMore={(data?.length ?? 0) > PAGE_SIZE} hrefFor={(p) => buildQuery({ status: shepherd && tab !== "pending" ? tab : undefined, page: p })} />
     </div>
   );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const color =
-    status === "approved"
-      ? "text-green-700"
-      : status === "declined"
-      ? "text-red-700"
-      : status === "completed"
-      ? "text-ink/40"
-      : "text-amber-700";
-  return <span className={`text-xs ${color}`}>{status}</span>;
 }

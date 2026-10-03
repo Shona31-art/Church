@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { checkModuleAccess } from "@/lib/paywall";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { togglePrayed, deletePrayerComment, removeFromWall } from "../actions";
 import { CommentForm } from "./CommentForm";
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
+import { moduleGate } from "@/lib/gate";
 
 // Church prayer wall (ported from the Android Prayer Board): requests members
 // chose to share, plus answered-prayer testimonies. Private prayers never
@@ -13,8 +13,8 @@ import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitBu
 const PAGE_SIZE = 30;
 
 export default async function PrayerWallPage({ searchParams }: { searchParams: { page?: string } }) {
-  const access = await checkModuleAccess("prayer_board");
-  if (!access.allowed) return <p className="text-red-600">{access.reason}</p>;
+  const gate = await moduleGate("prayer_board");
+  if (gate) return gate;
 
   const me = await getCurrentAppUser();
   const supabase = createClient();
@@ -128,8 +128,10 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
                   <form action={removeFromWall} className="ml-auto">
                     <input type="hidden" name="id" value={p.id} />
                     <ConfirmSubmitButton
-                      message="Remove this from the prayer wall? It stays on the member's private board — only sharing is turned off."
-                      className="text-xs text-ink/50 hover:text-red-700"
+                      title="Remove this request from the prayer wall?"
+                      message="Only sharing is turned off — it stays on the member's private board, untouched. The removal is noted in the audit log."
+                      confirmLabel="Remove from wall"
+                      className="btn-ghost btn-sm"
                     >
                       Remove from wall
                     </ConfirmSubmitButton>
@@ -148,8 +150,10 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
                         <form action={deletePrayerComment}>
                           <input type="hidden" name="id" value={c.id} />
                           <ConfirmSubmitButton
-                            message="Delete this message?"
-                            className="text-xs text-ink/40 hover:text-red-700 shrink-0"
+                            title="Delete this message?"
+                            message="The encouragement message will be permanently removed from the prayer wall."
+                            confirmLabel="Delete message"
+                            className="btn-ghost btn-sm shrink-0"
                           >
                             Delete
                           </ConfirmSubmitButton>

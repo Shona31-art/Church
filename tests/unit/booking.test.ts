@@ -8,14 +8,16 @@ describe("canTransition", () => {
     expect(canTransition("pending", "declined")).toBe(true);
   });
 
-  test("approved bookings can only be marked completed", () => {
+  test("approved bookings can be completed or cancelled, never re-opened", () => {
     expect(canTransition("approved", "completed")).toBe(true);
+    expect(canTransition("approved", "cancelled")).toBe(true);
     expect(canTransition("approved", "pending")).toBe(false);
   });
 
-  test("declined and completed are final", () => {
+  test("declined, completed and cancelled are final", () => {
     expect(canTransition("declined", "approved")).toBe(false);
     expect(canTransition("completed", "pending")).toBe(false);
+    expect(canTransition("cancelled", "approved")).toBe(false);
   });
 
   test("a pending request can't jump straight to completed", () => {
@@ -51,7 +53,7 @@ describe("statusChangeSchema", () => {
     const result = statusChangeSchema.safeParse({
       bookingId: "00000000-0000-0000-0000-000000000001",
       from: "pending",
-      to: "cancelled",
+      to: "archived",
     });
     expect(result.success).toBe(false);
   });

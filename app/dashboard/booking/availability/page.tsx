@@ -1,58 +1,66 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
-import { todayIso } from "@/lib/booking";
+import { moduleGate } from "@/lib/gate";
+import { can } from "@/lib/permissions";
+import { formatDate, todayInAppZone } from "@/lib/format";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Alert } from "@/components/ui/Alert";
+import { PermissionDenied } from "@/components/ui/Gates";
 import { AddBlockForm, RemoveBlockForm } from "./AvailabilityForms";
 
 export default async function AvailabilityPage() {
+  const gate = await moduleGate("pastor_booking");
+  if (gate) return gate;
+
   const me = await getCurrentAppUser();
-  if (!me || !["pastor", "church_admin"].includes(me.role)) {
-    return <p className="text-ink/60">Only pastors and church admins can manage availability.</p>;
+  if (!me || !can(me.role, "manageBookings")) {
+    return <PermissionDenied message="Only pastors and church admins can manage availability." backHref="/dashboard/booking" />;
   }
 
   const supabase = createClient();
-
-  const { data: pastors } =
+  const today = todayInAppZone();
+  const [{ data: pastors }, { data: blocks, error }] = await Promise.all([
     me.role === "church_admin"
-      ? await supabase.from("app_users").select("id, name").eq("church_id", me.church_id).in("role", ["pastor", "church_admin"])
-      : { data: [{ id: me.id, name: me.name }] };
-
-  const { data: blocks, error } = await supabase
-    .from("pastor_availability_blocks")
-    .select("*, app_users(name)")
-    .eq("church_id", me.church_id)
-    .gte("blocked_date", todayIso())
-    .order("blocked_date");
+      ? supabase.from("app_users").select("id, name").eq("church_id", me.church_id).in("role", ["pastor", "church_admin"]).neq("status", "disabled").order("name")
+      : Promise.resolve({ data: [{ id: me.id, name: me.name }] }),
+    supabase.from("pastor_availability_blocks").select("id, blocked_date, note, pastor_id, app_users(name)").eq("church_id", me.church_id).gte("blocked_date", today).order("blocked_date"),
+  ]);
 
   return (
-    <div className="max-w-lg">
-      <h1 className="text-2xl font-semibold mb-1">Availability</h1>
-      <p className="text-sm text-ink/50 mb-6">
-        Dates marked here show as a conflict warning when someone requests a
-        booking — it doesn't block the request outright, just flags it.
-      </p>
+    <div className="max-w-2xl space-y-6">
+      <PageHeader
+        back={{ href: "/dashboard/booking", label: "Booking requests" }}
+        title="Availability"
+        description="Dates you're away. Members see them when requesting, and requests on these dates are flagged — they aren't blocked outright."
+      />
 
-      <AddBlockForm pastors={me.role === "church_admin" ? pastors ?? [] : null} today={todayIso()} />
+      <AddBlockForm pastors={me.role === "church_admin" ? pastors ?? [] : null} today={today} />
 
-      <div className="space-y-2">
-        {blocks?.map((b: any) => (
-          <div key={b.id} className="flex items-center justify-between card-elevated rounded-lg px-4 py-3 text-sm">
-            <div>
-              <p>{new Date(b.blocked_date).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p>
-              <p className="text-xs text-ink/40">
-                {b.app_users?.name}
-                {b.note && ` · ${b.note}`}
-              </p>
-            </div>
-            <RemoveBlockForm id={b.id} />
-          </div>
-        ))}
-        {error && (
-          <p role="alert" className="text-sm text-red-700">⚠ Couldn't load blocked dates — refresh the page to try again.</p>
-        )}
-        {!error && !blocks?.length && (
-          <p className="text-ink/40 text-sm">No blocked dates coming up. Add one above when you're away.</p>
-        )}
-      </div>
+      {error ? (
+        <Alert tone="error">Couldn&apos;t load blocked dates — refresh the page to try again.</Alert>
+      ) : !blocks?.length ? (
+        <EmptyState title="No blocked dates coming up" description="Add one above when you'll be away." />
+      ) : (
+        <ul className="card-elevated rounded-2xl divide-y divide-line">
+          {blocks.map((b: any) => {
+            const label = `${formatDate(b.blocked_date)} (${b.app_users?.name ?? "pastor"})`;
+            const canRemove = me.role === "church_admin" || b.pastor_id === me.id;
+            return (
+              <li key={b.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                <div>
+                  <p className="font-medium">{formatDate(b.blocked_date, { weekday: "long" })}</p>
+                  <p className="text-xs text-ink/60">
+                    {b.app_users?.name}
+                    {b.note && ` · ${b.note}`}
+                  </p>
+                </div>
+                {canRemove && <RemoveBlockForm id={b.id} label={label} />}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

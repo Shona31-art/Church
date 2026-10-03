@@ -1,38 +1,80 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { useFormState } from "react-dom";
-import { addItem, assignItem, createPlan, removeItem, setPlanStatus } from "./actions";
+import { addItem, assignItem, createPlan, deletePlan, moveItem, removeItem, setPlanStatus, updatePlan } from "./actions";
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
+import { Alert } from "@/components/ui/Alert";
+import { FormActions, FormField, RequiredNote } from "@/components/ui/FormField";
+import { showToast } from "@/components/ui/Toaster";
 
-function ErrorLine({ error, className = "text-sm" }: { error?: string; className?: string }) {
-  return error ? <p role="alert" className={`${className} text-red-700`}>⚠ {error}</p> : null;
+function ErrorLine({ error }: { error?: string }) {
+  return error ? <Alert tone="error" className="mt-2">{error}</Alert> : null;
 }
 
-export function NewPlanForm() {
+export function NewPlanForm({ today }: { today: string }) {
   const [state, formAction] = useFormState(createPlan, null);
-  const field = "w-full border border-ink/20 rounded-lg px-4 py-3";
   return (
-    <form action={formAction} className="max-w-md space-y-4">
-      <ErrorLine error={state?.error} />
-      <div>
-        <label htmlFor="title" className="block text-sm font-medium mb-1">Service name</label>
-        <input id="title" name="title" required maxLength={120} defaultValue="Sunday Service" className={field} />
-      </div>
-      <div>
-        <label htmlFor="service_date" className="block text-sm font-medium mb-1">Date</label>
-        <input id="service_date" type="date" name="service_date" required className={field} />
-      </div>
+    <form action={formAction} className="card-elevated rounded-2xl p-5 sm:p-6 space-y-5 max-w-md">
+      {state?.error && <Alert tone="error">{state.error}</Alert>}
+      <RequiredNote />
+      <FormField label="Service name" htmlFor="title" required>
+        <input id="title" name="title" required maxLength={120} defaultValue="Sunday Service" className="input" />
+      </FormField>
+      <FormField label="Date" htmlFor="service_date" required>
+        <input id="service_date" type="date" name="service_date" required min={today} className="input" />
+      </FormField>
       <label className="flex items-start gap-2 text-sm">
-        <input type="checkbox" name="use_template" defaultChecked className="mt-1" />
+        <input type="checkbox" name="use_template" defaultChecked className="mt-1 h-4 w-4" />
         <span>
           Start with the standard running order
-          <span className="block text-xs text-ink/40">Worship → Prayer → Offering → Sermon → Announcements → Closing. You can remove or add items after.</span>
+          <span className="block text-xs text-ink/60">Worship → Prayer → Offering → Sermon → Announcements → Closing. You can change it after.</span>
         </span>
       </label>
-      <PendingButton pendingLabel="Creating…" className="bg-ember text-white px-6 py-3 rounded-lg font-medium disabled:opacity-50">
-        Create service plan
-      </PendingButton>
+      <FormActions>
+        <PendingButton pendingLabel="Creating…">Create service plan</PendingButton>
+        <Link href="/dashboard/service-planner" className="btn-secondary">
+          Cancel
+        </Link>
+      </FormActions>
+    </form>
+  );
+}
+
+export function EditPlanForm({ planId, title, serviceDate }: { planId: string; title: string; serviceDate: string }) {
+  const [state, formAction] = useFormState(updatePlan, null);
+  return (
+    <form action={formAction} className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+      <input type="hidden" name="plan_id" value={planId} />
+      <FormField label="Service name" htmlFor="plan-title">
+        <input id="plan-title" name="title" required maxLength={120} defaultValue={title} className="input" />
+      </FormField>
+      <FormField label="Date" htmlFor="plan-date">
+        <input id="plan-date" name="service_date" type="date" required defaultValue={serviceDate} className="input" />
+      </FormField>
+      <PendingButton className="btn-secondary">Save</PendingButton>
+      <div className="sm:col-span-3">
+        <ErrorLine error={state?.error} />
+      </div>
+    </form>
+  );
+}
+
+export function DeletePlanButton({ planId, title, itemCount }: { planId: string; title: string; itemCount: number }) {
+  const [state, formAction] = useFormState(deletePlan, null);
+  return (
+    <form action={formAction}>
+      <input type="hidden" name="plan_id" value={planId} />
+      <ConfirmSubmitButton
+        title={`Delete “${title}”?`}
+        message={`The plan and its ${itemCount} running-order item${itemCount === 1 ? "" : "s"} will be permanently deleted. Volunteers will no longer see it. This can't be undone.`}
+        confirmLabel="Delete plan"
+        pendingLabel="Deleting…"
+      >
+        Delete plan
+      </ConfirmSubmitButton>
+      <ErrorLine error={state?.error} />
     </form>
   );
 }
@@ -41,24 +83,25 @@ export function PublishButton({ planId, status }: { planId: string; status: "dra
   const [state, formAction] = useFormState(setPlanStatus, null);
   const publishing = status === "draft";
   return (
-    <form action={formAction} className="text-right">
+    <form action={formAction}>
       <input type="hidden" name="plan_id" value={planId} />
       <input type="hidden" name="from" value={status} />
       <input type="hidden" name="to" value={publishing ? "published" : "draft"} />
       {publishing ? (
-        <PendingButton pendingLabel="Publishing…" className="text-sm px-3 py-1.5 rounded-lg bg-ember text-white disabled:opacity-50">
-          Publish
-        </PendingButton>
+        <PendingButton pendingLabel="Publishing…">Publish</PendingButton>
       ) : (
         <ConfirmSubmitButton
-          message="Unpublish this plan? Volunteers will no longer see the running order."
+          title="Unpublish this plan?"
+          message="Volunteers will no longer see the running order until you publish it again."
+          confirmLabel="Unpublish"
           pendingLabel="Saving…"
-          className="text-sm px-3 py-1.5 rounded-lg border border-ink/20 disabled:opacity-50"
+          className="btn-secondary"
+          tone="primary"
         >
           Unpublish
         </ConfirmSubmitButton>
       )}
-      <ErrorLine error={state?.error} className="text-xs mt-1" />
+      <ErrorLine error={state?.error} />
     </form>
   );
 }
@@ -77,20 +120,54 @@ export function AssignForm({
   members: { id: string; name: string }[];
 }) {
   const [state, formAction] = useFormState(assignItem, null);
+  useEffect(() => {
+    if (state?.ok) showToast(`Saved who leads “${itemTitle}”.`);
+  }, [state, itemTitle]);
   return (
     <form action={formAction} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="plan_id" value={planId} />
       <input type="hidden" name="item_id" value={itemId} />
-      <label htmlFor={`assign-${itemId}`} className="sr-only">Who leads “{itemTitle}”</label>
-      <select id={`assign-${itemId}`} name="assigned_to" defaultValue={assignedTo ?? ""} className="text-sm border border-ink/20 rounded px-2 py-1 max-w-[12rem]">
+      <label htmlFor={`assign-${itemId}`} className="sr-only">
+        Who leads “{itemTitle}”
+      </label>
+      <select id={`assign-${itemId}`} name="assigned_to" defaultValue={assignedTo ?? ""} className="input w-auto max-w-[14rem] py-1.5">
         <option value="">Unassigned</option>
         {members.map((m) => (
-          <option key={m.id} value={m.id}>{m.name}</option>
+          <option key={m.id} value={m.id}>
+            {m.name}
+          </option>
         ))}
       </select>
-      <PendingButton pendingLabel="Saving…" className="text-xs text-ember disabled:opacity-50">Save</PendingButton>
-      {state?.ok && <span role="status" className="text-xs text-green-800">✓ Saved</span>}
-      <ErrorLine error={state?.error} className="text-xs w-full" />
+      <PendingButton className="btn-secondary btn-sm">
+        Save<span className="sr-only"> leader for {itemTitle}</span>
+      </PendingButton>
+      {state?.error && <p role="alert" className="w-full text-xs text-danger">{state.error}</p>}
+    </form>
+  );
+}
+
+export function MoveButtons({ planId, itemId, itemTitle, isFirst, isLast }: { planId: string; itemId: string; itemTitle: string; isFirst: boolean; isLast: boolean }) {
+  const [state, formAction] = useFormState(moveItem, null);
+  const button = (direction: "up" | "down", disabled: boolean) => (
+    <button
+      type="submit"
+      name="direction"
+      value={direction}
+      disabled={disabled}
+      className="btn-ghost btn-sm px-2"
+      aria-label={`Move “${itemTitle}” ${direction}`}
+      title={`Move ${direction}`}
+    >
+      <span aria-hidden>{direction === "up" ? "↑" : "↓"}</span>
+    </button>
+  );
+  return (
+    <form action={formAction} className="flex">
+      <input type="hidden" name="plan_id" value={planId} />
+      <input type="hidden" name="item_id" value={itemId} />
+      {button("up", isFirst)}
+      {button("down", isLast)}
+      {state?.error && <p role="alert" className="text-xs text-danger">{state.error}</p>}
     </form>
   );
 }
@@ -102,13 +179,15 @@ export function RemoveItemButton({ planId, itemId, itemTitle }: { planId: string
       <input type="hidden" name="plan_id" value={planId} />
       <input type="hidden" name="item_id" value={itemId} />
       <ConfirmSubmitButton
-        message={`Remove “${itemTitle}” from this service?`}
+        title={`Remove “${itemTitle}”?`}
+        message="It will be taken out of this service's running order."
+        confirmLabel="Remove item"
         pendingLabel="Removing…"
-        className="text-xs text-red-700 disabled:opacity-50"
+        className="btn-ghost btn-sm text-danger"
       >
         Remove<span className="sr-only"> {itemTitle}</span>
       </ConfirmSubmitButton>
-      <ErrorLine error={state?.error} className="text-xs" />
+      {state?.error && <p role="alert" className="text-xs text-danger">{state.error}</p>}
     </form>
   );
 }
@@ -122,10 +201,14 @@ export function AddItemForm({ planId }: { planId: string }) {
   return (
     <form ref={formRef} action={formAction} className="space-y-1">
       <input type="hidden" name="plan_id" value={planId} />
-      <label htmlFor="item_title" className="block text-sm font-medium">Add an item</label>
+      <label htmlFor="item_title" className="label">
+        Add an item
+      </label>
       <div className="flex gap-2">
-        <input id="item_title" name="item_title" required maxLength={120} placeholder="e.g. Baby Dedication" className="flex-1 border border-ink/20 rounded-lg px-4 py-2 text-sm" />
-        <PendingButton pendingLabel="Adding…" className="bg-ink/5 px-4 py-2 rounded-lg text-sm disabled:opacity-50">Add</PendingButton>
+        <input id="item_title" name="item_title" required maxLength={120} placeholder="e.g. Baby dedication" className="input flex-1" />
+        <PendingButton className="btn-secondary" pendingLabel="Adding…">
+          Add
+        </PendingButton>
       </div>
       <ErrorLine error={state?.error} />
     </form>

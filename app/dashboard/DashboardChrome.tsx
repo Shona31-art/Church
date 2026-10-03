@@ -82,10 +82,13 @@ export function DashboardChrome({
           </Link>
         </div>
         <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
+          <Link href="/dashboard/account" className="text-right hidden sm:block rounded-lg px-2 py-1 hover:bg-ink/5" title="My account">
             <p className="text-sm leading-tight">{userName}</p>
             <p className="text-xs text-ink/50 leading-tight">{userRole}</p>
-          </div>
+          </Link>
+          <Link href="/dashboard/account" className="sm:hidden btn-ghost btn-sm" aria-label="My account">
+            <span aria-hidden>👤</span>
+          </Link>
           <SignOutButton className="btn-secondary btn-sm" />
         </div>
       </header>

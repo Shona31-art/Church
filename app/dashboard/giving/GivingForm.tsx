@@ -1,73 +1,68 @@
 "use client";
 
 import { useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormState } from "react-dom";
 import { startGivingCheckout } from "./actions";
+import { PendingButton } from "@/components/ConfirmSubmitButton";
+import { Alert } from "@/components/ui/Alert";
+import { FormField } from "@/components/ui/FormField";
+import { GIVING_FUNDS, FUND_LABELS, MAX_GIFT_RAND, MIN_GIFT_RAND } from "@/lib/giving";
 
 const QUICK_AMOUNTS = [100, 250, 500, 1000];
 
 export function GivingForm({ disabled }: { disabled: boolean }) {
   const [state, formAction] = useFormState(startGivingCheckout, null);
-  const [amount, setAmount] = useState("250");
+  const [amount, setAmount] = useState(state?.values?.amount ?? "250");
+  const fe = state?.fieldErrors ?? {};
 
   return (
-    <form action={formAction} className="space-y-4">
-      {state?.error && (
-        <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
-          {state.error}
-        </p>
-      )}
+    <form action={formAction} className="card-elevated rounded-2xl p-5 sm:p-6 space-y-5">
+      {state?.error && <Alert tone="error">{state.error}</Alert>}
 
-      <div className="flex gap-2">
-        {QUICK_AMOUNTS.map((a) => (
-          <button
-            key={a}
-            type="button"
-            onClick={() => setAmount(String(a))}
-            className={`flex-1 border rounded-lg py-2 text-sm ${
-              amount === String(a) ? "border-ember bg-ember/5 text-ember font-semibold" : "border-ink/20"
-            }`}
-          >
-            R{a}
-          </button>
-        ))}
-      </div>
+      <fieldset>
+        <legend className="label">Choose an amount</legend>
+        <div className="grid grid-cols-4 gap-2">
+          {QUICK_AMOUNTS.map((a) => (
+            <button
+              key={a}
+              type="button"
+              onClick={() => setAmount(String(a))}
+              aria-pressed={amount === String(a)}
+              className={amount === String(a) ? "btn-primary" : "btn-secondary"}
+            >
+              R{a}
+            </button>
+          ))}
+        </div>
+      </fieldset>
 
-      <div>
-        <label className="text-xs text-ink/40">Amount (ZAR)</label>
+      <FormField label="Amount (rand)" htmlFor="amount" required error={fe.amount} hint={`Between R${MIN_GIFT_RAND} and R${MAX_GIFT_RAND.toLocaleString("en-ZA")}.`}>
         <input
-          type="number"
+          id="amount"
           name="amount"
-          min="1"
-          step="0.01"
+          inputMode="decimal"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           required
-          className="w-full border border-ink/20 rounded-lg px-4 py-3"
+          className="input tabular-nums"
+          aria-invalid={Boolean(fe.amount)}
         />
-      </div>
+      </FormField>
 
-      <select name="fund" className="w-full border border-ink/20 rounded-lg px-4 py-3">
-        <option value="general">General Fund</option>
-        <option value="tithe">Tithe</option>
-        <option value="missions">Missions</option>
-        <option value="building">Building Fund</option>
-      </select>
+      <FormField label="Fund" htmlFor="fund" required error={fe.fund}>
+        <select id="fund" name="fund" defaultValue={state?.values?.fund ?? "general"} className="input">
+          {GIVING_FUNDS.map((f) => (
+            <option key={f} value={f}>
+              {FUND_LABELS[f]}
+            </option>
+          ))}
+        </select>
+      </FormField>
 
-      <SubmitButton disabled={disabled} />
+      <PendingButton className="btn-primary w-full" pendingLabel="Opening secure checkout…" disabled={disabled}>
+        Give securely
+      </PendingButton>
+      <p className="text-xs text-ink/60 text-center">Card details are handled by Stripe. We never see or store them.</p>
     </form>
-  );
-}
-
-function SubmitButton({ disabled }: { disabled: boolean }) {
-  const { pending } = useFormStatus();
-  return (
-    <button
-      type="submit"
-      disabled={disabled || pending}
-      className="w-full bg-ember text-white py-3 rounded-lg font-medium disabled:opacity-50"
-    >
-      {pending ? "Redirecting to secure checkout..." : "Give now"}
-    </button>
   );
 }

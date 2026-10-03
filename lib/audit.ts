@@ -13,7 +13,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
  */
 export async function logAudit(params: {
   churchId: string | null;
-  actorId: string;
+  /** null for system events (e.g. a Stripe webhook) — there is no signed-in person. */
+  actorId: string | null;
   action: string;
   targetTable?: string;
   targetId?: string;

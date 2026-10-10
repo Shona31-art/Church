@@ -22,7 +22,7 @@ export interface AccessCheckResult {
 }
 
 export interface ChurchAccess {
-  status: EffectiveStatus | "none";
+  status: EffectiveStatus | "none" | "error";
   planKey: string | null;
   modules: Set<ModuleKey>;
   trialDaysLeft: number | null;
@@ -45,20 +45,37 @@ export const getChurchAccess = cache(async (): Promise<ChurchAccess | null> => {
   if (!me.church_id) return null;
 
   const supabase = createClient();
-  const { data: subscription } = await supabase
+  const { data: subscription, error: subscriptionError } = await supabase
     .from("church_subscriptions")
     .select("plan_key, status, is_lifetime, trial_expires_at, grace_period_end")
     .eq("church_id", me.church_id)
     .maybeSingle();
 
+  if (subscriptionError) {
+    console.error("[paywall] couldn't load church subscription:", subscriptionError.message);
+    return { status: "error", planKey: null, modules: new Set(), trialDaysLeft: null, graceDaysLeft: null };
+  }
+
   if (!subscription) {
     return { status: "none", planKey: null, modules: new Set(), trialDaysLeft: null, graceDaysLeft: null };
   }
 
-  const [{ data: planModules }, { data: overrides }] = await Promise.all([
+  const [{ data: planModules, error: planModulesError }, { data: overrides, error: overridesError }] = await Promise.all([
     supabase.from("plan_modules").select("module_key").eq("plan_key", subscription.plan_key),
     supabase.from("church_modules").select("module_key, enabled").eq("church_id", me.church_id),
   ]);
+
+  if (planModulesError || overridesError) {
+    if (planModulesError) console.error("[paywall] couldn't load plan modules:", planModulesError.message);
+    if (overridesError) console.error("[paywall] couldn't load church module overrides:", overridesError.message);
+    return {
+      status: "error",
+      planKey: subscription.plan_key,
+      modules: new Set(),
+      trialDaysLeft: null,
+      graceDaysLeft: null,
+    };
+  }
 
   const status = resolveAccountStatus(subscription);
   return {
@@ -79,6 +96,13 @@ export const getChurchAccess = cache(async (): Promise<ChurchAccess | null> => {
 export async function checkModuleAccess(moduleKey: ModuleKey): Promise<AccessCheckResult> {
   const access = await getChurchAccess();
   if (!access) return { allowed: false, kind: "account", reason: "Your session has expired — please sign in again." };
+  if (access.status === "error") {
+    return {
+      allowed: false,
+      kind: "account",
+      reason: "We couldn't verify your church's feature access. Refresh the page, and contact support if the problem continues.",
+    };
+  }
   if (access.status === "none") {
     return { allowed: false, kind: "account", reason: "Your church doesn't have a subscription set up yet. Contact support." };
   }

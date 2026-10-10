@@ -19,6 +19,7 @@ const STATUS: Record<string, { tone: BadgeTone; label: string }> = {
   payment_pending: { tone: "warning", label: "Payment pending" },
   suspended: { tone: "danger", label: "Suspended" },
   none: { tone: "neutral", label: "No subscription" },
+  error: { tone: "danger", label: "Couldn't verify access" },
 };
 
 export default async function BillingPage({ searchParams }: { searchParams: { checkout?: string } }) {

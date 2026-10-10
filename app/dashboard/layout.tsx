@@ -39,7 +39,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
   let banner: AccountBanner | null = null;
   if (access && me.role !== "super_admin") {
     const admin = can(me.role, "manageBilling");
-    if (access.status === "trial" && access.trialDaysLeft !== null && access.trialDaysLeft <= 7) {
+    if (access.status === "error") {
+      banner = {
+        tone: "error",
+        message: "We couldn't verify your church's feature access. Refresh the page; contact support if the problem continues.",
+      };
+    } else if (access.status === "none") {
+      banner = {
+        tone: "warning",
+        message: admin
+          ? "Your church doesn't have a subscription set up yet. Contact support to restore feature access."
+          : "Your church's subscription isn't set up yet. Contact your church admin.",
+      };
+    } else if (access.status === "trial" && access.trialDaysLeft !== null && access.trialDaysLeft <= 7) {
       banner = {
         tone: "info",
         message: `Your free trial ends in ${access.trialDaysLeft} day${access.trialDaysLeft === 1 ? "" : "s"}.`,

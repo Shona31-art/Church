@@ -27,6 +27,11 @@ const config: Config = {
       fontFamily: {
         display: ["'Playfair Display'", "Georgia", "serif"],
       },
+      // Form popups (components/ui/RouteModal.tsx): a short fade-and-rise.
+      keyframes: {
+        "modal-in": { from: { opacity: "0", transform: "translateY(8px)" }, to: { opacity: "1", transform: "none" } },
+      },
+      animation: { "modal-in": "modal-in 150ms ease-out" },
     },
   },
   plugins: [],

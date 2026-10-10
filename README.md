@@ -197,6 +197,7 @@ every server action, and is enforced again by Postgres RLS. Menus only hide link
 | "Not on your plan" screen | `components/ui/Gates.tsx` |
 | Buttons, inputs, cards, colours | `app/globals.css` (component classes), `tailwind.config.ts` (tokens) |
 | Shared UI (page header, empty/error states, badges, confirm dialog, toasts) | `components/ui/`, `components/ConfirmSubmitButton.tsx` |
+| Forms opening as popups | `components/ui/RouteModal.tsx`; one wrapper per form in `app/dashboard/@modal/(.)<route>/page.tsx`. A new form page needs a matching wrapper, or it opens as a full page |
 | Dates, times, money formatting; timezone | `lib/format.ts` |
 | Form error handling pattern | `lib/forms.ts` |
 | Dashboard home | `app/dashboard/page.tsx` |

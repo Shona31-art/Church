@@ -22,7 +22,7 @@ export function PageHeader({
   return (
     <header className="mb-6">
       {back && (
-        <Link href={back.href} className="inline-flex items-center gap-1 text-sm text-ink/60 hover:text-ink mb-2">
+        <Link href={back.href} data-page-back className="inline-flex items-center gap-1 text-sm text-ink/60 hover:text-ink mb-2">
           <span aria-hidden>←</span> {back.label}
         </Link>
       )}

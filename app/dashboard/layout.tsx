@@ -7,7 +7,9 @@ import { buildNavigation } from "@/lib/navigation";
 import { can, roleLabel } from "@/lib/permissions";
 import { DashboardChrome, type AccountBanner } from "./DashboardChrome";
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+// `modal` is the @modal parallel route: form pages opened as popups over the
+// current page (components/ui/RouteModal.tsx).
+export default async function DashboardLayout({ children, modal }: { children: React.ReactNode; modal: React.ReactNode }) {
   const session = await getSessionState();
 
   if (session.kind === "signed_out") redirect("/login");
@@ -81,6 +83,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       banner={banner}
     >
       {children}
+      {modal}
     </DashboardChrome>
   );
 }

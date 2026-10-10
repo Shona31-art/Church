@@ -56,6 +56,7 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 19 | `booking_security_fix.sql` | **Required.** Booking requests must start "pending"; availability locked to own church |
 | 20 | `support_security_fix.sql` | **Required.** Support screenshots: own-folder uploads, 5 MB image-only limit |
 | 21 | `platform_hardening.sql` | **Required.** DM, plan-catalogue and deactivated-account fixes; counseling escalation; announcement drafts; event & booking cancellation; Stripe webhook idempotency; makes the attachments bucket private |
+| 22 | `chat_v2.sql` | **Required for chat v2.** Profile photos & About; edit/delete (soft) messages; replies, reactions, voice notes, read receipts; per-chat settings; DM privacy & blocking; admin chat restrictions; private `avatars` and `chat-media` buckets; `chat_photos` feature switch (off for every church). Plain-language notes at the top of the file |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so

@@ -30,7 +30,7 @@ export default async function ChatChannelPage({ params }: { params: { id: string
   const [{ data: latest }, { data: members }] = await Promise.all([
     // Newest first, then reversed — so long channels show their latest
     // messages rather than their first 200.
-    supabase.from("chat_messages").select("id, channel_id, sender_id, content, created_at, app_users(name)").eq("channel_id", params.id).order("created_at", { ascending: false }).limit(HISTORY),
+    supabase.from("chat_messages").select("id, channel_id, sender_id, content, created_at, app_users(name)").eq("channel_id", params.id).neq("content", "").order("created_at", { ascending: false }).limit(HISTORY), // skip soft-deleted (emptied) messages until the chat v2 screen shows them
     supabase.from("app_users").select("id, name").eq("church_id", me.church_id),
   ]);
 

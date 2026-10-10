@@ -61,6 +61,12 @@ export function ChatThread({
         msg.sender_name = memberNamesRef.current[msg.sender_id] || "Member";
         setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev.filter((m) => !(m.id.startsWith("optimistic-") && m.content === msg.content && m.sender_id === msg.sender_id)), msg]));
       })
+      // A soft delete (chat_v2.sql) arrives as an UPDATE with deleted_at set.
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_messages", filter: `channel_id=eq.${channelId}` }, (payload) => {
+        const updated = payload.new as Message & { deleted_at?: string | null };
+        if (updated.deleted_at) setMessages((prev) => prev.filter((m) => m.id !== updated.id));
+        else setMessages((prev) => prev.map((m) => (m.id === updated.id ? { ...m, content: updated.content } : m)));
+      })
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "chat_messages", filter: `channel_id=eq.${channelId}` }, (payload) => {
         setMessages((prev) => prev.filter((m) => m.id !== (payload.old as Message).id));
       })
@@ -100,7 +106,13 @@ export function ChatThread({
 
   async function deleteMessage(id: string) {
     setConfirmingDelete(null);
-    const { error, count } = await supabase.from("chat_messages").delete({ count: "exact" }).eq("id", id);
+    // chat_v2.sql replaces hard deletes with delete_chat_message() (a soft
+    // delete). Until that migration is installed the function doesn't exist
+    // (PGRST202), so fall back to the old hard delete.
+    const { error: rpcError } = await supabase.rpc("delete_chat_message", { target_message: id });
+    const fallback = rpcError?.code === "PGRST202" ? await supabase.from("chat_messages").delete({ count: "exact" }).eq("id", id) : null;
+    const error = fallback ? fallback.error : rpcError;
+    const count = fallback ? fallback.count : 1;
     if (error || !count) {
       showToast("Couldn't delete that message — you may not have permission.", "error");
       return;

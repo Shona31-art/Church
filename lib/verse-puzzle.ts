@@ -26,6 +26,12 @@ export const PUZZLE_VERSES: PuzzleVerse[] = [
   { reference: "James 4:8", text: "Draw near to God, and he will draw near to you." },
   { reference: "Joshua 1:9", text: "Be strong and courageous. Don't be afraid. Don't be dismayed, for Yahweh your God is with you wherever you go." },
   { reference: "John 14:6", text: "Jesus said to him, I am the way, the truth, and the life." },
+  { reference: "John 3:30", text: "He must increase, but I must decrease." },
+  { reference: "1 Corinthians 16:14", text: "Let all that you do be done in love." },
+  { reference: "2 Corinthians 5:7", text: "for we walk by faith, not by sight." },
+  { reference: "Psalm 150:6", text: "Let everything that has breath praise Yahweh! Praise Yah!" },
+  { reference: "Genesis 1:1", text: "In the beginning, God created the heavens and the earth." },
+  { reference: "Matthew 5:8", text: "Blessed are the pure in heart, for they shall see God." },
 ];
 
 /** Splits verse text into words, keeping punctuation attached to its word. */
@@ -69,4 +75,43 @@ export function pickRound(count: number, random: () => number = Math.random): Pu
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
   return pool.slice(0, Math.min(count, pool.length));
+}
+
+// ---------------------------------------------------------------------------
+// Levels (games engine)
+// ---------------------------------------------------------------------------
+
+import type { Level } from "@/lib/games/catalog";
+import { shuffle, type Rng } from "@/lib/games/random";
+
+const LEVEL_RULES: Record<Level, { count: number; minWords: number; maxWords: number }> = {
+  easy: { count: 3, minWords: 4, maxWords: 9 },
+  medium: { count: 5, minWords: 4, maxWords: 14 },
+  hard: { count: 5, minWords: 10, maxWords: 100 },
+};
+
+/** Verses for one round at this level, chosen by the seeded generator. */
+export function pickRoundForLevel(level: Level, rng: Rng): PuzzleVerse[] {
+  const { count, minWords, maxWords } = LEVEL_RULES[level];
+  const fitting = PUZZLE_VERSES.filter((v) => {
+    const n = tokenize(v.text).length;
+    return n >= minWords && n <= maxWords;
+  });
+  return shuffle(fitting, rng).slice(0, count);
+}
+
+/** Tries allowed per verse before it must be revealed. */
+export const VERSE_TRIES = 5;
+
+/** Per verse (by position): tries used, solved, or revealed (no point). */
+export type VerseProgress = Record<string, { tries: number; solved?: boolean; revealed?: boolean }>;
+
+/** Points: verses solved without revealing the answer. */
+export function countSolvedVerses(verseCount: number, progress: VerseProgress): number {
+  let solved = 0;
+  for (let i = 0; i < verseCount; i++) {
+    const p = progress[String(i)];
+    if (p?.solved && !p.revealed) solved++;
+  }
+  return solved;
 }

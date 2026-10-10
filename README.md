@@ -58,6 +58,7 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 21 | `platform_hardening.sql` | **Required.** DM, plan-catalogue and deactivated-account fixes; counseling escalation; announcement drafts; event & booking cancellation; Stripe webhook idempotency; makes the attachments bucket private |
 | 22 | `chat_v2.sql` | **Required for chat v2.** Profile photos & About; edit/delete (soft) messages; replies, reactions, voice notes, read receipts; per-chat settings; DM privacy & blocking; admin chat restrictions; private `avatars` and `chat-media` buckets; `chat_photos` feature switch (off for every church). Plain-language notes at the top of the file |
 | 23 | `plan_basic_v2.sql` | Basic = 50 members and only features with no running cost: adds Bible reader, Service planner, Pastor booking and text chat to Basic; new `ai_assist` (AI writing help) and `chat_voice` (voice notes) switches kept on every other plan that had them |
+| 24 | `bible_games_v3.sql` | Game levels and server-checked scores: `game_sessions` (answers kept server-side, no member access), scoreboard points/level/time, members can no longer post scores directly; empty content-bank and badge tables for upcoming games |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so
@@ -213,6 +214,7 @@ every server action, and is enforced again by Postgres RLS. Menus only hide link
 | Outbound notifications (email/WhatsApp via webhook) | `lib/notify.ts` |
 | Chat (rules, edit window, reactions, voice limits) | `lib/chat.ts` (tested); screen in `app/dashboard/chat/[id]/`; edit/delete in `app/dashboard/chat/actions.ts` |
 | Nightly voice-note expiry | `app/api/cron/expire-chat-media/route.ts`, schedule in `vercel.json` |
+| Bible games | Rules, levels, points and puzzle generators: `lib/games/` (tested). Starting/finishing/marking: `app/dashboard/games/actions.ts` + `engine.ts`. Shared intro/timer/results frame: `app/dashboard/games/GameShell.tsx`; each game's board in its folder |
 | Any AI behaviour, model, timeout | `lib/ai.ts`; rate limit `lib/ai-quota.ts` |
 | Billing / Stripe webhook | `app/dashboard/billing/`, `app/api/stripe/webhook/route.ts`, `lib/billing.ts` |
 | Giving, giving report & CSV | `app/dashboard/giving/`, `app/api/giving/export/route.ts`, `lib/giving.ts` |

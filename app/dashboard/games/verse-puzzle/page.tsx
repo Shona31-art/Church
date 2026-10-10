@@ -1,17 +1,9 @@
-import { VersePuzzlePlayer } from "./VersePuzzlePlayer";
 import { moduleGate } from "@/lib/gate";
+import { isLevel } from "@/lib/games/catalog";
+import { VersePuzzleGame } from "./VersePuzzleGame";
 
-export default async function VersePuzzlePage() {
+export default async function VersePuzzlePage({ searchParams }: { searchParams: { level?: string } }) {
   const gate = await moduleGate("bible_games");
   if (gate) return gate;
-
-  return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-semibold">Verse puzzle</h1>
-      <p className="text-sm text-ink/50 mt-1 mb-6">
-        Put the words back in order. Five verses per round — one point for each you solve.
-      </p>
-      <VersePuzzlePlayer />
-    </div>
-  );
+  return <VersePuzzleGame initialLevel={isLevel(searchParams.level) ? searchParams.level : undefined} />;
 }

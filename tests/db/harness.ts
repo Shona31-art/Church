@@ -36,6 +36,7 @@ export const MIGRATION_ORDER = [
   "platform_hardening.sql",
   "chat_v2.sql",
   "plan_basic_v2.sql",
+  "bible_games_v3.sql",
 ];
 
 const SUPABASE_STUBS = `

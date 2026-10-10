@@ -4,7 +4,8 @@ import { tokenize, scrambleOrder, isCorrectOrder, pickRound, PUZZLE_VERSES } fro
 import { extractJson } from "@/lib/json";
 import { detectCrisisSignal } from "@/lib/crisis-detection";
 import { verseRefForDate, DAILY_VERSE_REFS } from "@/lib/bible";
-import { generatePuzzle } from "@/app/dashboard/games/word-search/generator";
+import { buildWordSearch } from "@/lib/games/word-search";
+import { createRng } from "@/lib/games/random";
 
 const person = (birthDate: string, name = "A") => ({ userId: name, name, birthDate });
 
@@ -126,11 +127,13 @@ describe("verse of the day", () => {
 describe("word search generator", () => {
   test("every placed word can actually be read from the grid", () => {
     for (let run = 0; run < 25; run++) {
-      const { grid, words } = generatePuzzle(12, 8);
+      const { grid, words } = buildWordSearch("medium", createRng(run));
       expect(grid).toHaveLength(12);
       grid.forEach((row) => expect(row.every((c) => /^[A-Z]$/.test(c))).toBe(true));
       for (const w of words) {
-        const read = [...w.word].map((_, i) => grid[w.row + w.dRow * i][w.col + w.dCol * i]).join("");
+        const dr = Math.sign(w.end[0] - w.start[0]);
+        const dc = Math.sign(w.end[1] - w.start[1]);
+        const read = [...w.word].map((_, i) => grid[w.start[0] + dr * i][w.start[1] + dc * i]).join("");
         expect(read).toBe(w.word);
       }
     }

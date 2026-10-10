@@ -1,14 +1,9 @@
-import { WordSearchPlayer } from "./WordSearchPlayer";
 import { moduleGate } from "@/lib/gate";
+import { isLevel } from "@/lib/games/catalog";
+import { WordSearchGame } from "./WordSearchGame";
 
-export default async function WordSearchPage() {
+export default async function WordSearchPage({ searchParams }: { searchParams: { level?: string } }) {
   const gate = await moduleGate("bible_games");
   if (gate) return gate;
-
-  return (
-    <div>
-      <h1 className="text-2xl font-semibold mb-6">Word search</h1>
-      <WordSearchPlayer />
-    </div>
-  );
+  return <WordSearchGame initialLevel={isLevel(searchParams.level) ? searchParams.level : undefined} />;
 }

@@ -7,6 +7,7 @@ import { buildNavigation } from "@/lib/navigation";
 import { can, roleLabel } from "@/lib/permissions";
 import { DashboardChrome, type AccountBanner } from "./DashboardChrome";
 import { getAvatarUrls } from "@/lib/avatars";
+import { getMemberLimitStatus } from "@/lib/member-limit";
 
 // `modal` is the @modal parallel route: form pages opened as popups over the
 // current page (components/ui/RouteModal.tsx).
@@ -72,6 +73,22 @@ export default async function DashboardLayout({ children, modal }: { children: R
         message: "Your church's subscription has ended, so most features are paused. Your data is safe.",
         action: admin ? { href: "/dashboard/billing", label: "Renew" } : undefined,
       };
+    }
+
+    // Only when nothing more urgent is showing: tell admins they're at (or,
+    // after a plan change, over) the member limit. Everyone keeps access.
+    if (!banner && admin && me.church_id) {
+      const members = await getMemberLimitStatus(me.church_id);
+      if (members.reached && members.limit !== null) {
+        banner = {
+          tone: "warning",
+          message:
+            members.count > members.limit
+              ? `Your church has ${members.count} members; your plan includes ${members.limit}. Everyone keeps access, but you can't add members until you upgrade or deactivate people who have left.`
+              : `You've reached your plan's ${members.limit}-member limit. Upgrade to add more members.`,
+          action: { href: "/dashboard/billing", label: "See plans" },
+        };
+      }
     }
   }
 

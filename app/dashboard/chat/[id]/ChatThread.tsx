@@ -44,6 +44,7 @@ export function ChatThread({
   churchId,
   isDm,
   v2,
+  voiceEnabled,
   initialMessages,
   quotedMessages,
   initialReactions,
@@ -56,6 +57,8 @@ export function ChatThread({
   churchId: string;
   isDm: boolean;
   v2: boolean;
+  /** Voice notes are a plan feature (not on Basic — they use Storage). */
+  voiceEnabled: boolean;
   initialMessages: ChatMessage[];
   quotedMessages: ChatMessage[];
   initialReactions: ChatReaction[];
@@ -406,7 +409,7 @@ export function ChatThread({
             : null
         }
         onCancelMode={cancelMode}
-        onSendVoice={v2 ? sendVoice : undefined}
+        onSendVoice={voiceEnabled ? sendVoice : undefined}
       />
 
       <dialog

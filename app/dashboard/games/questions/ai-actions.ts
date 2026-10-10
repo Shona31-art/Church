@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { AI_NOT_ON_PLAN, planIncludes } from "@/lib/features";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { z } from "zod";
 import { generateJson, isAiConfigured } from "@/lib/ai";
@@ -33,6 +34,7 @@ export async function generateQuestionsWithAI(
   if (!me || !["church_admin", "pastor"].includes(me.role)) {
     return { questions: [], error: "Only church admins and pastors can generate questions." };
   }
+  if (!(await planIncludes("ai_assist"))) return { questions: [], error: AI_NOT_ON_PLAN };
   const quota = await consumeAiQuota("quiz_generation");
   if (!quota.ok) return { questions: [], error: quota.error };
   const safeCount = Math.min(Math.max(Math.trunc(count) || 5, 1), 10);

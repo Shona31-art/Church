@@ -24,6 +24,19 @@ Not used, on purpose: paid analytics, paid monitoring, maps, AI image
 generation (posters are drawn in the browser from templates at no cost),
 document-generation services (CSV/JSON exports are built in).
 
+## What each plan costs you to run
+
+**Basic is designed to cost you nothing per church** beyond your fixed
+hosting (it stays inside the free tiers until you have many churches):
+
+| On Basic (no running cost) | Not on Basic (costs per use) |
+|---|---|
+| Members (up to 50), Announcements, Calendar, Pastoral care, Prayer board & wall, Journal, Bible reader, Bible games, Service planner, Pastor booking, text chat with profile photos, Giving (Stripe's fee comes out of each gift), Support | AI writing help (`ai_assist`), Sermon AI, AI counseling, Bible study AI, Poster AI, chat voice notes (`chat_voice`, Storage), chat photos (`chat_photos`, off everywhere by default) |
+
+On Basic the prayer board still suggests verses, from a built-in keyword
+list instead of AI. A Super admin can switch any of these on for one church
+(e.g. a pilot) from the platform console.
+
 ## Cost by stage
 
 | Stage | Expected cost | Notes |

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { BIBLE_BOOKS } from "@/lib/bible";
 import { moduleGate } from "@/lib/gate";
+import { getChurchAccess } from "@/lib/paywall";
 
 export default async function BibleHomePage() {
   const gate = await moduleGate("bible");
@@ -17,15 +18,19 @@ export default async function BibleHomePage() {
     .eq("user_id", me!.id)
     .order("created_at", { ascending: false })
     .limit(5);
+  // The AI study tool is its own (paid) feature; Basic has the reader only.
+  const studyAvailable = Boolean((await getChurchAccess())?.modules.has("bible_study_ai"));
 
   return (
     <div className="max-w-lg">
       <h1 className="text-2xl font-semibold mb-6">Bible</h1>
 
-      <Link href="/dashboard/bible/study" className="block card-interactive rounded-2xl p-4 mb-8">
-        <p className="font-semibold">✨ Bible study</p>
-        <p className="text-sm text-ink/50">Explain a passage, get a devotional, cross-references or a 7-day reading plan.</p>
-      </Link>
+      {studyAvailable && (
+        <Link href="/dashboard/bible/study" className="block card-interactive rounded-2xl p-4 mb-8">
+          <p className="font-semibold">✨ Bible study</p>
+          <p className="text-sm text-ink/50">Explain a passage, get a devotional, cross-references or a 7-day reading plan.</p>
+        </Link>
+      )}
 
       {bookmarks?.length ? (
         <section className="mb-8">

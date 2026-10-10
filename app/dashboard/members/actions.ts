@@ -13,6 +13,7 @@ import { assignableRoles, can, canEditMemberRole } from "@/lib/permissions";
 import { memberCreateSchema, memberUpdateSchema } from "@/lib/member-schemas";
 import { FormState, SESSION_EXPIRED, formValues, invalid, optionalField } from "@/lib/forms";
 import { AVATAR_BUCKET } from "@/lib/avatar-path";
+import { getMemberLimitStatus } from "@/lib/member-limit";
 import { CHAT_MEDIA_BUCKET } from "@/lib/chat";
 
 // Every member mutation. Each action re-checks who's asking (server actions
@@ -47,25 +48,6 @@ async function departmentBelongsToChurch(departmentId: string | null, churchId: 
 }
 
 /**
- * Plan member limits (plans.member_limit; null = unlimited). Deactivated
- * people don't count, so a church can make room by deactivating.
- */
-async function memberLimitReached(churchId: string): Promise<{ reached: boolean; limit: number | null }> {
-  const supabase = createClient();
-  const { data: sub } = await supabase.from("church_subscriptions").select("plan_key").eq("church_id", churchId).maybeSingle();
-  if (!sub) return { reached: false, limit: null };
-  const { data: plan } = await supabase.from("plans").select("member_limit").eq("key", sub.plan_key).maybeSingle();
-  const limit = plan?.member_limit ?? null;
-  if (limit === null) return { reached: false, limit };
-  const { count } = await supabase
-    .from("app_users")
-    .select("id", { count: "exact", head: true })
-    .eq("church_id", churchId)
-    .neq("status", "disabled");
-  return { reached: (count ?? 0) >= limit, limit };
-}
-
-/**
  * Add member: creates their login (invite email) and church profile.
  * Form fields: name, email, phone?, role, department_id?
  */
@@ -95,7 +77,7 @@ export async function createMember(_prev: FormState, formData: FormData): Promis
   if (!(await departmentBelongsToChurch(input.departmentId, me.church_id!))) {
     return { error: "That department couldn't be found — refresh and try again.", values };
   }
-  const limit = await memberLimitReached(me.church_id!);
+  const limit = await getMemberLimitStatus(me.church_id!);
   if (limit.reached) {
     return {
       error: `Your plan allows ${limit.limit} active members and you've reached it. Deactivate someone who has left, or a church admin can upgrade from Billing.`,
@@ -276,7 +258,7 @@ export async function setMemberStatus(_prev: FormState, formData: FormData): Pro
     return { error: target.id === me.id ? "You can't deactivate your own account." : "Only a church admin can change a church admin's access." };
   }
   if (to.data === "active") {
-    const limit = await memberLimitReached(me.church_id!);
+    const limit = await getMemberLimitStatus(me.church_id!);
     if (limit.reached) return { error: `Your plan allows ${limit.limit} active members. Upgrade or deactivate someone else first.` };
   }
 

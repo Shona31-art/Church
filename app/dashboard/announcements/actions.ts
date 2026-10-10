@@ -11,6 +11,7 @@ import { can } from "@/lib/permissions";
 import { generateText } from "@/lib/ai";
 import { consumeAiQuota } from "@/lib/ai-quota";
 import { FormState, SESSION_EXPIRED, formValues, invalid } from "@/lib/forms";
+import { AI_NOT_ON_PLAN, planIncludes } from "@/lib/features";
 
 // Announcement lifecycle: draft → published → archived (→ restored to draft),
 // or deleted. Authors manage their own; pastors and church admins manage all
@@ -187,6 +188,7 @@ export type AnnouncementChannel = keyof typeof CHANNEL_GUIDE;
 export async function draftAnnouncementWithAi(title: string, details: string, channel: string): Promise<{ text?: string; error?: string }> {
   const me = await requirePoster();
   if (!me) return { error: "You don't have permission to post announcements." };
+  if (!(await planIncludes("ai_assist"))) return { error: AI_NOT_ON_PLAN };
 
   const parsed = z
     .object({

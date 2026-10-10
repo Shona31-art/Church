@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
 import { can } from "@/lib/permissions";
-import { isAiConfigured } from "@/lib/ai";
+import { aiAssistAvailable } from "@/lib/features";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { AnnouncementForm } from "../AnnouncementForm";
@@ -21,7 +21,7 @@ export default async function NewAnnouncementPage() {
   return (
     <div>
       <PageHeader back={{ href: "/dashboard/announcements", label: "Announcements" }} title="New announcement" />
-      <AnnouncementForm departments={departments ?? []} canPostChurchWide={can(me.role, "postChurchWide")} aiAvailable={isAiConfigured()} />
+      <AnnouncementForm departments={departments ?? []} canPostChurchWide={can(me.role, "postChurchWide")} aiAvailable={await aiAssistAvailable()} />
     </div>
   );
 }

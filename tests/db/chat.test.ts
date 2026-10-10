@@ -61,6 +61,8 @@ beforeAll(async () => {
       ('${LEADER}',   '${CHURCH_A}', '${YOUTH}', 'Leader',   'l@a.test', 'department_leader', 'active'),
       ('${CAROL}',    '${CHURCH_A}', null,       'Carol',    'c@a.test', 'member',            'active'),
       ('${OUTSIDER}', '${CHURCH_B}', null,       'Outsider', 'o@b.test', 'member',            'active');
+    -- Premium: voice notes are a plan feature (plan_basic_v2.sql).
+    insert into church_subscriptions (church_id, plan_key, status) values ('${CHURCH_A}', 'premium', 'active');
     insert into chat_channels (id, church_id, department_id, name, is_dm) values
       ('${GENERAL}', '${CHURCH_A}', null, 'General', false),
       ('${YOUTH_CHANNEL}', '${CHURCH_A}', '${YOUTH}', 'Youth', false);

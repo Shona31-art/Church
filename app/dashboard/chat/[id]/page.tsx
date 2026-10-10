@@ -5,6 +5,7 @@ import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
 import { can } from "@/lib/permissions";
 import { getAvatarUrls } from "@/lib/avatars";
+import { planIncludes } from "@/lib/features";
 import type { ChatMessage, ChatReaction } from "@/lib/chat";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Avatar } from "@/components/ui/Avatar";
@@ -111,6 +112,7 @@ export default async function ChatChannelPage({ params }: { params: { id: string
         churchId={me.church_id!}
         isDm={channel.is_dm}
         v2={v2}
+        voiceEnabled={v2 && (await planIncludes("chat_voice"))}
         initialMessages={messages}
         quotedMessages={(quoted ?? []) as unknown as ChatMessage[]}
         initialReactions={(reactions ?? []) as ChatReaction[]}

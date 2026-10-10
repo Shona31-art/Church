@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
 import { can, isShepherd } from "@/lib/permissions";
-import { isAiConfigured } from "@/lib/ai";
+import { aiAssistAvailable } from "@/lib/features";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { AnnouncementForm } from "../../AnnouncementForm";
@@ -37,7 +37,7 @@ export default async function EditAnnouncementPage({ params }: { params: { id: s
       <AnnouncementForm
         departments={departments ?? []}
         canPostChurchWide={can(me.role, "postChurchWide")}
-        aiAvailable={isAiConfigured()}
+        aiAvailable={await aiAssistAvailable()}
         announcement={a}
       />
     </div>

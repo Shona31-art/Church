@@ -21,6 +21,10 @@ export const MODULE_KEYS = [
   "giving",
   "pastoral_care",
   "bible_study_ai",
+  // Switches for costly parts of otherwise free features (plan_basic_v2.sql):
+  "ai_assist", // AI helper buttons inside announcements, prayers, quiz questions
+  "chat_voice", // voice notes in chat (Storage)
+  "chat_photos", // photo sharing in chat (Storage) — in no plan by default
 ] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 
@@ -45,6 +49,9 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   giving: "Giving",
   pastoral_care: "Pastoral Care",
   bible_study_ai: "Bible Study AI",
+  ai_assist: "AI writing help",
+  chat_voice: "Chat voice notes",
+  chat_photos: "Chat photo sharing",
 };
 
 export const PLAN_LABELS: Record<string, string> = {

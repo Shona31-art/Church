@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, Pencil, Reply, SendHorizontal, X } from "lucide-react";
+import { ImagePlus, Pencil, Reply, SendHorizontal, Smile, X } from "lucide-react";
 import { MAX_MESSAGE_LENGTH } from "@/lib/chat";
 import { VoiceRecorder, type RecordedVoiceNote } from "./VoiceRecorder";
+import { EmojiPicker } from "./EmojiPicker";
 
 /**
  * The message box. Enter sends, Shift+Enter adds a line. Shows a banner when
@@ -47,15 +48,36 @@ export function Composer({
   const ref = useRef<HTMLTextAreaElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
   const [voiceActive, setVoiceActive] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const showMic = Boolean(onSendVoice) && !value.trim() && mode?.kind !== "edit";
 
-  // Grow with the text, up to ~6 lines, then scroll.
+  // Grow with the text, up to ~6 lines, then scroll. Borders are added back
+  // and the scrollbar stays hidden until it's actually needed (otherwise a
+  // one-line box shows scroll arrows).
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+    const border = el.offsetHeight - el.clientHeight;
+    const wanted = el.scrollHeight + border;
+    el.style.height = `${Math.min(wanted, 160)}px`;
+    el.style.overflowY = wanted > 160 ? "auto" : "hidden";
   }, [value]);
+
+  /** Inserts an emoji where the cursor is (or at the end), keeping the box focused. */
+  function insertEmoji(emoji: string) {
+    const el = ref.current;
+    const start = el?.selectionStart ?? value.length;
+    const end = el?.selectionEnd ?? value.length;
+    const next = value.slice(0, start) + emoji + value.slice(end);
+    if (next.length > MAX_MESSAGE_LENGTH) return;
+    onChange(next);
+    onTyping?.();
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
+  }
 
   // Jump into the box when starting a reply or an edit.
   useEffect(() => {
@@ -108,7 +130,30 @@ export function Composer({
         {typingText}
       </p>
 
+      {emojiOpen && (
+        <EmojiPicker
+          onPick={insertEmoji}
+          onClose={() => {
+            setEmojiOpen(false);
+            ref.current?.focus();
+          }}
+        />
+      )}
+
       <div className="flex items-end gap-2">
+        {!voiceActive && (
+          <button
+            type="button"
+            data-emoji-toggle
+            onClick={() => setEmojiOpen((o) => !o)}
+            aria-expanded={emojiOpen}
+            aria-haspopup="dialog"
+            aria-label={emojiOpen ? "Close emoji" : "Add emoji"}
+            className={`btn-ghost btn-icon h-11 w-11 rounded-full ${emojiOpen ? "bg-gold/15 text-ink" : ""}`}
+          >
+            <Smile aria-hidden className="h-5 w-5" />
+          </button>
+        )}
         {onPickPhoto && mode?.kind !== "edit" && !voiceActive && (
           <>
             <button

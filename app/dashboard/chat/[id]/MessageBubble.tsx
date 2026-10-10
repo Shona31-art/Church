@@ -124,8 +124,9 @@ export function MessageBubble({
           </div>
 
           {hasMenu && (
-            // Shown on hover/focus with a mouse; always visible on touch screens.
-            <div className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(pointer:coarse)]:opacity-100">
+            // Always faintly visible (so people find reactions and replies),
+            // fully visible on hover/focus, and always on touch screens.
+            <div className="opacity-40 transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(pointer:coarse)]:opacity-100">
               <MessageMenu
                 align={isMine ? "right" : "left"}
                 senderLabel={isMine ? "your message" : `message from ${sender.name}`}

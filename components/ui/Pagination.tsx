@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 /**
@@ -20,15 +21,15 @@ export function Pagination({
     <nav aria-label="Pagination" className="mt-6 flex items-center justify-between gap-3 text-sm">
       {page > 0 ? (
         <Link href={hrefFor(page - 1)} className="btn-secondary btn-sm" rel="prev">
-          ← Previous
+          <ChevronLeft aria-hidden className="h-4 w-4" /> Previous
         </Link>
       ) : (
         <span />
       )}
-      <span className="text-xs text-ink/50">{summary ?? `Page ${page + 1}`}</span>
+      <span className="tabular text-xs text-ink/50">{summary ?? `Page ${page + 1}`}</span>
       {hasMore ? (
         <Link href={hrefFor(page + 1)} className="btn-secondary btn-sm" rel="next">
-          Next →
+          Next <ChevronRight aria-hidden className="h-4 w-4" />
         </Link>
       ) : (
         <span />

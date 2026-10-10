@@ -59,7 +59,7 @@ export default async function GamesHubPage() {
 
       <div className="grid gap-4 md:grid-cols-3">
         {GAMES.map((g) => (
-          <Link key={g.href} href={g.href} className="card-elevated rounded-2xl p-5 hover:border-gold/60">
+          <Link key={g.href} href={g.href} className="card-interactive rounded-2xl p-5">
             <h2 className="font-semibold">{g.title}</h2>
             <p className="text-sm text-ink/60 mt-2">{g.body}</p>
             <p className="text-sm text-ember mt-4">Play →</p>

@@ -22,7 +22,7 @@ export default async function BibleHomePage() {
     <div className="max-w-lg">
       <h1 className="text-2xl font-semibold mb-6">Bible</h1>
 
-      <Link href="/dashboard/bible/study" className="block card-elevated rounded-2xl p-4 mb-8 hover:border-gold/60">
+      <Link href="/dashboard/bible/study" className="block card-interactive rounded-2xl p-4 mb-8">
         <p className="font-semibold">✨ Bible study</p>
         <p className="text-sm text-ink/50">Explain a passage, get a devotional, cross-references or a 7-day reading plan.</p>
       </Link>
@@ -35,7 +35,7 @@ export default async function BibleHomePage() {
               <Link
                 key={i}
                 href={`/dashboard/bible/read?book=${encodeURIComponent(b.book)}&chapter=${b.chapter}`}
-                className="text-sm bg-white/60 border border-ink/10 px-3 py-1.5 rounded-lg"
+                className="text-sm bg-surface border border-ink/10 px-3 py-1.5 rounded-lg"
               >
                 {b.book} {b.chapter}:{b.verse}
               </Link>
@@ -50,7 +50,7 @@ export default async function BibleHomePage() {
           <Link
             key={book}
             href={`/dashboard/bible/read?book=${encodeURIComponent(book)}&chapter=1`}
-            className="text-sm border border-ink/10 rounded-lg px-3 py-2 bg-white/60 hover:bg-white"
+            className="text-sm border border-ink/10 rounded-lg px-3 py-2 bg-surface hover:bg-surface"
           >
             {book}
           </Link>

@@ -75,7 +75,7 @@ export function MonthView({ ym, today, events }: { ym: YearMonth; today: string;
                     <span
                       aria-hidden
                       className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs ${
-                        isToday ? "bg-ember text-white font-semibold" : day.inMonth ? "text-ink" : "text-ink/30"
+                        isToday ? "bg-ember text-on-ember font-semibold" : day.inMonth ? "text-ink" : "text-ink/30"
                       }`}
                     >
                       {Number(day.date.slice(8))}

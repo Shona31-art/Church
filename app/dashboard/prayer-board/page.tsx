@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { AnswerPrayerForm } from "./AnswerPrayerForm";
 import { toggleSharing, reopenPrayer, deletePrayer } from "./actions";
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
+import { NAV_ICONS } from "@/components/ui/NavIcon";
 
 export default async function PrayerBoardPage() {
   const gate = await moduleGate("prayer_board");
@@ -53,7 +54,7 @@ export default async function PrayerBoardPage() {
           Praying for ({active.length})
         </h2>
         {!active.length && !error ? (
-          <EmptyState icon="🙏" title="No active prayers" description="Write down what's on your heart. We'll suggest a few Bible verses to pray with." action={addButton} />
+          <EmptyState icon={NAV_ICONS.prayer} title="No active prayers" description="Write down what's on your heart. We'll suggest a few Bible verses to pray with." action={addButton} />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {active.map((item) => (

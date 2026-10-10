@@ -11,6 +11,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
 import { PriorityBadge, TicketStatusBadge } from "./SupportBadges";
+import { NAV_ICONS } from "@/components/ui/NavIcon";
 
 const TABS = [
   { key: "active", label: "Open & in progress" },
@@ -78,7 +79,7 @@ export default async function SupportPage({ searchParams }: { searchParams: { st
         <Alert tone="error">Couldn&apos;t load tickets — refresh the page to try again.</Alert>
       ) : !tickets.length ? (
         <EmptyState
-          icon="🛟"
+          icon={NAV_ICONS.support}
           title={q ? "No tickets match that search" : tab === "closed" ? "No closed tickets" : "No open tickets"}
           description={platform || q ? undefined : "If something in the app isn't working, open a ticket and we'll help."}
           action={q ? undefined : newButton}
@@ -87,7 +88,7 @@ export default async function SupportPage({ searchParams }: { searchParams: { st
         <ul className="space-y-2">
           {tickets.map((t) => (
             <li key={t.id}>
-              <Link href={`/dashboard/support/${t.id}`} className="card-elevated rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 hover:border-gold/60">
+              <Link href={`/dashboard/support/${t.id}`} className="card-interactive rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-medium">{t.subject}</p>
                   <p className="text-xs text-ink/60">

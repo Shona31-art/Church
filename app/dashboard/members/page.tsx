@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { MemberStatusBadge } from "./MemberBadges";
+import { NAV_ICONS } from "@/components/ui/NavIcon";
 
 type Search = { q?: string; role?: string; status?: string; department?: string; page?: string };
 
@@ -107,7 +108,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
           <EmptyState title="No members match those filters" description="Try a different name, or clear the filters." action={<Link href="/dashboard/members" className="btn-secondary">Clear filters</Link>} />
         ) : (
           <EmptyState
-            icon="👥"
+            icon={NAV_ICONS.members}
             title="No members yet"
             description="Add your first church member to start building your directory. They'll get an email to set up their login."
             action={<Link href="/dashboard/members/new" className="btn-primary">Add member</Link>}

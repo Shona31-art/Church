@@ -83,7 +83,7 @@ export function VersePuzzlePlayer() {
           <p className="text-xs text-ink/40 mt-2">Your score was added to the church scoreboard.</p>
         )}
         <div className="flex justify-center gap-3 mt-6">
-          <button onClick={playAgain} className="bg-ember text-white px-5 py-2.5 rounded-lg text-sm font-medium">
+          <button onClick={playAgain} className="btn-primary">
             Play again
           </button>
           <Link href="/dashboard/games" className="border border-ink/15 px-5 py-2.5 rounded-lg text-sm">
@@ -114,7 +114,7 @@ export function VersePuzzlePlayer() {
             key={t.id}
             onClick={() => unplace(t)}
             disabled={status !== "playing"}
-            className="px-3 py-1.5 rounded-lg bg-ember text-white text-sm"
+            className="btn-primary btn-sm"
             aria-label={`Remove ${t.word}`}
           >
             {t.word}
@@ -151,7 +151,7 @@ export function VersePuzzlePlayer() {
             <button
               onClick={check}
               disabled={placed.length !== words.length}
-              className="bg-ember text-white px-5 py-2.5 rounded-lg text-sm font-medium disabled:opacity-40"
+              className="btn-primary"
             >
               Check
             </button>
@@ -171,7 +171,7 @@ export function VersePuzzlePlayer() {
           </>
         )}
         {(status === "correct" || status === "revealed") && (
-          <button onClick={next} className="bg-ember text-white px-5 py-2.5 rounded-lg text-sm font-medium">
+          <button onClick={next} className="btn-primary">
             {index + 1 >= round.length ? "Finish" : "Next verse"}
           </button>
         )}

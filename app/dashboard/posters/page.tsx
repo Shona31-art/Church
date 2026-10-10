@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { PosterPreview } from "./PosterCanvas";
+import { NAV_ICONS } from "@/components/ui/NavIcon";
 
 export default async function PostersPage({ searchParams }: { searchParams: { page?: string } }) {
   const gate = await moduleGate("ai_poster");
@@ -51,12 +52,12 @@ export default async function PostersPage({ searchParams }: { searchParams: { pa
       {error ? (
         <Alert tone="error">Couldn&apos;t load posters — refresh the page to try again.</Alert>
       ) : !posters.length ? (
-        <EmptyState icon="🖼️" title="No posters yet" description="Design a poster for your next event in a couple of minutes." action={newButton} />
+        <EmptyState icon={NAV_ICONS.posters} title="No posters yet" description="Design a poster for your next event in a couple of minutes." action={newButton} />
       ) : (
         <ul className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
           {posters.map((p) => (
             <li key={p.id}>
-              <Link href={`/dashboard/posters/${p.id}`} className="block card-elevated rounded-xl p-2 hover:border-gold/60">
+              <Link href={`/dashboard/posters/${p.id}`} className="block card-interactive rounded-xl p-2">
                 <PosterPreview
                   showDownload={false}
                   data={{

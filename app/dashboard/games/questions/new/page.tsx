@@ -116,7 +116,7 @@ export default function NewQuestionPage() {
               </p>
               <div className="space-y-2 mb-4">
                 {generated.map((q, i) => (
-                  <div key={i} className="border border-ink/10 rounded-lg p-3 bg-white/60 text-sm">
+                  <div key={i} className="border border-ink/10 rounded-lg p-3 bg-surface text-sm">
                     <div className="flex justify-between gap-2">
                       <p className="font-medium">{q.question}</p>
                       <button onClick={() => removeGenerated(i)} className="text-xs text-danger shrink-0">

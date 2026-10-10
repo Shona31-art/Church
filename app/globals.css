@@ -1,22 +1,115 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Manrope:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ----------------------------------------------------------------------------
+   Colour tokens (RGB triples, consumed by tailwind.config.ts).
+
+   Light is the default. Dark applies when the device prefers it — unless the
+   person picked "Light" in the theme menu (data-theme="light") — or when they
+   picked "Dark" explicitly. The choice is set on <html> before first paint by
+   the script in app/layout.tsx, so there is no flash of the wrong theme.
+   ------------------------------------------------------------------------- */
 :root {
-  --gold: #A88A4A;
+  color-scheme: light;
+  --ink: 20 22 31;
+  --parchment: 248 247 244;
+  --surface: 255 255 255;
+  --surface-raised: 243 242 238;
+  --line: 232 230 224;
+  --line-strong: 214 211 203;
+  --ember: 27 42 74;
+  --on-ember: 255 255 255;
+  --gold: 168 138 74;
+  --shadow: 20 22 31;
+
+  --success: 23 113 79;
+  --success-tint: 231 244 238;
+  --success-line: 183 222 203;
+  --warning: 138 79 6;
+  --warning-tint: 251 241 225;
+  --warning-line: 235 203 149;
+  --danger: 180 35 24;
+  --danger-tint: 253 236 234;
+  --danger-line: 242 184 178;
+  --info: 36 80 143;
+  --info-tint: 234 240 250;
+  --info-line: 188 205 234;
+}
+
+/* Dark: deep navy-black surfaces, warm off-white text, champagne actions.
+   CSS can't share a block between a selector and a media query, so the dark
+   values appear twice — keep the two blocks below identical. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: 237 234 227;
+  --parchment: 13 15 21;
+  --surface: 21 24 32;
+  --surface-raised: 30 34 44;
+  --line: 39 43 54;
+  --line-strong: 58 63 77;
+  --ember: 226 205 160;
+  --on-ember: 18 20 28;
+  --gold: 201 170 106;
+  --shadow: 0 0 0;
+
+  --success: 94 201 152;
+  --success-tint: 17 44 34;
+  --success-line: 32 84 63;
+  --warning: 232 177 92;
+  --warning-tint: 48 35 15;
+  --warning-line: 99 72 30;
+  --danger: 248 123 113;
+  --danger-tint: 56 22 22;
+  --danger-line: 110 42 40;
+  --info: 138 176 240;
+  --info-tint: 21 33 56;
+  --info-line: 45 70 112;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ink: 237 234 227;
+    --parchment: 13 15 21;
+    --surface: 21 24 32;
+    --surface-raised: 30 34 44;
+    --line: 39 43 54;
+    --line-strong: 58 63 77;
+    --ember: 226 205 160;
+    --on-ember: 18 20 28;
+    --gold: 201 170 106;
+    --shadow: 0 0 0;
+
+    --success: 94 201 152;
+    --success-tint: 17 44 34;
+    --success-line: 32 84 63;
+    --warning: 232 177 92;
+    --warning-tint: 48 35 15;
+    --warning-line: 99 72 30;
+    --danger: 248 123 113;
+    --danger-tint: 56 22 22;
+    --danger-line: 110 42 40;
+    --info: 138 176 240;
+    --info-tint: 21 33 56;
+    --info-line: 45 70 112;
+  }
 }
 
 body {
-  background-color: #FAFAF8;
-  color: #14161F;
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: rgb(var(--parchment));
+  color: rgb(var(--ink));
+  @apply font-sans antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 h1, h2, h3 {
-  font-family: 'Playfair Display', Georgia, serif;
-  letter-spacing: -0.01em;
+  @apply font-display;
+  letter-spacing: -0.015em;
+}
+
+::selection {
+  background-color: rgb(var(--gold) / 0.28);
 }
 
 /* Accessibility: visible focus ring on every interactive element, set once
@@ -26,13 +119,15 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
-summary:focus-visible {
-  outline: 2px solid var(--gold);
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid rgb(var(--gold));
   outline-offset: 2px;
 }
 
 button, a {
-  transition: opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease,
+    box-shadow 0.2s ease, transform 0.15s ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -42,46 +137,69 @@ button, a {
   }
 }
 
+/* Native <dialog> defaults to a white "Canvas" background — use the theme. */
+dialog {
+  background-color: rgb(var(--surface));
+  color: rgb(var(--ink));
+}
+
 /* The one signature motif: a restrained brass hairline under page titles and
    the brand mark — letterhead, not liturgy. */
 .rule-gold {
   width: 32px;
   height: 2px;
-  background-color: var(--gold);
-}
-
-/* Cards: a thin border plus a soft shadow rather than a heavy fill. */
-.card-elevated {
-  background: #FFFFFF;
-  border: 1px solid #ECEAE4;
-  box-shadow: 0 1px 2px rgba(20, 22, 31, 0.04), 0 2px 8px rgba(20, 22, 31, 0.03);
+  border-radius: 1px;
+  background-color: rgb(var(--gold));
 }
 
 @layer components {
+  /* Cards: hairline border plus a soft layered shadow rather than a heavy fill. */
+  .card-elevated {
+    @apply bg-surface border border-line shadow-card;
+  }
+  /* Whole-card links (list rows, tiles): lift slightly on hover. */
+  .card-interactive {
+    @apply card-elevated hover:border-line-strong hover:shadow-card-hover hover:-translate-y-px;
+  }
+
   /* Buttons. One primary action per screen; secondary for cancel/back/view;
      danger only for destructive actions. Min height 40px (44px on touch
      screens) so they're easy to tap. */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 min-h-[40px] text-sm font-medium whitespace-nowrap
-      disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 min-h-[40px] text-sm font-semibold whitespace-nowrap
+      active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
   }
   @media (pointer: coarse) {
     .btn { min-height: 44px; }
   }
-  .btn-primary { @apply btn bg-ember text-white hover:bg-ember/90; }
-  .btn-secondary { @apply btn border border-ink/15 bg-white text-ink hover:bg-ink/5; }
-  .btn-danger { @apply btn bg-danger text-white hover:bg-danger/90; }
-  .btn-danger-outline { @apply btn border border-danger-line text-danger bg-white hover:bg-danger-tint; }
-  .btn-ghost { @apply btn text-ink/70 hover:bg-ink/5 hover:text-ink; }
-  .btn-sm { @apply px-3 min-h-[32px] text-xs; }
+  /* The inset highlight gives the primary button a subtle, tactile top edge. */
+  .btn-primary {
+    @apply btn bg-ember text-on-ember shadow-[inset_0_1px_0_rgb(255_255_255/0.12),0_1px_2px_rgb(var(--shadow)/0.2)] hover:bg-ember/90;
+  }
+  .btn-secondary { @apply btn border border-line-strong bg-surface text-ink shadow-xs hover:bg-surface-raised; }
+  .btn-danger { @apply btn bg-danger text-surface hover:bg-danger/90; }
+  .btn-danger-outline { @apply btn border border-danger-line text-danger bg-surface hover:bg-danger-tint; }
+  .btn-ghost { @apply btn font-medium text-ink/70 hover:bg-ink/5 hover:text-ink; }
+  .btn-sm { @apply px-3 min-h-[32px] rounded-lg text-xs; }
+  .btn-icon { @apply btn h-10 w-10 p-0; }
 
-  /* Form controls */
+  /* Form controls: the ring replaces the global outline so focus reads as part
+     of the field, but it's strong enough to see (gold border + soft halo). */
   .input {
-    @apply w-full rounded-lg border border-ink/20 bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-ink/40
+    @apply w-full rounded-xl border border-line-strong bg-surface px-3.5 py-2.5 text-sm text-ink shadow-xs placeholder:text-ink/40
+      transition-[border-color,box-shadow] duration-150
+      hover:border-ink/25
+      focus-visible:outline-none focus-visible:border-gold focus-visible:ring-4 focus-visible:ring-gold/20
       disabled:bg-ink/5 disabled:text-ink/50 aria-[invalid=true]:border-danger;
   }
-  .label { @apply block text-sm font-medium mb-1; }
-  .hint { @apply text-xs text-ink/50 mt-1; }
+  .label { @apply block text-sm font-semibold text-ink/90 mb-1.5; }
+  .hint { @apply text-xs text-ink/55 mt-1.5; }
 
-  .link { @apply text-ember underline-offset-2 hover:underline; }
+  .link { @apply text-ember font-medium underline-offset-4 hover:underline; }
+
+  /* Small uppercase label above a group or a figure ("THIS MONTH"). */
+  .eyebrow { @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-ink/45; }
+
+  /* Figures that change (counts, money, times) keep their width. */
+  .tabular { font-variant-numeric: tabular-nums; }
 }

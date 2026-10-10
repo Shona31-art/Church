@@ -14,6 +14,7 @@ import { Alert } from "@/components/ui/Alert";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { DeleteCareLog, FollowUpToggle } from "./CareLogControls";
+import { NAV_ICONS } from "@/components/ui/NavIcon";
 
 export default async function PastoralCarePage({ searchParams }: { searchParams: { type?: string; q?: string; page?: string; due?: string } }) {
   const gate = await moduleGate("pastoral_care");
@@ -70,7 +71,7 @@ export default async function PastoralCarePage({ searchParams }: { searchParams:
         filtered ? (
           <EmptyState title="No records match those filters" action={<Link href="/dashboard/pastoral-care" className="btn-secondary">Clear filters</Link>} />
         ) : (
-          <EmptyState icon="🕊️" title="No care records yet" description="Record hospital visits, counselling sessions and follow-ups so nobody falls through the cracks." action={addButton} />
+          <EmptyState icon={NAV_ICONS.pastoralCare} title="No care records yet" description="Record hospital visits, counselling sessions and follow-ups so nobody falls through the cracks." action={addButton} />
         )
       ) : (
         <ul className="space-y-3">

@@ -43,7 +43,7 @@ export default async function ChurchSettingsPage() {
       <ol className="space-y-2">
         {steps.map((s, i) => (
           <li key={s.title}>
-            <Link href={s.href} className="card-elevated rounded-xl p-4 flex items-center justify-between gap-3 hover:border-gold/60">
+            <Link href={s.href} className="card-interactive rounded-xl p-4 flex items-center justify-between gap-3">
               <div>
                 <p className="font-medium">
                   {i + 1}. {s.title}

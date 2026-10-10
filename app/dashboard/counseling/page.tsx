@@ -10,6 +10,7 @@ import { Alert } from "@/components/ui/Alert";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { startConversation } from "./actions";
+import { NAV_ICONS } from "@/components/ui/NavIcon";
 
 export default async function CounselingHome() {
   const gate = await moduleGate("ai_counseling");
@@ -92,7 +93,7 @@ export default async function CounselingHome() {
 
       {!enabled ? (
         <EmptyState
-          icon="🤝"
+          icon={NAV_ICONS.counseling}
           title="AI counseling isn't turned on for your church"
           description={can(me.role, "configureCounseling") ? "Turn it on in Settings when you're ready." : "Ask your church admin or pastor if they plan to enable it."}
           action={

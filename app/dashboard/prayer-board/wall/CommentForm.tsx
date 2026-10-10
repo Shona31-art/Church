@@ -29,7 +29,7 @@ export function CommentForm({ prayerId }: { prayerId: string }) {
           placeholder="Leave a word of encouragement…"
           className="flex-1 min-w-0 border border-ink/20 rounded-lg px-3 py-2 text-sm"
         />
-        <PendingButton className="text-sm bg-ember text-white rounded-lg px-3 py-2 disabled:opacity-50" pendingLabel="…">
+        <PendingButton className="btn-primary btn-sm" pendingLabel="…">
           Post
         </PendingButton>
       </div>

@@ -55,7 +55,7 @@ export default async function SuperAdminHome() {
 
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
         {stats.map((s) => (
-          <Link key={s.label} href={s.href} className="card-elevated rounded-xl p-4 hover:border-gold/60">
+          <Link key={s.label} href={s.href} className="card-interactive rounded-xl p-4">
             <p className="text-2xl font-semibold tabular-nums">{s.value}</p>
             <p className="text-xs text-ink/60 mt-1">{s.label}</p>
           </Link>

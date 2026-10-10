@@ -1,3 +1,4 @@
+import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 
 /**
@@ -20,18 +21,18 @@ export function PageHeader({
   meta?: React.ReactNode;
 }) {
   return (
-    <header className="mb-6">
+    <header className="mb-8">
       {back && (
-        <Link href={back.href} data-page-back className="inline-flex items-center gap-1 text-sm text-ink/60 hover:text-ink mb-2">
-          <span aria-hidden>←</span> {back.label}
+        <Link href={back.href} data-page-back className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-ink/55 hover:text-ink">
+          <ChevronLeft aria-hidden className="h-4 w-4" /> {back.label}
         </Link>
       )}
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold break-words">{title}</h1>
-          <div className="rule-gold mt-2" />
+          <h1 className="text-[28px] font-semibold leading-tight break-words sm:text-[32px]">{title}</h1>
+          <div className="rule-gold mt-3" />
           {meta && <div className="mt-3 flex flex-wrap items-center gap-2">{meta}</div>}
-          {description && <p className="mt-2 text-sm text-ink/60 max-w-2xl">{description}</p>}
+          {description && <p className="mt-3 max-w-2xl text-[15px] text-ink/60">{description}</p>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
@@ -55,10 +56,10 @@ export function Section({
 }) {
   const id = `section-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   return (
-    <section aria-labelledby={id} className={`card-elevated rounded-2xl p-5 ${className}`}>
+    <section aria-labelledby={id} className={`card-elevated rounded-2xl p-5 sm:p-6 ${className}`}>
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
-          <h2 id={id} className="text-lg font-semibold">{title}</h2>
+          <h2 id={id} className="text-xl font-semibold">{title}</h2>
           {description && <p className="text-sm text-ink/60 mt-1">{description}</p>}
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -74,7 +75,7 @@ export function DetailList({ items }: { items: { label: string; value: React.Rea
     <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-[10rem_1fr] text-sm">
       {items.map((item) => (
         <div key={item.label} className="contents">
-          <dt className="text-ink/50">{item.label}</dt>
+          <dt className="font-medium text-ink/50">{item.label}</dt>
           <dd className="break-words">{item.value ?? <span className="text-ink/40">—</span>}</dd>
         </div>
       ))}

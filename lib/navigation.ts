@@ -5,11 +5,12 @@
 
 import { can, type Capability } from "@/lib/permissions";
 import type { ModuleKey } from "@/lib/subscription";
+import type { NavIconName } from "@/components/ui/NavIcon";
 
 export interface NavLink {
   href: string;
   label: string;
-  icon: string;
+  icon: NavIconName;
 }
 
 export interface NavGroup {
@@ -25,56 +26,56 @@ interface NavSpec extends NavLink {
 const CHURCH_NAV: { label: string; items: NavSpec[] }[] = [
   {
     label: "Overview",
-    items: [{ href: "/dashboard", label: "Home", icon: "🏠" }],
+    items: [{ href: "/dashboard", label: "Home", icon: "home" }],
   },
   {
     label: "Church",
     items: [
-      { href: "/dashboard/members", label: "Members", icon: "👥", module: "members", capability: "viewMembers" },
-      { href: "/dashboard/departments", label: "Departments", icon: "🗂️", capability: "manageDepartments" },
-      { href: "/dashboard/announcements", label: "Announcements", icon: "📢", module: "announcements" },
-      { href: "/dashboard/calendar", label: "Calendar", icon: "📅", module: "calendar" },
+      { href: "/dashboard/members", label: "Members", icon: "members", module: "members", capability: "viewMembers" },
+      { href: "/dashboard/departments", label: "Departments", icon: "departments", capability: "manageDepartments" },
+      { href: "/dashboard/announcements", label: "Announcements", icon: "announcements", module: "announcements" },
+      { href: "/dashboard/calendar", label: "Calendar", icon: "calendar", module: "calendar" },
     ],
   },
   {
     label: "Ministry",
     items: [
-      { href: "/dashboard/service-planner", label: "Service Planner", icon: "🗓️", module: "service_planner" },
-      { href: "/dashboard/sermons", label: "Sermons", icon: "🎤", module: "sermon_ai" },
-      { href: "/dashboard/booking", label: "Pastor Booking", icon: "📋", module: "pastor_booking" },
-      { href: "/dashboard/pastoral-care", label: "Pastoral Care", icon: "🕊️", module: "pastoral_care", capability: "pastoralCare" },
-      { href: "/dashboard/counseling", label: "Counseling", icon: "🤝", module: "ai_counseling" },
+      { href: "/dashboard/service-planner", label: "Service Planner", icon: "servicePlanner", module: "service_planner" },
+      { href: "/dashboard/sermons", label: "Sermons", icon: "sermons", module: "sermon_ai" },
+      { href: "/dashboard/booking", label: "Pastor Booking", icon: "booking", module: "pastor_booking" },
+      { href: "/dashboard/pastoral-care", label: "Pastoral Care", icon: "pastoralCare", module: "pastoral_care", capability: "pastoralCare" },
+      { href: "/dashboard/counseling", label: "Counseling", icon: "counseling", module: "ai_counseling" },
     ],
   },
   {
     label: "Community",
     items: [
-      { href: "/dashboard/prayer-board", label: "Prayer Board", icon: "🙏", module: "prayer_board" },
-      { href: "/dashboard/chat", label: "Chats", icon: "💬", module: "dept_chats" },
+      { href: "/dashboard/prayer-board", label: "Prayer Board", icon: "prayer", module: "prayer_board" },
+      { href: "/dashboard/chat", label: "Chats", icon: "chat", module: "dept_chats" },
     ],
   },
   {
     label: "Growth & resources",
     items: [
-      { href: "/dashboard/bible", label: "Bible", icon: "📖", module: "bible" },
-      { href: "/dashboard/journal", label: "Journal", icon: "📝", module: "journal" },
-      { href: "/dashboard/games", label: "Games", icon: "🎮", module: "bible_games" },
-      { href: "/dashboard/posters", label: "Posters", icon: "🖼️", module: "ai_poster", capability: "makePosters" },
+      { href: "/dashboard/bible", label: "Bible", icon: "bible", module: "bible" },
+      { href: "/dashboard/journal", label: "Journal", icon: "journal", module: "journal" },
+      { href: "/dashboard/games", label: "Games", icon: "games", module: "bible_games" },
+      { href: "/dashboard/posters", label: "Posters", icon: "posters", module: "ai_poster", capability: "makePosters" },
     ],
   },
   {
     label: "Finance",
     items: [
-      { href: "/dashboard/giving", label: "Giving", icon: "💝", module: "giving" },
-      { href: "/dashboard/giving/report", label: "Giving report", icon: "📊", module: "giving", capability: "viewGivingReport" },
-      { href: "/dashboard/billing", label: "Billing", icon: "💳", capability: "manageBilling" },
+      { href: "/dashboard/giving", label: "Giving", icon: "giving", module: "giving" },
+      { href: "/dashboard/giving/report", label: "Giving report", icon: "report", module: "giving", capability: "viewGivingReport" },
+      { href: "/dashboard/billing", label: "Billing", icon: "billing", capability: "manageBilling" },
     ],
   },
   {
     label: "Administration",
     items: [
-      { href: "/dashboard/setup", label: "Church settings", icon: "⚙️", capability: "manageChurchProfile" },
-      { href: "/dashboard/support", label: "Support", icon: "🛟", module: "support" },
+      { href: "/dashboard/setup", label: "Church settings", icon: "settings", capability: "manageChurchProfile" },
+      { href: "/dashboard/support", label: "Support", icon: "support", module: "support" },
     ],
   },
 ];
@@ -83,10 +84,10 @@ const PLATFORM_NAV: NavGroup[] = [
   {
     label: "Platform",
     items: [
-      { href: "/dashboard/super-admin", label: "Overview", icon: "📈" },
-      { href: "/dashboard/super-admin/churches", label: "Churches", icon: "⛪" },
-      { href: "/dashboard/super-admin/users", label: "Platform users", icon: "👤" },
-      { href: "/dashboard/support", label: "Support tickets", icon: "🛟" },
+      { href: "/dashboard/super-admin", label: "Overview", icon: "overview" },
+      { href: "/dashboard/super-admin/churches", label: "Churches", icon: "churches" },
+      { href: "/dashboard/super-admin/users", label: "Platform users", icon: "user" },
+      { href: "/dashboard/support", label: "Support tickets", icon: "support" },
     ],
   },
 ];

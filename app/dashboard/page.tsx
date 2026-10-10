@@ -359,7 +359,7 @@ export default async function DashboardHomePage() {
 
 function Stat({ label, value, hint, href, mono }: { label: string; value: string; hint?: string; href: string; mono?: boolean }) {
   return (
-    <Link href={href} className="card-elevated rounded-xl p-4 hover:border-gold/60 block">
+    <Link href={href} className="card-interactive rounded-xl p-4 block">
       <p className={`text-2xl font-semibold ${mono ? "tabular-nums" : ""}`}>{value}</p>
       <p className="text-xs text-ink/60 mt-1">
         {label}
@@ -388,7 +388,7 @@ function QuickLinks({ has }: { has: (m: ModuleKey) => boolean }) {
       </h2>
       <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
         {links.map((q) => (
-          <Link key={q.href} href={q.href} className="card-elevated rounded-xl p-4 hover:border-gold/60">
+          <Link key={q.href} href={q.href} className="card-interactive rounded-xl p-4">
             <p className="text-sm font-semibold">{q.label}</p>
             <p className="text-xs text-ink/60 mt-1">{q.hint}</p>
           </Link>

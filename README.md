@@ -195,7 +195,9 @@ every server action, and is enforced again by Postgres RLS. Menus only hide link
 | The menu (grouping, which role/plan sees what) | `lib/navigation.ts` |
 | Which plan includes which feature | `plan_modules` rows (SQL); gating in `lib/paywall.ts` + `lib/gate.tsx` |
 | "Not on your plan" screen | `components/ui/Gates.tsx` |
-| Buttons, inputs, cards, colours | `app/globals.css` (component classes), `tailwind.config.ts` (tokens) |
+| Buttons, inputs, cards, colours | `app/globals.css` (component classes + light/dark colour values), `tailwind.config.ts` (token names, shadows) |
+| Light/dark theme switch | `lib/theme.ts`, `components/ui/ThemeSwitcher.tsx`; applied before paint in `app/layout.tsx` |
+| Icons (menu + empty states) | `components/ui/NavIcon.tsx` (lucide-react) |
 | Shared UI (page header, empty/error states, badges, confirm dialog, toasts) | `components/ui/`, `components/ConfirmSubmitButton.tsx` |
 | Forms opening as popups | `components/ui/RouteModal.tsx`; one wrapper per form in `app/dashboard/@modal/(.)<route>/page.tsx`. A new form page needs a matching wrapper, or it opens as a full page |
 | Dates, times, money formatting; timezone | `lib/format.ts` |
@@ -249,8 +251,10 @@ the Aperture default). Conventions every screen follows:
 - **Journal storage fix is reasoned, not observed.** The old code stored the
   JSON text of a Buffer in `bytea` columns; new code writes hex and reads both
   formats (unit-tested). Confirm by saving and reading one entry after deploying.
-- **Brand assets:** the landing page uses a plain square as a stand-in logo and
-  no photography. Supply a real logo (SVG) and images before launch.
+- **Brand assets (placeholders):** the landing page uses a plain square as a stand-in
+  logo and no photography, and the dashboard sidebar shows the church's initials
+  as a monogram in place of a church logo. Supply a real logo (SVG) and images
+  before launch.
 - **Notifications are in-app only** unless you set `NOTIFY_WEBHOOK_URL`. Crisis
   escalations are recorded and shown to pastors on the Counseling page, but no
   email/WhatsApp is sent without the webhook.

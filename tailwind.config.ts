@@ -3,35 +3,59 @@ import type { Config } from "tailwindcss";
 // Design tokens. Pages use these names, never raw hex values or Tailwind's
 // stock red/green/amber — so a palette change happens here, once.
 //
+// Each colour is an RGB triple defined as a CSS variable in app/globals.css,
+// with a light and a dark value. That is what makes dark mode work without
+// touching pages: `text-ink/60` or `bg-ember` resolve to whichever theme is
+// active, and opacity modifiers keep working.
+//
 // Neutrals (ink, parchment, surface, line) carry most of every screen.
-// ember (navy) is for primary actions; gold is a small accent only.
+// ember is for primary actions (deep navy in light, champagne in dark), with
+// on-ember as the text that sits on it; gold is a small accent only.
 // success / warning / danger / info are reserved for state and always paired
 // with an icon or words, never colour alone. Each foreground colour passes
-// WCAG AA (4.5:1) on both white and its own tint.
+// WCAG AA (4.5:1) on surface and on its own tint, in both themes.
+const token = (name: string) => `rgb(var(--${name}) / <alpha-value>)`;
+
 const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        ink: "#14161F", // near-black navy — primary text
-        parchment: "#FAFAF8", // page background
-        surface: "#FFFFFF", // cards
-        line: "#E6E4DE", // borders and dividers
-        ember: "#1B2A4A", // deep navy — primary actions, links
-        gold: "#A88A4A", // restrained brass — hairlines, small accents only
-        success: { DEFAULT: "#17714F", tint: "#E7F4EE", line: "#B7DECB" },
-        warning: { DEFAULT: "#8A4F06", tint: "#FBF1E1", line: "#EBCB95" },
-        danger: { DEFAULT: "#B42318", tint: "#FDECEA", line: "#F2B8B2" },
-        info: { DEFAULT: "#24508F", tint: "#EAF0FA", line: "#BCCDEA" },
+        ink: token("ink"), // primary text
+        parchment: token("parchment"), // page background
+        surface: token("surface"), // cards, inputs, popups
+        "surface-raised": token("surface-raised"), // hover / selected rows, sidebar active item
+        line: token("line"), // borders and dividers
+        "line-strong": token("line-strong"), // input borders
+        ember: token("ember"), // primary actions, links
+        "on-ember": token("on-ember"), // text/icons on an ember background
+        gold: token("gold"), // restrained brass — hairlines, small accents only
+        success: { DEFAULT: token("success"), tint: token("success-tint"), line: token("success-line") },
+        warning: { DEFAULT: token("warning"), tint: token("warning-tint"), line: token("warning-line") },
+        danger: { DEFAULT: token("danger"), tint: token("danger-tint"), line: token("danger-line") },
+        info: { DEFAULT: token("info"), tint: token("info-tint"), line: token("info-line") },
       },
       fontFamily: {
-        display: ["'Playfair Display'", "Georgia", "serif"],
+        // Loaded with next/font in app/layout.tsx (self-hosted, no layout shift).
+        sans: ["var(--font-sans)", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+        display: ["var(--font-display)", "Georgia", "serif"],
+      },
+      boxShadow: {
+        // Layered, low-opacity shadows read as depth rather than "drop shadow".
+        xs: "0 1px 2px rgb(var(--shadow) / 0.05)",
+        card: "0 1px 2px rgb(var(--shadow) / 0.04), 0 4px 16px -4px rgb(var(--shadow) / 0.06)",
+        "card-hover": "0 2px 4px rgb(var(--shadow) / 0.05), 0 12px 32px -8px rgb(var(--shadow) / 0.12)",
+        pop: "0 8px 24px -6px rgb(var(--shadow) / 0.18), 0 24px 64px -12px rgb(var(--shadow) / 0.22)",
       },
       // Form popups (components/ui/RouteModal.tsx): a short fade-and-rise.
       keyframes: {
-        "modal-in": { from: { opacity: "0", transform: "translateY(8px)" }, to: { opacity: "1", transform: "none" } },
+        "modal-in": { from: { opacity: "0", transform: "translateY(8px) scale(0.99)" }, to: { opacity: "1", transform: "none" } },
+        "fade-in": { from: { opacity: "0" }, to: { opacity: "1" } },
       },
-      animation: { "modal-in": "modal-in 150ms ease-out" },
+      animation: {
+        "modal-in": "modal-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "fade-in": "fade-in 200ms ease-out",
+      },
     },
   },
   plugins: [],

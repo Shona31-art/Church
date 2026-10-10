@@ -62,7 +62,7 @@ export function StudyTool({ initialQuery }: { initialQuery: string }) {
           </div>
         </fieldset>
 
-        <button type="submit" disabled={loading} className="bg-ember text-white px-6 py-3 rounded-lg font-medium disabled:opacity-50">
+        <button type="submit" disabled={loading} className="btn-primary">
           {loading ? "Studying…" : "Study"}
         </button>
       </form>

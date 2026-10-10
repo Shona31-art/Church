@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { MonthView, type MonthEvent } from "./MonthView";
+import { NAV_ICONS } from "@/components/ui/NavIcon";
 
 const TABS = [
   { key: "month", label: "Month" },
@@ -116,7 +117,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: { w
           <EmptyState title="No past events" description="Events move here once they're over." />
         ) : (
           <EmptyState
-            icon="📅"
+            icon={NAV_ICONS.calendar}
             title="Nothing scheduled yet"
             description={canCreate ? "Create your first event so the church knows what's coming up." : "When your church schedules events, they'll show here."}
             action={createButton}
@@ -135,7 +136,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: { w
                   const mine = e.event_rsvps?.find((r: any) => r.user_id === me.id)?.status as RsvpStatus | undefined;
                   return (
                     <li key={e.id}>
-                      <Link href={`/dashboard/calendar/${e.id}`} className="card-elevated rounded-xl p-4 flex gap-4 hover:border-gold/60">
+                      <Link href={`/dashboard/calendar/${e.id}`} className="card-interactive rounded-xl p-4 flex gap-4">
                         <div className="w-14 shrink-0 text-center" aria-hidden>
                           <p className="text-xs uppercase text-ink/50">{new Date(e.start_time).toLocaleDateString("en-ZA", { weekday: "short", timeZone: APP_TIMEZONE })}</p>
                           <p className="text-2xl font-semibold leading-tight">{new Date(e.start_time).toLocaleDateString("en-ZA", { day: "numeric", timeZone: APP_TIMEZONE })}</p>

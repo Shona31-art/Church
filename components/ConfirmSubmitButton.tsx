@@ -56,10 +56,10 @@ export function ConfirmSubmitButton({
         ref={dialogRef}
         aria-labelledby={`${id}-title`}
         aria-describedby={`${id}-desc`}
-        className="w-[calc(100%-2rem)] max-w-md rounded-2xl p-0 text-ink shadow-xl backdrop:bg-ink/40"
+        className="w-[calc(100%-2rem)] max-w-md rounded-2xl border border-line p-0 shadow-pop backdrop:bg-ink/45 backdrop:backdrop-blur-[2px] motion-safe:animate-modal-in"
       >
         <div className="p-6">
-          <h2 id={`${id}-title`} className="text-lg font-semibold">
+          <h2 id={`${id}-title`} className="text-xl font-semibold">
             {title}
           </h2>
           <div id={`${id}-desc`} className="mt-2 text-sm text-ink/70">

@@ -1,5 +1,7 @@
 "use client";
 
+import { CircleAlert, CircleCheck, Info, X, type LucideIcon } from "lucide-react";
+
 import { useEffect, useState } from "react";
 
 // Toast notifications ("Member added.", "Couldn't save — try again.").
@@ -42,7 +44,7 @@ const TONE_CLASS: Record<Tone, string> = {
   error: "border-danger-line bg-danger-tint text-danger",
   info: "border-info-line bg-info-tint text-info",
 };
-const TONE_ICON: Record<Tone, string> = { success: "✓", error: "⚠", info: "i" };
+const TONE_ICON: Record<Tone, LucideIcon> = { success: CircleCheck, error: CircleAlert, info: Info };
 
 let nextId = 1;
 
@@ -82,11 +84,9 @@ export function Toaster() {
         <div
           key={t.id}
           role={t.tone === "error" ? "alert" : "status"}
-          className={`pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-lg ${TONE_CLASS[t.tone]}`}
+          className={`pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl border px-4 py-3 text-sm shadow-pop backdrop-blur motion-safe:animate-modal-in ${TONE_CLASS[t.tone]}`}
         >
-          <span aria-hidden className="font-bold">
-            {TONE_ICON[t.tone]}
-          </span>
+          <ToastIcon tone={t.tone} />
           <p className="flex-1">{t.message}</p>
           <button
             type="button"
@@ -94,10 +94,15 @@ export function Toaster() {
             className="-m-1 p-1 opacity-70 hover:opacity-100"
             aria-label="Dismiss notification"
           >
-            ✕
+            <X aria-hidden className="h-4 w-4" />
           </button>
         </div>
       ))}
     </div>
   );
+}
+
+function ToastIcon({ tone }: { tone: Tone }) {
+  const Icon = TONE_ICON[tone];
+  return <Icon aria-hidden className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />;
 }

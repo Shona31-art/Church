@@ -10,6 +10,7 @@ import { FilterBar } from "@/components/ui/FilterBar";
 import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
+import { NAV_ICONS } from "@/components/ui/NavIcon";
 
 export default async function SermonsPage({ searchParams }: { searchParams: { q?: string; page?: string } }) {
   const gate = await moduleGate("sermon_ai");
@@ -49,7 +50,7 @@ export default async function SermonsPage({ searchParams }: { searchParams: { q?
           <EmptyState title="No sermons match that search" />
         ) : (
           <EmptyState
-            icon="🎤"
+            icon={NAV_ICONS.sermons}
             title="No sermons yet"
             description={canCreate ? "Add last Sunday's message so members can revisit it during the week." : "Sermons your church shares will appear here."}
             action={addButton}
@@ -59,7 +60,7 @@ export default async function SermonsPage({ searchParams }: { searchParams: { q?
         <ul className="space-y-2">
           {sermons.map((s) => (
             <li key={s.id}>
-              <Link href={`/dashboard/sermons/${s.id}`} className="card-elevated rounded-xl p-4 block hover:border-gold/60">
+              <Link href={`/dashboard/sermons/${s.id}`} className="card-interactive rounded-xl p-4 block">
                 <p className="font-semibold">{s.title}</p>
                 <p className="text-sm text-ink/60">
                   {s.speaker ? `${s.speaker} · ` : ""}

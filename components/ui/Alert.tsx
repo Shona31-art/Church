@@ -1,10 +1,12 @@
+import { CircleAlert, CircleCheck, Info, TriangleAlert, type LucideIcon } from "lucide-react";
+
 type Tone = "error" | "warning" | "success" | "info";
 
-const STYLES: Record<Tone, { box: string; icon: string; label: string }> = {
-  error: { box: "bg-danger-tint border-danger-line text-danger", icon: "⚠", label: "Error" },
-  warning: { box: "bg-warning-tint border-warning-line text-warning", icon: "!", label: "Warning" },
-  success: { box: "bg-success-tint border-success-line text-success", icon: "✓", label: "Success" },
-  info: { box: "bg-info-tint border-info-line text-info", icon: "i", label: "Note" },
+const STYLES: Record<Tone, { box: string; Icon: LucideIcon; label: string }> = {
+  error: { box: "bg-danger-tint border-danger-line text-danger", Icon: CircleAlert, label: "Error" },
+  warning: { box: "bg-warning-tint border-warning-line text-warning", Icon: TriangleAlert, label: "Warning" },
+  success: { box: "bg-success-tint border-success-line text-success", Icon: CircleCheck, label: "Success" },
+  info: { box: "bg-info-tint border-info-line text-info", Icon: Info, label: "Note" },
 };
 
 /**
@@ -25,16 +27,14 @@ export function Alert({
   action?: React.ReactNode;
   className?: string;
 }) {
-  const s = STYLES[tone];
+  const { box, Icon, label } = STYLES[tone];
   return (
-    <div role={tone === "error" ? "alert" : "status"} className={`flex gap-3 rounded-lg border p-3 text-sm ${s.box} ${className}`}>
-      <span aria-hidden className="font-bold leading-5 w-4 text-center shrink-0">
-        {s.icon}
-      </span>
+    <div role={tone === "error" ? "alert" : "status"} className={`flex gap-3 rounded-xl border px-4 py-3 text-sm ${box} ${className}`}>
+      <Icon aria-hidden className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
       <div className="min-w-0 flex-1">
-        <span className="sr-only">{s.label}: </span>
+        <span className="sr-only">{label}: </span>
         {title && <p className="font-semibold">{title}</p>}
-        {children && <div className={title ? "mt-0.5" : ""}>{children}</div>}
+        {children && <div className={title ? "mt-0.5 opacity-90" : ""}>{children}</div>}
         {action && <div className="mt-2">{action}</div>}
       </div>
     </div>
@@ -45,9 +45,9 @@ export function Alert({
 export function FieldError({ id, children }: { id?: string; children?: React.ReactNode }) {
   if (!children) return null;
   return (
-    <p id={id} role="alert" className="text-xs text-danger mt-1">
-      <span aria-hidden>⚠ </span>
-      {children}
+    <p id={id} role="alert" className="mt-1.5 flex items-start gap-1.5 text-xs text-danger">
+      <CircleAlert aria-hidden className="mt-px h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+      <span>{children}</span>
     </p>
   );
 }

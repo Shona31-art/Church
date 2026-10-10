@@ -152,13 +152,13 @@ export default async function BibleReaderPage({
             required
             className="flex-1 border border-ink/20 rounded-lg px-3 py-2 text-sm"
           />
-          <button type="submit" className="bg-ember text-white px-4 py-2 rounded-lg text-sm">
+          <button type="submit" className="btn-primary">
             Save
           </button>
         </form>
         <div className="space-y-2">
           {myNotes?.map((n) => (
-            <div key={n.id} className="border border-ink/10 rounded-lg p-3 bg-white/60 text-sm flex justify-between gap-2">
+            <div key={n.id} className="border border-ink/10 rounded-lg p-3 bg-surface text-sm flex justify-between gap-2">
               <div>
                 {n.verse && <span className="text-ember text-xs mr-2">v{n.verse}</span>}
                 {n.note}

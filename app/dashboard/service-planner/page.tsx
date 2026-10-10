@@ -10,6 +10,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { NAV_ICONS } from "@/components/ui/NavIcon";
 
 export default async function ServicePlannerPage({ searchParams }: { searchParams: { when?: string; page?: string } }) {
   const gate = await moduleGate("service_planner");
@@ -69,7 +70,7 @@ export default async function ServicePlannerPage({ searchParams }: { searchParam
         <Alert tone="error" title="Couldn't load service plans">Refresh the page to try again.</Alert>
       ) : plans.length === 0 ? (
         <EmptyState
-          icon="🗓️"
+          icon={NAV_ICONS.servicePlanner}
           title={past ? "No past services" : "No upcoming services planned"}
           description={canManage ? "Create a plan to share the running order with your team." : "Your pastors haven't published a plan yet."}
           action={past ? undefined : newButton}
@@ -78,7 +79,7 @@ export default async function ServicePlannerPage({ searchParams }: { searchParam
         <ul className="space-y-2">
           {plans.map((p) => (
             <li key={p.id}>
-              <Link href={`/dashboard/service-planner/${p.id}`} className="card-elevated rounded-xl p-4 flex items-center justify-between gap-3 hover:border-gold/60">
+              <Link href={`/dashboard/service-planner/${p.id}`} className="card-interactive rounded-xl p-4 flex items-center justify-between gap-3">
                 <div>
                   <p className="font-semibold">{p.title}</p>
                   <p className="text-sm text-ink/60">

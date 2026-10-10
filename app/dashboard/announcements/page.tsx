@@ -11,6 +11,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { NAV_ICONS } from "@/components/ui/NavIcon";
 
 const TABS = [
   { key: "published", label: "Published" },
@@ -83,7 +84,7 @@ export default async function AnnouncementsPage({ searchParams }: { searchParams
           <EmptyState title="No archived announcements" description="Archive old announcements to keep the list tidy without deleting them." />
         ) : (
           <EmptyState
-            icon="📢"
+            icon={NAV_ICONS.announcements}
             title="No announcements yet"
             description={canPost ? "Share your first piece of news with the church." : "When your church posts news, it will appear here."}
             action={newButton}
@@ -93,7 +94,7 @@ export default async function AnnouncementsPage({ searchParams }: { searchParams
         <ul className="space-y-3">
           {items.map((a) => (
             <li key={a.id}>
-              <Link href={`/dashboard/announcements/${a.id}`} className="card-elevated rounded-2xl p-5 block hover:border-gold/60">
+              <Link href={`/dashboard/announcements/${a.id}`} className="card-interactive rounded-2xl p-5 block">
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   {a.pinned && <StatusBadge tone="info">Pinned</StatusBadge>}
                   <StatusBadge tone="neutral">{a.departments?.name ? `${a.departments.name} only` : "Church-wide"}</StatusBadge>

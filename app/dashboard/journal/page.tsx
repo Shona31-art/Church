@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
 import { Pagination } from "@/components/ui/Pagination";
 import { DeleteEntry } from "./JournalForms";
+import { NAV_ICONS } from "@/components/ui/NavIcon";
 
 export default async function JournalPage({ searchParams }: { searchParams: { page?: string } }) {
   const gate = await moduleGate("journal");
@@ -51,7 +52,7 @@ export default async function JournalPage({ searchParams }: { searchParams: { pa
       {error ? (
         <Alert tone="error">Couldn&apos;t load your journal — refresh the page to try again.</Alert>
       ) : entries.length === 0 ? (
-        <EmptyState icon="📝" title="No entries yet" description="Start writing whenever you're ready. This is just between you and God." action={configured ? newButton : undefined} />
+        <EmptyState icon={NAV_ICONS.journal} title="No entries yet" description="Start writing whenever you're ready. This is just between you and God." action={configured ? newButton : undefined} />
       ) : (
         <ul className="space-y-3">
           {entries.map((entry) => (

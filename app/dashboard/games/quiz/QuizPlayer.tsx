@@ -59,7 +59,7 @@ export function QuizPlayer({ questions }: { questions: QuizQuestion[] }) {
         <div className="flex gap-2 justify-center">
           <button
             onClick={() => router.refresh()}
-            className="bg-ember text-white px-5 py-2.5 rounded-lg text-sm font-medium"
+            className="btn-primary"
           >
             Play again
           </button>
@@ -104,7 +104,7 @@ export function QuizPlayer({ questions }: { questions: QuizQuestion[] }) {
       {selected !== null && (
         <button
           onClick={handleNext}
-          className="bg-ember text-white px-5 py-2.5 rounded-lg text-sm font-medium"
+          className="btn-primary"
         >
           {isLast ? "Finish quiz" : "Next question"}
         </button>

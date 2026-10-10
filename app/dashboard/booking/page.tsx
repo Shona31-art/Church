@@ -11,6 +11,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
 import { BookingBadge } from "./BookingBadge";
+import { NAV_ICONS } from "@/components/ui/NavIcon";
 
 const SHEPHERD_TABS = [
   { key: "pending", label: "Needs a decision" },
@@ -88,13 +89,13 @@ export default async function BookingPage({ searchParams }: { searchParams: { st
         shepherd ? (
           <EmptyState title={tab === "pending" ? "No requests waiting" : "Nothing here yet"} description={tab === "pending" ? "New requests from members will appear here." : undefined} />
         ) : (
-          <EmptyState icon="📋" title="You haven't requested a booking yet" description="Ask a pastor for a wedding, baptism, counselling and more." action={requestButton} />
+          <EmptyState icon={NAV_ICONS.booking} title="You haven't requested a booking yet" description="Ask a pastor for a wedding, baptism, counselling and more." action={requestButton} />
         )
       ) : (
         <ul className="space-y-2">
           {bookings.map((b) => (
             <li key={b.id}>
-              <Link href={`/dashboard/booking/${b.id}`} className="card-elevated rounded-xl p-4 flex items-center justify-between gap-3 hover:border-gold/60">
+              <Link href={`/dashboard/booking/${b.id}`} className="card-interactive rounded-xl p-4 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-semibold">{BOOKING_TYPE_LABELS[b.booking_type as keyof typeof BOOKING_TYPE_LABELS] ?? b.booking_type}</p>
                   <p className="text-sm text-ink/60">

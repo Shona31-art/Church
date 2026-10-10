@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { X } from "lucide-react";
 
 const WIDTHS = {
   md: "md:max-w-xl",
@@ -65,11 +66,11 @@ export function RouteModal({ children, size = "lg" }: { children: React.ReactNod
       onInput={() => {
         dirty.current = true;
       }}
-      className={`m-0 h-full max-h-full w-full max-w-full rounded-none bg-parchment overflow-y-auto p-0 text-ink shadow-xl backdrop:bg-ink/40 motion-safe:animate-modal-in md:m-auto md:h-auto md:max-h-[90vh] md:w-[calc(100%-2rem)] md:rounded-2xl ${WIDTHS[size]} [&_[data-page-back]]:hidden`}
+      className={`m-0 h-full max-h-full w-full max-w-full rounded-none bg-parchment overflow-y-auto p-0 text-ink shadow-pop backdrop:bg-ink/45 backdrop:backdrop-blur-[2px] md:border md:border-line motion-safe:animate-modal-in md:m-auto md:h-auto md:max-h-[90vh] md:w-[calc(100%-2rem)] md:rounded-2xl ${WIDTHS[size]} [&_[data-page-back]]:hidden`}
     >
       <div className="sticky top-0 z-10 flex justify-end bg-parchment/95 px-3 pt-3 backdrop-blur">
-        <button type="button" onClick={close} className="btn-secondary h-9 w-9 p-0" aria-label="Close">
-          <span aria-hidden>✕</span>
+        <button type="button" onClick={close} className="btn-secondary btn-sm h-9 w-9 rounded-full p-0" aria-label="Close">
+          <X aria-hidden className="h-4 w-4" />
         </button>
       </div>
       <div className="px-5 pb-6 md:px-8 md:pb-8">{children}</div>

@@ -100,7 +100,7 @@ export default function NewPrayerPage() {
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending} className="bg-ember text-white px-6 py-3 rounded-lg font-medium disabled:opacity-50">
+    <button type="submit" disabled={pending} className="btn-primary">
       {pending ? "Saving..." : "Save prayer"}
     </button>
   );

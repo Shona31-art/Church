@@ -118,10 +118,10 @@ export function ChatThread({
           const canDelete = (isMine || canModerate) && !m.id.startsWith("optimistic-");
           return (
             <div key={m.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-              <div className={`rounded-2xl px-3.5 py-2 text-sm max-w-[80%] ${isMine ? "bg-ember text-white" : "bg-parchment border border-line"}`}>
+              <div className={`rounded-2xl px-3.5 py-2 text-sm max-w-[80%] ${isMine ? "bg-ember text-on-ember" : "bg-parchment border border-line"}`}>
                 {!isMine && <p className="text-xs font-semibold opacity-70 mb-0.5">{m.sender_name}</p>}
                 <p className="whitespace-pre-wrap break-words">{m.content}</p>
-                <div className={`mt-1 flex items-center gap-3 text-[11px] ${isMine ? "text-white/70" : "text-ink/50"}`}>
+                <div className={`mt-1 flex items-center gap-3 text-[11px] ${isMine ? "text-on-ember/70" : "text-ink/50"}`}>
                   <time dateTime={m.created_at}>{m.id.startsWith("optimistic-") ? "Sending…" : formatDateTime(m.created_at, { weekday: undefined })}</time>
                   {canDelete &&
                     (confirmingDelete === m.id ? (

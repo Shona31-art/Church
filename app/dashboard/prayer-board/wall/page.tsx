@@ -56,7 +56,7 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
     <div className="max-w-2xl">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
         <h1 className="text-2xl font-semibold">Church prayer wall</h1>
-        <Link href="/dashboard/prayer-board/new" className="bg-ember text-white px-4 py-2 rounded-lg text-sm font-medium">
+        <Link href="/dashboard/prayer-board/new" className="btn-primary">
           + Share a request
         </Link>
       </div>
@@ -112,7 +112,7 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
                     <input type="hidden" name="id" value={p.id} />
                     <PendingButton
                       className={`text-sm rounded-lg px-3 py-1.5 border ${
-                        iPrayed ? "bg-ember text-white border-ember" : "border-ink/20 hover:bg-ink/5"
+                        iPrayed ? "bg-ember text-on-ember border-ember" : "border-ink/20 hover:bg-ink/5"
                       }`}
                       pendingLabel="…"
                     >

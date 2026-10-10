@@ -76,7 +76,7 @@ function WordSearchBoard({ puzzle, onPlayAgain }: { puzzle: WordSearchPuzzle; on
           {found.size} / {puzzle.words.length} words found
         </p>
         <div className="flex gap-2 justify-center mt-4">
-          <button onClick={onPlayAgain} className="bg-ember text-white px-5 py-2.5 rounded-lg text-sm font-medium">
+          <button onClick={onPlayAgain} className="btn-primary">
             Play again
           </button>
           <button
@@ -112,10 +112,10 @@ function WordSearchBoard({ puzzle, onPlayAgain }: { puzzle: WordSearchPuzzle; on
                   onClick={() => handleCellClick(r, c)}
                   className={`aspect-square text-xs font-medium rounded ${
                     isFound
-                      ? "bg-ember text-white"
+                      ? "bg-ember text-on-ember"
                       : isStart
                       ? "bg-ink/20 text-ink"
-                      : "bg-white/70 border border-ink/10 text-ink hover:bg-ink/5"
+                      : "bg-surface border border-ink/10 text-ink hover:bg-ink/5"
                   }`}
                 >
                   {letter}
@@ -138,7 +138,7 @@ function WordSearchBoard({ puzzle, onPlayAgain }: { puzzle: WordSearchPuzzle; on
       </div>
 
       {allFound && (
-        <button onClick={handleFinish} className="mt-6 bg-ember text-white px-6 py-3 rounded-lg font-medium">
+        <button onClick={handleFinish} className="btn-primary mt-6">
           Finish
         </button>
       )}

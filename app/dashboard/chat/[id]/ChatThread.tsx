@@ -4,7 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { showToast } from "@/components/ui/Toaster";
 import {
+  CHAT_MEDIA_BUCKET,
   MAX_MESSAGE_LENGTH,
+  baseMimeType,
+  chatMediaPath,
   canDeleteMessage,
   canEditMessage,
   dayKey,
@@ -19,6 +22,7 @@ import {
 import { deleteChatMessage, editChatMessage } from "../actions";
 import { MessageBubble } from "./MessageBubble";
 import { Composer } from "./Composer";
+import type { RecordedVoiceNote } from "./VoiceRecorder";
 
 export interface ChatPerson {
   name: string;
@@ -37,6 +41,7 @@ const UNKNOWN_PERSON: ChatPerson = { name: "Former member", photoUrl: null };
  */
 export function ChatThread({
   channelId,
+  churchId,
   isDm,
   v2,
   initialMessages,
@@ -48,6 +53,7 @@ export function ChatThread({
   directory,
 }: {
   channelId: string;
+  churchId: string;
   isDm: boolean;
   v2: boolean;
   initialMessages: ChatMessage[];
@@ -103,6 +109,9 @@ export function ChatThread({
       deleted_at: row.deleted_at ?? null,
       deleted_by: row.deleted_by ?? null,
       reply_to_id: row.reply_to_id ?? null,
+      media_path: row.media_path ?? null,
+      media_duration_ms: row.media_duration_ms ?? null,
+      media_expired_at: row.media_expired_at ?? null,
     });
     const filter = `channel_id=eq.${channelId}`;
 
@@ -187,6 +196,9 @@ export function ChatThread({
       deleted_at: null,
       deleted_by: null,
       reply_to_id: quoting?.id ?? null,
+      media_path: null,
+      media_duration_ms: null,
+      media_expired_at: null,
       pending: true,
     };
     setMessages((prev) => [...prev, optimistic]);
@@ -216,13 +228,73 @@ export function ChatThread({
     );
   }
 
+  /**
+   * Voice note: upload to the private chat-media bucket, then post the
+   * message. If posting fails the file is removed again, and the recorder
+   * keeps the note so it can be retried.
+   */
+  async function sendVoice(note: RecordedVoiceNote): Promise<string | null> {
+    const quoting = replyTo;
+    const path = chatMediaPath(churchId, channelId, currentUserId, crypto.randomUUID(), note.extension);
+    const { error: uploadError } = await supabase.storage
+      .from(CHAT_MEDIA_BUCKET)
+      .upload(path, note.blob, { contentType: baseMimeType(note.blob.type), upsert: false });
+    if (uploadError) {
+      console.error("[chat] voice upload failed:", uploadError.message);
+      return /jwt|auth/i.test(uploadError.message)
+        ? "Your session has expired — sign in again."
+        : "Couldn't upload your voice note — check your connection and try again.";
+    }
+
+    const { data, error } = await supabase
+      .from("chat_messages")
+      .insert({
+        channel_id: channelId,
+        sender_id: currentUserId,
+        content: "",
+        kind: "voice",
+        media_path: path,
+        media_duration_ms: Math.round(note.durationMs),
+        reply_to_id: quoting?.id ?? null,
+      })
+      .select("id, created_at")
+      .single();
+    if (error || !data) {
+      await supabase.storage.from(CHAT_MEDIA_BUCKET).remove([path]);
+      return /row-level security/i.test(error?.message ?? "")
+        ? "You can't send voice notes here right now."
+        : "Couldn't send your voice note — try again.";
+    }
+
+    setReplyTo(null);
+    const sent: ChatMessage = {
+      id: data.id,
+      channel_id: channelId,
+      sender_id: currentUserId,
+      content: "",
+      created_at: data.created_at,
+      kind: "voice",
+      edited_at: null,
+      deleted_at: null,
+      deleted_by: null,
+      reply_to_id: quoting?.id ?? null,
+      media_path: path,
+      media_duration_ms: Math.round(note.durationMs),
+      media_expired_at: null,
+    };
+    setMessages((prev) => (prev.some((m) => m.id === sent.id) ? prev : [...prev, sent]));
+    return null;
+  }
+
   async function confirmDelete() {
     const target = deleting;
     setDeleting(null);
     if (!target) return;
     const result = await deleteChatMessage(target.id);
     if (result.error) return showToast(result.error, "error");
-    setMessages((prev) => prev.map((m) => (m.id === target.id ? { ...m, content: "", deleted_at: new Date().toISOString(), deleted_by: currentUserId } : m)));
+    setMessages((prev) =>
+      prev.map((m) => (m.id === target.id ? { ...m, content: "", media_path: null, deleted_at: new Date().toISOString(), deleted_by: currentUserId } : m))
+    );
     setReactions((prev) => prev.filter((r) => r.message_id !== target.id));
     if (editing?.id === target.id || replyTo?.id === target.id) cancelMode();
   }
@@ -334,6 +406,7 @@ export function ChatThread({
             : null
         }
         onCancelMode={cancelMode}
+        onSendVoice={v2 ? sendVoice : undefined}
       />
 
       <dialog

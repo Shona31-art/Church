@@ -34,6 +34,9 @@ export interface ChatMessage {
   deleted_at: string | null;
   deleted_by: string | null;
   reply_to_id: string | null;
+  media_path: string | null;
+  media_duration_ms: number | null;
+  media_expired_at: string | null;
   /** True until the server confirms the insert. */
   pending?: boolean;
 }
@@ -112,4 +115,58 @@ export function messagePreview(message: Pick<ChatMessage, "content" | "kind" | "
   if (message.kind === "image") return message.content ? `Photo · ${message.content}` : "Photo";
   const text = message.content.replace(/\s+/g, " ").trim();
   return text.length > 90 ? `${text.slice(0, 89)}…` : text;
+}
+
+// ---------------------------------------------------------------------------
+// Voice notes
+// ---------------------------------------------------------------------------
+
+export const CHAT_MEDIA_BUCKET = "chat-media";
+
+/** Longest voice note. The database allows a little slack (125 s) for rounding. */
+export const MAX_VOICE_MS = 2 * 60 * 1000;
+
+/** Matches the chat-media bucket's file size limit in chat_v2.sql. */
+export const MAX_VOICE_BYTES = 1024 * 1024;
+
+/** Voice notes (and photos) are deleted this long after sending. */
+export const MEDIA_RETENTION_DAYS = 90;
+
+/** Files sent before this moment are due for deletion. */
+export function mediaExpiryCutoff(now: Date = new Date()): Date {
+  return new Date(now.getTime() - MEDIA_RETENTION_DAYS * 86_400_000);
+}
+
+/** 83_000 → "1:23". */
+export function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+/**
+ * The recording format to ask the browser for. MP4/AAC first: it plays on
+ * every phone, including older iPhones that can't play WebM. Then WebM/Opus
+ * (Chrome, Firefox, Android) and Ogg. Null if the browser can't record.
+ */
+export function pickRecordingFormat(isSupported: (mime: string) => boolean): { mimeType: string; extension: string } | null {
+  const candidates = [
+    // AAC named explicitly: some browsers record "audio/mp4" with Opus inside,
+    // which older iPhones can't play.
+    { mimeType: "audio/mp4;codecs=mp4a.40.2", extension: "m4a" },
+    { mimeType: "audio/mp4", extension: "m4a" },
+    { mimeType: "audio/webm;codecs=opus", extension: "webm" },
+    { mimeType: "audio/webm", extension: "webm" },
+    { mimeType: "audio/ogg;codecs=opus", extension: "ogg" },
+  ];
+  return candidates.find((c) => isSupported(c.mimeType)) ?? null;
+}
+
+/** "audio/webm;codecs=opus" → "audio/webm" (Storage checks the plain type). */
+export function baseMimeType(mime: string): string {
+  return mime.split(";")[0].trim().toLowerCase();
+}
+
+/** chat-media/<church>/<channel>/<sender>/<random>.<ext> — the folder the Storage policy allows. */
+export function chatMediaPath(churchId: string, channelId: string, senderId: string, fileId: string, extension: string): string {
+  return `${churchId}/${channelId}/${senderId}/${fileId}.${extension}`;
 }

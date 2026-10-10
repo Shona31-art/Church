@@ -262,6 +262,18 @@ describe("voice notes and photos", () => {
     expect(await send(BOB, GENERAL, "", "voice", `${CHURCH_A}/${GENERAL}/${BOB}/note.webm`)).toBeTruthy();
   });
 
+  test("the nightly job (service role) can expire a voice note; members can't fake one", async () => {
+    const note = await send(ALICE, GENERAL, "", "voice", `${CHURCH_A}/${GENERAL}/${ALICE}/old.webm`);
+    await asUser(db, null, () => rows(`update chat_messages set media_path = null, media_expired_at = now() where id = $1`, [note]));
+    const [m] = await rows(`select media_path, media_expired_at from chat_messages where id = $1`, [note]);
+    expect(m.media_path).toBeNull();
+    expect(m.media_expired_at).not.toBeNull();
+
+    // A voice note with no file, sent as already-expired, is refused.
+    const fake = await attempt(ALICE, `insert into chat_messages (channel_id, sender_id, content, kind, media_expired_at) values ($1, $2, '', 'voice', now())`, [GENERAL, ALICE]);
+    expect(fake).toMatch(/row-level security/);
+  });
+
   test("photos are refused until the church has photo sharing switched on", async () => {
     const photo = `${CHURCH_A}/${GENERAL}/${BOB}/pic.webp`;
     const sql = `insert into chat_messages (channel_id, sender_id, content, kind, media_path) values ($1, $2, '', 'image', $3)`;

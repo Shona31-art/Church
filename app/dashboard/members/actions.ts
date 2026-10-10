@@ -13,6 +13,7 @@ import { assignableRoles, can, canEditMemberRole } from "@/lib/permissions";
 import { memberCreateSchema, memberUpdateSchema } from "@/lib/member-schemas";
 import { FormState, SESSION_EXPIRED, formValues, invalid, optionalField } from "@/lib/forms";
 import { AVATAR_BUCKET } from "@/lib/avatar-path";
+import { CHAT_MEDIA_BUCKET } from "@/lib/chat";
 
 // Every member mutation. Each action re-checks who's asking (server actions
 // are public endpoints), validates input with Zod, and is backed by the
@@ -363,6 +364,15 @@ export async function deleteMemberPermanently(_prev: FormState, formData: FormDa
   if (photos?.length) {
     const { error: photoError } = await admin.storage.from(AVATAR_BUCKET).remove(photos.map((f) => `${photoFolder}/${f.name}`));
     if (photoError) return { error: "Couldn't remove this person's profile photo, so nothing was deleted. Try again." };
+  }
+
+  // Their chat messages are removed by the database cascade, but voice notes
+  // (and photos) are files in Storage — remove those too.
+  const { data: chatFiles } = await admin.from("chat_messages").select("media_path").eq("sender_id", target.id).not("media_path", "is", null);
+  const chatPaths = (chatFiles ?? []).map((m) => m.media_path as string).filter((p) => p.startsWith(`${me.church_id}/`));
+  if (chatPaths.length) {
+    const { error: chatFileError } = await admin.storage.from(CHAT_MEDIA_BUCKET).remove(chatPaths);
+    if (chatFileError) return { error: "Couldn't remove this person's voice notes, so nothing was deleted. Try again." };
   }
 
   const { error } = await admin.auth.admin.deleteUser(target.id);

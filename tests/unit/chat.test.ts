@@ -1,5 +1,18 @@
 import { describe, expect, test } from "vitest";
-import { canDeleteMessage, canEditMessage, dayLabel, messagePreview, startsGroup, summarizeReactions, type ChatMessage } from "@/lib/chat";
+import {
+  baseMimeType,
+  canDeleteMessage,
+  canEditMessage,
+  chatMediaPath,
+  dayLabel,
+  formatDuration,
+  mediaExpiryCutoff,
+  messagePreview,
+  pickRecordingFormat,
+  startsGroup,
+  summarizeReactions,
+  type ChatMessage,
+} from "@/lib/chat";
 
 const ME = "me";
 const base: ChatMessage = {
@@ -13,6 +26,9 @@ const base: ChatMessage = {
   deleted_at: null,
   deleted_by: null,
   reply_to_id: null,
+  media_path: null,
+  media_duration_ms: null,
+  media_expired_at: null,
 };
 const at = (iso: string) => new Date(iso).getTime();
 
@@ -86,5 +102,29 @@ describe("messagePreview", () => {
     expect(messagePreview({ ...base, content: "x".repeat(200) })).toHaveLength(90);
     expect(messagePreview({ ...base, kind: "voice", content: "" })).toBe("Voice note");
     expect(messagePreview({ ...base, deleted_at: "2026-10-10T08:01:00Z" })).toBe("This message was deleted");
+  });
+});
+
+describe("voice notes", () => {
+  test("durations read like a clock", () => {
+    expect(formatDuration(0)).toBe("0:00");
+    expect(formatDuration(83_000)).toBe("1:23");
+    expect(formatDuration(120_000)).toBe("2:00");
+  });
+
+  test("recording format prefers MP4 (plays everywhere), then WebM, then Ogg", () => {
+    expect(pickRecordingFormat(() => true)).toEqual({ mimeType: "audio/mp4;codecs=mp4a.40.2", extension: "m4a" });
+    expect(pickRecordingFormat((m) => m === "audio/mp4")).toEqual({ mimeType: "audio/mp4", extension: "m4a" });
+    expect(pickRecordingFormat((m) => m.startsWith("audio/webm"))).toEqual({ mimeType: "audio/webm;codecs=opus", extension: "webm" });
+    expect(pickRecordingFormat(() => false)).toBeNull();
+    expect(baseMimeType("audio/webm;codecs=opus")).toBe("audio/webm");
+  });
+
+  test("files go in the church/channel/sender folder", () => {
+    expect(chatMediaPath("ch", "c1", "u1", "f", "m4a")).toBe("ch/c1/u1/f.m4a");
+  });
+
+  test("files expire 90 days after sending", () => {
+    expect(mediaExpiryCutoff(new Date("2026-10-10T00:00:00Z")).toISOString()).toBe("2026-07-12T00:00:00.000Z");
   });
 });

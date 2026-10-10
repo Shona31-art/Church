@@ -12,7 +12,8 @@ import { ChatThread, type ChatPerson } from "./ChatThread";
 
 const HISTORY = 200;
 
-const V2_COLUMNS = "id, channel_id, sender_id, content, created_at, kind, edited_at, deleted_at, deleted_by, reply_to_id";
+const V2_COLUMNS =
+  "id, channel_id, sender_id, content, created_at, kind, edited_at, deleted_at, deleted_by, reply_to_id, media_path, media_duration_ms, media_expired_at";
 const V1_COLUMNS = "id, channel_id, sender_id, content, created_at";
 
 export default async function ChatChannelPage({ params }: { params: { id: string } }) {
@@ -57,6 +58,9 @@ export default async function ChatChannelPage({ params }: { params: { id: string
     deleted_at: m.deleted_at ?? null,
     deleted_by: m.deleted_by ?? null,
     reply_to_id: m.reply_to_id ?? null,
+    media_path: m.media_path ?? null,
+    media_duration_ms: m.media_duration_ms ?? null,
+    media_expired_at: m.media_expired_at ?? null,
   }));
   const loadedIds = new Set(messages.map((m) => m.id));
 
@@ -104,6 +108,7 @@ export default async function ChatChannelPage({ params }: { params: { id: string
       />
       <ChatThread
         channelId={channel.id}
+        churchId={me.church_id!}
         isDm={channel.is_dm}
         v2={v2}
         initialMessages={messages}

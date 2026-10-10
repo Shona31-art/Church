@@ -97,6 +97,7 @@ shared prayer and care note. It refuses to run without `SEED_CONFIRM=yes` —
 | `AI_CALLS_PER_USER_PER_HOUR` | no | Per-person AI cap (default 30) — protects the API bill |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_BASIC`, `STRIPE_PRICE_PREMIUM` | no | Billing and giving (Stripe test mode is free) |
 | `NOTIFY_WEBHOOK_URL`, `NOTIFY_WEBHOOK_SECRET` | no | Send alerts via a Make.com/n8n webhook; blank = in-app only |
+| `CRON_SECRET` | yes in production | Lets Vercel Cron call `/api/cron/expire-chat-media` (deletes voice notes after 90 days). Blank = the job refuses to run |
 
 ### Stripe (optional)
 
@@ -209,6 +210,8 @@ every server action, and is enforced again by Postgres RLS. Menus only hide link
 | Pastor booking rules | `lib/booking.ts` (tested), `app/dashboard/booking/` |
 | AI counseling, crisis escalation | `lib/counseling.ts`, `app/dashboard/counseling/actions.ts`, `lib/crisis-detection.ts` |
 | Outbound notifications (email/WhatsApp via webhook) | `lib/notify.ts` |
+| Chat (rules, edit window, reactions, voice limits) | `lib/chat.ts` (tested); screen in `app/dashboard/chat/[id]/`; edit/delete in `app/dashboard/chat/actions.ts` |
+| Nightly voice-note expiry | `app/api/cron/expire-chat-media/route.ts`, schedule in `vercel.json` |
 | Any AI behaviour, model, timeout | `lib/ai.ts`; rate limit `lib/ai-quota.ts` |
 | Billing / Stripe webhook | `app/dashboard/billing/`, `app/api/stripe/webhook/route.ts`, `lib/billing.ts` |
 | Giving, giving report & CSV | `app/dashboard/giving/`, `app/api/giving/export/route.ts`, `lib/giving.ts` |

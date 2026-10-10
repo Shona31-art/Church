@@ -1,10 +1,11 @@
 "use client";
 
-import { Ban } from "lucide-react";
+import { Ban, MicOff } from "lucide-react";
 import { formatTime } from "@/lib/format";
 import { REACTION_LABELS, messagePreview, type ChatMessage, type Reaction, type ReactionSummary } from "@/lib/chat";
 import { Avatar } from "@/components/ui/Avatar";
 import { MessageMenu } from "./MessageMenu";
+import { VoicePlayer } from "./VoicePlayer";
 import type { ChatPerson } from "./ChatThread";
 
 /** One message: optional sender header, reply quote, text, time, reactions and menu. */
@@ -81,6 +82,15 @@ export function MessageBubble({
                 <Ban aria-hidden className="h-3.5 w-3.5" />
                 {removedByModerator ? "Removed by a moderator" : "This message was deleted"}
               </p>
+            ) : message.kind === "voice" ? (
+              message.media_path && !message.media_expired_at ? (
+                <VoicePlayer path={message.media_path} durationMs={message.media_duration_ms ?? 0} onDark={isMine} />
+              ) : (
+                <p className="flex items-center gap-1.5 italic opacity-70">
+                  <MicOff aria-hidden className="h-3.5 w-3.5" />
+                  Voice note expired
+                </p>
+              )
             ) : (
               <p className="whitespace-pre-wrap break-words">{message.content}</p>
             )}

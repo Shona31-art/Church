@@ -155,3 +155,26 @@ export async function updateMyAbout(_prev: FormState, formData: FormData): Promi
   flash("Saved.");
   return { ok: true };
 }
+
+/** Form fields: dm_privacy (everyone | leaders | nobody), share_read_receipts (checkbox). */
+export async function updateChatPrivacy(_prev: FormState, formData: FormData): Promise<FormState> {
+  const me = await getCurrentAppUser();
+  if (!me) return { error: SESSION_EXPIRED };
+
+  const parsed = z
+    .object({ dmPrivacy: z.enum(["everyone", "leaders", "nobody"]), receipts: z.boolean() })
+    .safeParse({ dmPrivacy: formData.get("dm_privacy"), receipts: formData.get("share_read_receipts") === "on" });
+  if (!parsed.success) return { error: "Choose who can message you." };
+
+  const { error } = await createClient()
+    .from("app_users")
+    .update({ dm_privacy: parsed.data.dmPrivacy, share_read_receipts: parsed.data.receipts })
+    .eq("id", me.id);
+  if (error) {
+    console.error("[account] chat privacy update failed:", error.message);
+    return { error: error.code === "42703" ? MIGRATION_MISSING : "Couldn't save — please try again." };
+  }
+  revalidatePath("/dashboard/account");
+  flash("Chat privacy saved.");
+  return { ok: true };
+}

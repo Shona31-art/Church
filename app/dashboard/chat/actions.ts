@@ -8,7 +8,8 @@ import { checkModuleAccess } from "@/lib/paywall";
 import { flash } from "@/lib/flash";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
-import { MAX_MESSAGE_LENGTH } from "@/lib/chat";
+import { MAX_MESSAGE_LENGTH, MUTE_OPTIONS, muteUntil, type MuteOption } from "@/lib/chat";
+import { revalidatePath } from "next/cache";
 
 /**
  * Opens (or reuses) a direct message with someone in the same church.
@@ -30,7 +31,14 @@ export async function startDirectMessage(formData: FormData): Promise<void> {
   const { data: channelId, error } = await createClient().rpc("start_direct_message", { other_user: other.data });
   if (error || !channelId) {
     console.error("[chat] start DM failed:", error?.message);
-    flash("Couldn't start that conversation. They may no longer be in your church.", "error");
+    flash(
+      /isn't accepting/.test(error?.message ?? "")
+        ? "This person isn't accepting new direct messages."
+        : /can't message/.test(error?.message ?? "")
+        ? "You can't message this person."
+        : "Couldn't start that conversation. They may no longer be in your church.",
+      "error"
+    );
     redirect("/dashboard/chat/dm/new");
   }
   redirect(`/dashboard/chat/${channelId}`);
@@ -115,5 +123,87 @@ export async function deleteChatMessage(messageId: string): Promise<ChatActionRe
       metadata: { channel_id: message.channel_id, sender_id: message.sender_id },
     });
   }
+  return {};
+}
+
+// ---------------------------------------------------------------------------
+// Per-chat settings (only ever your own — RLS on chat_member_settings)
+// ---------------------------------------------------------------------------
+
+async function requireChatUser() {
+  const me = await getCurrentAppUser();
+  if (!me) return null;
+  return (await checkModuleAccess("dept_chats")).allowed ? me : null;
+}
+
+async function saveMySettings(channelId: string, values: Record<string, string | null>): Promise<ChatActionResult> {
+  const me = await requireChatUser();
+  if (!me) return { error: "Your session has expired — sign in again." };
+  if (!z.string().uuid().safeParse(channelId).success) return { error: "That chat couldn't be found." };
+
+  const { error } = await createClient()
+    .from("chat_member_settings")
+    .upsert({ channel_id: channelId, user_id: me.id, ...values }, { onConflict: "channel_id,user_id" });
+  if (error) {
+    console.error("[chat] settings save failed:", error.message);
+    return { error: "Couldn't save that setting — please try again." };
+  }
+  revalidatePath("/dashboard/chat");
+  return {};
+}
+
+/** Input: channel id, mute choice ("8h" | "1w" | "always") or null to unmute. */
+export async function setChatMute(channelId: string, option: MuteOption | null): Promise<ChatActionResult> {
+  if (option !== null && !MUTE_OPTIONS.some((o) => o.value === option)) return { error: "Choose how long to mute for." };
+  return saveMySettings(channelId, { muted_until: option ? muteUntil(option) : null });
+}
+
+/** Input: channel id, pinned true/false. Pinned chats sit at the top of your list. */
+export async function setChatPinned(channelId: string, pinned: boolean): Promise<ChatActionResult> {
+  return saveMySettings(channelId, { pinned_at: pinned ? new Date().toISOString() : null });
+}
+
+/** Input: channel id. Hides everything sent before now — for you only; nobody else's copy changes. */
+export async function clearMyChatHistory(channelId: string): Promise<ChatActionResult> {
+  const result = await saveMySettings(channelId, { cleared_at: new Date().toISOString() });
+  if (!result.error) revalidatePath(`/dashboard/chat/${channelId}`);
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Blocking (the blocked person is never told)
+// ---------------------------------------------------------------------------
+
+/** Input: the other person's user id. Stops DMs both ways, including from pastors. */
+export async function blockMember(userId: string): Promise<ChatActionResult> {
+  const me = await requireChatUser();
+  if (!me) return { error: "Your session has expired — sign in again." };
+  const target = z.string().uuid().safeParse(userId);
+  if (!target.success || target.data === me.id) return { error: "That person couldn't be found." };
+
+  const { error } = await createClient().from("chat_blocks").upsert({ blocker_id: me.id, blocked_id: target.data }, { onConflict: "blocker_id,blocked_id" });
+  if (error) {
+    console.error("[chat] block failed:", error.message);
+    return { error: "Couldn't block this person — please try again." };
+  }
+  revalidatePath("/dashboard/chat", "layout");
+  revalidatePath("/dashboard/account");
+  return {};
+}
+
+/** Input: the other person's user id. */
+export async function unblockMember(userId: string): Promise<ChatActionResult> {
+  const me = await requireChatUser();
+  if (!me) return { error: "Your session has expired — sign in again." };
+  const target = z.string().uuid().safeParse(userId);
+  if (!target.success) return { error: "That person couldn't be found." };
+
+  const { error } = await createClient().from("chat_blocks").delete().eq("blocker_id", me.id).eq("blocked_id", target.data);
+  if (error) {
+    console.error("[chat] unblock failed:", error.message);
+    return { error: "Couldn't unblock this person — please try again." };
+  }
+  revalidatePath("/dashboard/chat", "layout");
+  revalidatePath("/dashboard/account");
   return {};
 }

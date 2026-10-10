@@ -12,6 +12,7 @@ import { PermissionDenied } from "@/components/ui/Gates";
 import { MemberStatusBadge } from "../MemberBadges";
 import { MemberAccountActions } from "./MemberAccountActions";
 import { RemovePhotoButton } from "./RemovePhotoButton";
+import { ChatRestrictions, type ActiveRestriction } from "./ChatRestrictions";
 import { Avatar } from "@/components/ui/Avatar";
 import { getAvatarUrls } from "@/lib/avatars";
 
@@ -25,6 +26,8 @@ const ACTIVITY_LABELS: Record<string, string> = {
   "member.exported": "Personal data exported",
   "member.self_export": "Exported their own data",
   "member.photo_removed": "Profile photo removed",
+  "member.chat_restricted": "Chat restricted",
+  "member.chat_restriction_lifted": "Chat restriction lifted",
 };
 
 export default async function MemberProfilePage({ params }: { params: { id: string } }) {
@@ -63,6 +66,26 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
   const canChangeAccess = canEditMemberRole(me, member);
   const department = (member as any).departments?.name as string | undefined;
   const photoUrl = (await getAvatarUrls([member.id])).get(member.id) ?? null;
+
+  // Active chat restrictions (chat_v2.sql). Missing table → section hidden.
+  const nowIso = new Date().toISOString();
+  const { data: restrictionRows, error: restrictionError } = canChangeAccess
+    ? await supabase
+        .from("member_chat_restrictions")
+        .select("id, kind, until, reason, created_at, setter:app_users!member_chat_restrictions_created_by_fkey(name)")
+        .eq("user_id", member.id)
+        .is("lifted_at", null)
+        .or(`until.is.null,until.gt.${nowIso}`)
+        .order("created_at", { ascending: false })
+    : { data: null, error: null };
+  const restrictions: ActiveRestriction[] = (restrictionRows ?? []).map((r: any) => ({
+    id: r.id,
+    kind: r.kind,
+    until: r.until,
+    reason: r.reason,
+    createdAt: r.created_at,
+    createdByName: r.setter?.name ?? "a former leader",
+  }));
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -138,6 +161,12 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
           />
         )}
       </Section>
+
+      {canChangeAccess && !restrictionError && restrictionRows && (
+        <Section title="Chat restrictions" description="Pause someone's group-chat posting or voice notes after misuse. Logged, and they see the reason.">
+          <ChatRestrictions memberId={member.id} memberName={member.name} active={restrictions} />
+        </Section>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title="Pastoral care" description="Confidential — visible to pastors and church admins only.">

@@ -6,6 +6,10 @@ import {
   chatMediaPath,
   dayLabel,
   formatDuration,
+  isMuted,
+  muteUntil,
+  receiptStatus,
+  restrictionUntil,
   mediaExpiryCutoff,
   messagePreview,
   pickRecordingFormat,
@@ -126,5 +130,28 @@ describe("voice notes", () => {
 
   test("files expire 90 days after sending", () => {
     expect(mediaExpiryCutoff(new Date("2026-10-10T00:00:00Z")).toISOString()).toBe("2026-07-12T00:00:00.000Z");
+  });
+});
+
+describe("chat settings and receipts", () => {
+  const now = new Date("2026-10-10T08:00:00Z");
+  test("mute durations, and 'always' never ends", () => {
+    expect(muteUntil("8h", now)).toBe("2026-10-10T16:00:00.000Z");
+    expect(isMuted(muteUntil("always", now), new Date("2100-01-01T00:00:00Z"))).toBe(true);
+    expect(isMuted("2026-10-10T07:59:00Z", now)).toBe(false);
+    expect(isMuted(null, now)).toBe(false);
+  });
+
+  test("read ticks only when the other person's shared read time reaches the message", () => {
+    const msg = { created_at: "2026-10-10T08:00:00Z" };
+    expect(receiptStatus(msg, null)).toBe("sent");
+    expect(receiptStatus(msg, "2026-10-10T07:59:59Z")).toBe("sent");
+    expect(receiptStatus(msg, "2026-10-10T08:00:00Z")).toBe("read");
+    expect(receiptStatus({ ...msg, pending: true }, "2026-10-10T09:00:00Z")).toBe("sending");
+  });
+
+  test("restriction end dates; 'until lifted' has none", () => {
+    expect(restrictionUntil("1d", now)).toBe("2026-10-11T08:00:00.000Z");
+    expect(restrictionUntil("lifted", now)).toBeNull();
   });
 });

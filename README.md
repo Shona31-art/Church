@@ -260,6 +260,11 @@ the Aperture default). Conventions every screen follows:
   logo and no photography, and the dashboard sidebar shows the church's initials
   as a monogram in place of a church logo. Supply a real logo (SVG) and images
   before launch.
+- **Chat "typing…" uses an open Realtime broadcast** keyed by the chat's random ID.
+  It carries only a user ID (never message text), but isn't permission-checked the
+  way messages are. Supabase "private channels" (Realtime Authorization) would close
+  this; worth enabling if chats become sensitive. Chat mute only hides unread counts,
+  because there are no chat notifications yet. Read ticks (✓✓) show in DMs only.
 - **Notifications are in-app only** unless you set `NOTIFY_WEBHOOK_URL`. Crisis
   escalations are recorded and shown to pastors on the Counseling page, but no
   email/WhatsApp is sent without the webhook.

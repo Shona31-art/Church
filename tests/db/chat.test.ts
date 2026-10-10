@@ -322,6 +322,15 @@ describe("read receipts", () => {
     expect(await asUser(db, BOB, () => rows(`select last_read_at from chat_member_settings where channel_id = $1`, [GENERAL]))).toHaveLength(1);
   });
 
+  test("chat settings: your own only, and only for chats you're in", async () => {
+    const save = (user: string, channel: string) =>
+      attempt(user, `insert into chat_member_settings (channel_id, user_id, pinned_at) values ($1, $2, now())
+                     on conflict (channel_id, user_id) do update set pinned_at = excluded.pinned_at`, [channel, user]);
+    expect(await save(BOB, GENERAL)).toBeNull();
+    expect(await save(BOB, YOUTH_CHANNEL)).toMatch(/row-level security/);
+    expect(await attempt(BOB, `insert into chat_member_settings (channel_id, user_id) values ($1, $2)`, [GENERAL, ALICE])).toMatch(/row-level security/);
+  });
+
   test("outsiders can't mark another church's chat read", async () => {
     expect(await attempt(OUTSIDER, `select mark_chat_read($1)`, [GENERAL])).toMatch(/access/);
   });

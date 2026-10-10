@@ -1,11 +1,12 @@
 "use client";
 
-import { Ban, MicOff } from "lucide-react";
+import { Ban, Check, CheckCheck, ImageOff, MicOff } from "lucide-react";
 import { formatTime } from "@/lib/format";
 import { REACTION_LABELS, messagePreview, type ChatMessage, type Reaction, type ReactionSummary } from "@/lib/chat";
 import { Avatar } from "@/components/ui/Avatar";
 import { MessageMenu } from "./MessageMenu";
 import { VoicePlayer } from "./VoicePlayer";
+import { ChatImage } from "./ChatImage";
 import type { ChatPerson } from "./ChatThread";
 
 /** One message: optional sender header, reply quote, text, time, reactions and menu. */
@@ -24,6 +25,7 @@ export function MessageBubble({
   onEdit,
   onDelete,
   onJumpTo,
+  receipt,
 }: {
   message: ChatMessage;
   isMine: boolean;
@@ -39,6 +41,8 @@ export function MessageBubble({
   onEdit?: () => void;
   onDelete?: () => void;
   onJumpTo: (messageId: string) => void;
+  /** Ticks on my own messages in a DM (read receipts). */
+  receipt?: "sending" | "sent" | "read";
 }) {
   const deleted = Boolean(message.deleted_at);
   const removedByModerator = deleted && message.deleted_by && message.deleted_by !== message.sender_id;
@@ -82,6 +86,18 @@ export function MessageBubble({
                 <Ban aria-hidden className="h-3.5 w-3.5" />
                 {removedByModerator ? "Removed by a moderator" : "This message was deleted"}
               </p>
+            ) : message.kind === "image" ? (
+              message.media_path && !message.media_expired_at ? (
+                <>
+                  <ChatImage path={message.media_path} caption={message.content} />
+                  {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
+                </>
+              ) : (
+                <p className="flex items-center gap-1.5 italic opacity-70">
+                  <ImageOff aria-hidden className="h-3.5 w-3.5" />
+                  Photo expired
+                </p>
+              )
             ) : message.kind === "voice" ? (
               message.media_path && !message.media_expired_at ? (
                 <VoicePlayer path={message.media_path} durationMs={message.media_duration_ms ?? 0} onDark={isMine} />
@@ -98,6 +114,12 @@ export function MessageBubble({
             <p className={`mt-1 flex items-center justify-end gap-1.5 text-[11px] tabular ${isMine && !deleted ? "text-on-ember/65" : "text-ink/45"}`}>
               {message.edited_at && !deleted && <span>Edited</span>}
               <time dateTime={message.created_at}>{message.pending ? "Sending…" : formatTime(message.created_at)}</time>
+              {receipt && receipt !== "sending" && !deleted && (
+                <span className={receipt === "read" ? "text-gold" : ""} title={receipt === "read" ? "Read" : "Sent"}>
+                  {receipt === "read" ? <CheckCheck aria-hidden className="h-3.5 w-3.5" /> : <Check aria-hidden className="h-3.5 w-3.5" />}
+                  <span className="sr-only">{receipt === "read" ? "Read" : "Sent"}</span>
+                </span>
+              )}
             </p>
           </div>
 

@@ -14,6 +14,7 @@ import { memberCreateSchema, memberUpdateSchema } from "@/lib/member-schemas";
 import { FormState, SESSION_EXPIRED, formValues, invalid, optionalField } from "@/lib/forms";
 import { AVATAR_BUCKET } from "@/lib/avatar-path";
 import { getMemberLimitStatus } from "@/lib/member-limit";
+import { RESTRICTION_DURATIONS, RESTRICTION_KINDS, restrictionUntil, type RestrictionDuration, type RestrictionKind } from "@/lib/chat";
 import { CHAT_MEDIA_BUCKET } from "@/lib/chat";
 
 // Every member mutation. Each action re-checks who's asking (server actions
@@ -402,5 +403,87 @@ export async function removeMemberPhoto(_prev: FormState, formData: FormData): P
   await logAudit({ churchId: me.church_id, actorId: me.id, action: "member.photo_removed", targetTable: "app_users", targetId: target.id });
   revalidatePath(`/dashboard/members/${target.id}`);
   flash("Profile photo removed.");
+  return { ok: true };
+}
+
+/**
+ * Restricts a member in chat — e.g. after repeated off-topic posts or misuse
+ * of voice notes. Pastors and church admins; a pastor can't restrict a church
+ * admin. The database enforces the same rule (can_restrict_member) and the
+ * restriction itself. Logged. The member can see it, with the reason.
+ * Form fields: member_id, kind (group_mute | no_voice), duration (1d | 7d | 30d | lifted), reason.
+ */
+export async function restrictMemberChat(_prev: FormState, formData: FormData): Promise<FormState> {
+  const me = await requireMemberManager();
+  if (!me) return { error: "Only pastors and church admins can restrict members." };
+
+  const parsed = z
+    .object({
+      memberId: uuid,
+      kind: z.enum(Object.keys(RESTRICTION_KINDS) as [RestrictionKind, ...RestrictionKind[]]),
+      duration: z.enum(RESTRICTION_DURATIONS.map((d) => d.value) as [RestrictionDuration, ...RestrictionDuration[]]),
+      reason: z.string().trim().min(3, "Give a short reason — the member will see it.").max(500),
+    })
+    .safeParse({ memberId: formData.get("member_id"), kind: formData.get("kind"), duration: formData.get("duration"), reason: formData.get("reason") ?? "" });
+  if (!parsed.success) return invalid(parsed.error, formData);
+
+  const target = await loadMember(parsed.data.memberId, me.church_id!);
+  if (!target) return { error: "That member couldn't be found in your church." };
+  if (!canEditMemberRole(me, target)) return { error: "You can't restrict this person." };
+
+  const { data: created, error } = await createClient()
+    .from("member_chat_restrictions")
+    .insert({
+      church_id: me.church_id,
+      user_id: target.id,
+      kind: parsed.data.kind,
+      until: restrictionUntil(parsed.data.duration),
+      reason: parsed.data.reason,
+      created_by: me.id,
+    })
+    .select("id")
+    .single();
+  if (error || !created) {
+    console.error("[members] chat restriction failed:", error?.message);
+    return { error: "Couldn't save the restriction — please try again." };
+  }
+
+  await logAudit({
+    churchId: me.church_id,
+    actorId: me.id,
+    action: "member.chat_restricted",
+    targetTable: "member_chat_restrictions",
+    targetId: created.id,
+    metadata: { member_id: target.id, kind: parsed.data.kind, duration: parsed.data.duration },
+  });
+  revalidatePath(`/dashboard/members/${target.id}`);
+  flash(`${target.name}: ${RESTRICTION_KINDS[parsed.data.kind].toLowerCase()}.`);
+  return { ok: true };
+}
+
+/** Lifts a chat restriction early. Form fields: restriction_id, member_id. Logged. */
+export async function liftChatRestriction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const me = await requireMemberManager();
+  if (!me) return { error: "Only pastors and church admins can lift restrictions." };
+
+  const ids = z.object({ restrictionId: uuid, memberId: uuid }).safeParse({ restrictionId: formData.get("restriction_id"), memberId: formData.get("member_id") });
+  if (!ids.success) return { error: "That restriction couldn't be found." };
+  const target = await loadMember(ids.data.memberId, me.church_id!);
+  if (!target || !canEditMemberRole(me, target)) return { error: "You can't change this person's restrictions." };
+
+  const { error, count } = await createClient()
+    .from("member_chat_restrictions")
+    .update({ lifted_at: new Date().toISOString(), lifted_by: me.id }, { count: "exact" })
+    .eq("id", ids.data.restrictionId)
+    .eq("user_id", target.id)
+    .is("lifted_at", null);
+  if (error || !count) {
+    console.error("[members] lift restriction failed:", error?.message);
+    return { error: "Couldn't lift the restriction — it may already have ended." };
+  }
+
+  await logAudit({ churchId: me.church_id, actorId: me.id, action: "member.chat_restriction_lifted", targetTable: "member_chat_restrictions", targetId: ids.data.restrictionId, metadata: { member_id: target.id } });
+  revalidatePath(`/dashboard/members/${target.id}`);
+  flash("Restriction lifted.");
   return { ok: true };
 }

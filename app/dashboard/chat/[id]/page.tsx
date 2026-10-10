@@ -6,7 +6,9 @@ import { moduleGate } from "@/lib/gate";
 import { can } from "@/lib/permissions";
 import { getAvatarUrls } from "@/lib/avatars";
 import { planIncludes } from "@/lib/features";
-import type { ChatMessage, ChatReaction } from "@/lib/chat";
+import { isMuted, muteLabel, type ChatMessage, type ChatReaction } from "@/lib/chat";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { ChatMenu } from "./ChatMenu";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Avatar } from "@/components/ui/Avatar";
 import { ChatThread, type ChatPerson } from "./ChatThread";
@@ -35,11 +37,23 @@ export default async function ChatChannelPage({ params }: { params: { id: string
     otherUserId = other?.user_id ?? null;
   }
 
+  // My own settings for this chat (mute / pin / "clear my history").
+  // Missing table (chat_v2.sql not run) simply means no settings.
+  const { data: settings } = await supabase
+    .from("chat_member_settings")
+    .select("muted_until, pinned_at, cleared_at")
+    .eq("channel_id", params.id)
+    .eq("user_id", me.id)
+    .maybeSingle();
+
   // Newest first, then reversed — long channels show their latest messages.
   // If chat_v2.sql hasn't been run, the new columns don't exist (42703): fall
   // back to plain text chat rather than breaking the page.
-  const latestQuery = (columns: string) =>
-    supabase.from("chat_messages").select(columns).eq("channel_id", params.id).order("created_at", { ascending: false }).limit(HISTORY);
+  const latestQuery = (columns: string) => {
+    let query = supabase.from("chat_messages").select(columns).eq("channel_id", params.id);
+    if (settings?.cleared_at) query = query.gt("created_at", settings.cleared_at);
+    return query.order("created_at", { ascending: false }).limit(HISTORY);
+  };
   let v2 = true;
   let { data: latest, error } = await latestQuery(V2_COLUMNS);
   if (error?.code === "42703") {
@@ -85,6 +99,26 @@ export default async function ChatChannelPage({ params }: { params: { id: string
   const { data: otherAbout } = otherUserId && v2 ? await supabase.from("app_users").select("about").eq("id", otherUserId).maybeSingle() : { data: null };
   const title = channel.is_dm ? other?.name ?? "Former member" : channel.name;
 
+  // Read receipts (RLS returns nothing if either of us has them off), whether
+  // I've blocked the other person, my own chat restrictions, plan switches.
+  const nowIso = new Date().toISOString();
+  const [{ data: receipt }, { data: myBlock }, { data: myRestrictions }, voiceOnPlan, photosOnPlan] = await Promise.all([
+    otherUserId && v2
+      ? supabase.from("chat_read_receipts").select("read_at").eq("channel_id", params.id).eq("user_id", otherUserId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    otherUserId && v2
+      ? supabase.from("chat_blocks").select("blocked_id").eq("blocker_id", me.id).eq("blocked_id", otherUserId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    v2
+      ? supabase.from("member_chat_restrictions").select("kind, until, reason").eq("user_id", me.id).is("lifted_at", null).or(`until.is.null,until.gt.${nowIso}`)
+      : Promise.resolve({ data: [] }),
+    v2 ? planIncludes("chat_voice") : Promise.resolve(false),
+    v2 ? planIncludes("chat_photos") : Promise.resolve(false),
+  ]);
+  const groupMute = (myRestrictions ?? []).find((r: any) => r.kind === "group_mute") as { until: string | null; reason: string } | undefined;
+  const noVoice = (myRestrictions ?? []).some((r: any) => r.kind === "no_voice");
+  const mutedUntil = isMuted(settings?.muted_until) ? settings!.muted_until : null;
+
   return (
     <div className="max-w-3xl">
       <PageHeader
@@ -106,13 +140,37 @@ export default async function ChatChannelPage({ params }: { params: { id: string
             ? "Department channel"
             : "Everyone in the church can read this channel."
         }
+        meta={
+          mutedUntil || settings?.pinned_at ? (
+            <>
+              {settings?.pinned_at && <StatusBadge tone="neutral">Pinned</StatusBadge>}
+              {mutedUntil && <StatusBadge tone="neutral">{muteLabel(mutedUntil)}</StatusBadge>}
+            </>
+          ) : undefined
+        }
+        actions={
+          v2 ? (
+            <ChatMenu
+              channelId={channel.id}
+              mutedUntil={mutedUntil}
+              pinned={Boolean(settings?.pinned_at)}
+              dmWith={otherUserId ? { id: otherUserId, name: title, blockedByMe: Boolean(myBlock) } : null}
+            />
+          ) : undefined
+        }
       />
       <ChatThread
         channelId={channel.id}
         churchId={me.church_id!}
         isDm={channel.is_dm}
         v2={v2}
-        voiceEnabled={v2 && (await planIncludes("chat_voice"))}
+        voiceEnabled={voiceOnPlan}
+        photosEnabled={photosOnPlan}
+        otherUserId={otherUserId}
+        initialOtherReadAt={receipt?.read_at ?? null}
+        blockedOther={Boolean(myBlock)}
+        groupMute={groupMute ?? null}
+        noVoice={noVoice}
         initialMessages={messages}
         quotedMessages={(quoted ?? []) as unknown as ChatMessage[]}
         initialReactions={(reactions ?? []) as ChatReaction[]}

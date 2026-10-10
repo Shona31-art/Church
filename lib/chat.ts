@@ -170,3 +170,74 @@ export function baseMimeType(mime: string): string {
 export function chatMediaPath(churchId: string, channelId: string, senderId: string, fileId: string, extension: string): string {
   return `${churchId}/${channelId}/${senderId}/${fileId}.${extension}`;
 }
+
+// ---------------------------------------------------------------------------
+// Per-chat settings, read receipts, restrictions
+// ---------------------------------------------------------------------------
+
+/** Mute choices offered in a chat's menu. "always" is stored as a far-future date. */
+export const MUTE_OPTIONS = [
+  { value: "8h", label: "8 hours", ms: 8 * 3600_000 },
+  { value: "1w", label: "1 week", ms: 7 * 86_400_000 },
+  { value: "always", label: "Always", ms: null },
+] as const;
+export type MuteOption = (typeof MUTE_OPTIONS)[number]["value"];
+
+const ALWAYS = "9999-12-31T00:00:00.000Z";
+
+/** The muted_until value to store for a choice made at `now`. */
+export function muteUntil(option: MuteOption, now: Date = new Date()): string {
+  const choice = MUTE_OPTIONS.find((o) => o.value === option)!;
+  return choice.ms === null ? ALWAYS : new Date(now.getTime() + choice.ms).toISOString();
+}
+
+export function isMuted(mutedUntil: string | null | undefined, now: Date = new Date()): boolean {
+  return Boolean(mutedUntil) && new Date(mutedUntil!).getTime() > now.getTime();
+}
+
+/** "Muted until Mon 12:00" / "Muted" (for "always"). */
+export function muteLabel(mutedUntil: string): string {
+  if (mutedUntil.startsWith("9999")) return "Muted";
+  return `Muted until ${new Date(mutedUntil).toLocaleString("en-ZA", { timeZone: APP_TIMEZONE, weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false })}`;
+}
+
+/**
+ * Ticks on my own message in a DM: "sent" (✓) until the other person's
+ * shared read time reaches it, then "read" (✓✓). No receipt (they've turned
+ * receipts off, or I have) stays at "sent" — never a false "read".
+ */
+export function receiptStatus(message: Pick<ChatMessage, "created_at" | "pending">, otherReadAt: string | null | undefined): "sending" | "sent" | "read" {
+  if (message.pending) return "sending";
+  if (otherReadAt && new Date(otherReadAt).getTime() >= new Date(message.created_at).getTime()) return "read";
+  return "sent";
+}
+
+export const RESTRICTION_KINDS = {
+  group_mute: "Can't post in group chats",
+  no_voice: "Can't send voice notes",
+} as const;
+export type RestrictionKind = keyof typeof RESTRICTION_KINDS;
+
+export const RESTRICTION_DURATIONS = [
+  { value: "1d", label: "24 hours", ms: 86_400_000 },
+  { value: "7d", label: "7 days", ms: 7 * 86_400_000 },
+  { value: "30d", label: "30 days", ms: 30 * 86_400_000 },
+  { value: "lifted", label: "Until lifted", ms: null },
+] as const;
+export type RestrictionDuration = (typeof RESTRICTION_DURATIONS)[number]["value"];
+
+/** End time for a restriction, or null for "until lifted". */
+export function restrictionUntil(duration: RestrictionDuration, now: Date = new Date()): string | null {
+  const choice = RESTRICTION_DURATIONS.find((d) => d.value === duration)!;
+  return choice.ms === null ? null : new Date(now.getTime() + choice.ms).toISOString();
+}
+
+export const DM_PRIVACY_OPTIONS = {
+  everyone: "Everyone in my church",
+  leaders: "Department leaders, pastors and admins only",
+  nobody: "Nobody (pastors and admins can still reach me)",
+} as const;
+export type DmPrivacy = keyof typeof DM_PRIVACY_OPTIONS;
+
+// Chat photos (behind the chat_photos plan switch).
+export const CHAT_PHOTO_MAX_DIMENSION = 1600;

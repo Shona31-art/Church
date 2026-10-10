@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Pencil, Reply, SendHorizontal, X } from "lucide-react";
+import { ImagePlus, Pencil, Reply, SendHorizontal, X } from "lucide-react";
 import { MAX_MESSAGE_LENGTH } from "@/lib/chat";
 import { VoiceRecorder, type RecordedVoiceNote } from "./VoiceRecorder";
 
@@ -20,6 +20,11 @@ export function Composer({
   mode,
   onCancelMode,
   onSendVoice,
+  onPickPhoto,
+  photoBusy = false,
+  onTyping,
+  typingText,
+  notice,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -29,8 +34,18 @@ export function Composer({
   mode: { kind: "reply"; name: string; preview: string } | { kind: "edit" } | null;
   onCancelMode: () => void;
   onSendVoice?: (note: RecordedVoiceNote) => Promise<string | null>;
+  /** Set when photo sharing is on for this church. The typed text becomes the caption. */
+  onPickPhoto?: (file: File) => void;
+  photoBusy?: boolean;
+  /** Called as the person types (for the "typing…" indicator). */
+  onTyping?: () => void;
+  /** "Alice is typing…" — shown above the box. */
+  typingText?: string | null;
+  /** Replaces the box entirely, e.g. "You blocked Alice" or a posting restriction. */
+  notice?: React.ReactNode;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const photoRef = useRef<HTMLInputElement>(null);
   const [voiceActive, setVoiceActive] = useState(false);
   const showMic = Boolean(onSendVoice) && !value.trim() && mode?.kind !== "edit";
 
@@ -55,6 +70,10 @@ export function Composer({
       e.preventDefault();
       onCancelMode();
     }
+  }
+
+  if (notice) {
+    return <div className="border-t border-line bg-surface/80 p-4 text-center text-sm text-ink/70">{notice}</div>;
   }
 
   return (
@@ -84,7 +103,38 @@ export function Composer({
         </div>
       )}
 
+      {/* Visual only: announcing every keystroke elsewhere would swamp screen readers. */}
+      <p aria-hidden className="mb-1 h-4 truncate px-1 text-xs italic text-ink/50">
+        {typingText}
+      </p>
+
       <div className="flex items-end gap-2">
+        {onPickPhoto && mode?.kind !== "edit" && !voiceActive && (
+          <>
+            <button
+              type="button"
+              onClick={() => photoRef.current?.click()}
+              disabled={photoBusy}
+              className="btn-ghost btn-icon h-11 w-11 rounded-full"
+              aria-label={photoBusy ? "Sending photo…" : value.trim() ? "Send a photo with this text as its caption" : "Send a photo"}
+            >
+              <ImagePlus aria-hidden className={`h-5 w-5 ${photoBusy ? "animate-pulse" : ""}`} />
+            </button>
+            <input
+              ref={photoRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) onPickPhoto(file);
+              }}
+            />
+          </>
+        )}
         <label htmlFor="chat-message" className="sr-only">
           {mode?.kind === "edit" ? "Edit message" : "Message"}
         </label>
@@ -94,7 +144,10 @@ export function Composer({
           id="chat-message"
           rows={1}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            onChange(e.target.value);
+            if (e.target.value) onTyping?.();
+          }}
           onKeyDown={onKeyDown}
           maxLength={MAX_MESSAGE_LENGTH}
           placeholder="Type a message…"

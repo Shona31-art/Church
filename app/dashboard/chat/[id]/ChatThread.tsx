@@ -3,9 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { showToast } from "@/components/ui/Toaster";
+import { useRouter } from "next/navigation";
 import {
   CHAT_MEDIA_BUCKET,
+  CHAT_PHOTO_MAX_DIMENSION,
   MAX_MESSAGE_LENGTH,
+  MAX_VOICE_BYTES,
+  receiptStatus,
   baseMimeType,
   chatMediaPath,
   canDeleteMessage,
@@ -19,7 +23,9 @@ import {
   type ChatReaction,
   type Reaction,
 } from "@/lib/chat";
-import { deleteChatMessage, editChatMessage } from "../actions";
+import { formatDateTime } from "@/lib/format";
+import { toCompressedImage } from "@/lib/image-resize";
+import { deleteChatMessage, editChatMessage, unblockMember } from "../actions";
 import { MessageBubble } from "./MessageBubble";
 import { Composer } from "./Composer";
 import type { RecordedVoiceNote } from "./VoiceRecorder";
@@ -45,6 +51,12 @@ export function ChatThread({
   isDm,
   v2,
   voiceEnabled,
+  photosEnabled,
+  otherUserId,
+  initialOtherReadAt,
+  blockedOther,
+  groupMute,
+  noVoice,
   initialMessages,
   quotedMessages,
   initialReactions,
@@ -59,6 +71,18 @@ export function ChatThread({
   v2: boolean;
   /** Voice notes are a plan feature (not on Basic — they use Storage). */
   voiceEnabled: boolean;
+  /** Photo sharing: the chat_photos switch, off unless a Super admin enables it. */
+  photosEnabled: boolean;
+  /** In a DM: the other person (for read ticks and blocking). */
+  otherUserId: string | null;
+  /** Their shared "read up to" time; null if either of us has receipts off. */
+  initialOtherReadAt: string | null;
+  /** I've blocked the other person in this DM. */
+  blockedOther: boolean;
+  /** An active admin restriction on my posting in group chats. */
+  groupMute: { until: string | null; reason: string } | null;
+  /** An active admin restriction on my voice notes. */
+  noVoice: boolean;
   initialMessages: ChatMessage[];
   quotedMessages: ChatMessage[];
   initialReactions: ChatReaction[];
@@ -79,6 +103,13 @@ export function ChatThread({
   const [editing, setEditing] = useState<ChatMessage | null>(null);
   const [deleting, setDeleting] = useState<ChatMessage | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [otherReadAt, setOtherReadAt] = useState<string | null>(initialOtherReadAt);
+  const [typers, setTypers] = useState<Record<string, number>>({});
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const router = useRouter();
+  const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const lastTypingSentRef = useRef(0);
+  const lastReadRef = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
 
@@ -147,11 +178,63 @@ export function ChatThread({
           return added ? [...rest, added] : rest;
         });
       })
+      // Read receipts: RLS only lets these through if both of us share
+      // receipts, so otherwise ticks simply stay at ✓.
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_read_receipts", filter }, (payload) => {
+        const row = payload.new as { user_id?: string; read_at?: string };
+        if (row?.user_id && row.user_id === otherUserId && row.read_at) setOtherReadAt(row.read_at);
+      })
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [channelId, supabase]);
+  }, [channelId, supabase, otherUserId]);
+
+  // "Typing…" travels as a Realtime broadcast — nothing is stored.
+  useEffect(() => {
+    if (!v2) return;
+    const typing = supabase
+      .channel(`typing:${channelId}`, { config: { broadcast: { self: false } } })
+      .on("broadcast", { event: "typing" }, ({ payload }) => {
+        const userId = (payload as { user_id?: string } | undefined)?.user_id;
+        if (userId && userId !== currentUserId) setTypers((t) => ({ ...t, [userId]: Date.now() + 4000 }));
+      })
+      .subscribe();
+    typingChannelRef.current = typing;
+    const sweep = setInterval(() => {
+      setTypers((t) => {
+        const live = Object.fromEntries(Object.entries(t).filter(([, expires]) => expires > Date.now()));
+        return Object.keys(live).length === Object.keys(t).length ? t : live;
+      });
+    }, 1000);
+    return () => {
+      clearInterval(sweep);
+      supabase.removeChannel(typing);
+      typingChannelRef.current = null;
+    };
+  }, [channelId, supabase, currentUserId, v2]);
+
+  function announceTyping() {
+    if (Date.now() - lastTypingSentRef.current < 2500) return;
+    lastTypingSentRef.current = Date.now();
+    typingChannelRef.current?.send({ type: "broadcast", event: "typing", payload: { user_id: currentUserId } });
+  }
+
+  // Mark the chat read while it's open and visible, and as new messages arrive.
+  const lastMessageAt = messages.length ? messages[messages.length - 1].created_at : null;
+  useEffect(() => {
+    if (!v2) return;
+    function markRead() {
+      if (document.visibilityState !== "visible" || Date.now() - lastReadRef.current < 2000) return;
+      lastReadRef.current = Date.now();
+      supabase.rpc("mark_chat_read", { target_channel: channelId }).then(({ error }) => {
+        if (error) console.error("[chat] mark read failed:", error.message);
+      });
+    }
+    markRead();
+    document.addEventListener("visibilitychange", markRead);
+    return () => document.removeEventListener("visibilitychange", markRead);
+  }, [channelId, supabase, v2, lastMessageAt]);
 
   function cancelMode() {
     if (editing) setDraft("");
@@ -289,6 +372,63 @@ export function ChatThread({
     return null;
   }
 
+  /** Photo: compress in the browser, upload, then post — the typed text becomes its caption. */
+  async function sendPhoto(file: File) {
+    if (!file.type.startsWith("image/")) return setSendError("Choose a photo (JPG, PNG or WebP).");
+    if (file.size > 20 * 1024 * 1024) return setSendError("That photo is over 20 MB — choose a smaller one.");
+    const caption = draft.trim().slice(0, 1000);
+    const quoting = replyTo;
+    setSendError(null);
+    setPhotoBusy(true);
+    try {
+      const { blob, extension } = await toCompressedImage(file, CHAT_PHOTO_MAX_DIMENSION, MAX_VOICE_BYTES);
+      const path = chatMediaPath(churchId, channelId, currentUserId, crypto.randomUUID(), extension);
+      const { error: uploadError } = await supabase.storage.from(CHAT_MEDIA_BUCKET).upload(path, blob, { contentType: blob.type, upsert: false });
+      if (uploadError) {
+        console.error("[chat] photo upload failed:", uploadError.message);
+        return setSendError("Couldn't upload that photo — check your connection and try again.");
+      }
+      const { data, error } = await supabase
+        .from("chat_messages")
+        .insert({ channel_id: channelId, sender_id: currentUserId, content: caption, kind: "image", media_path: path, reply_to_id: quoting?.id ?? null })
+        .select("id, created_at")
+        .single();
+      if (error || !data) {
+        await supabase.storage.from(CHAT_MEDIA_BUCKET).remove([path]);
+        return setSendError(/row-level security/i.test(error?.message ?? "") ? "Photo sharing isn't available here." : "Couldn't send that photo — try again.");
+      }
+      setDraft("");
+      setReplyTo(null);
+      const sent: ChatMessage = {
+        id: data.id,
+        channel_id: channelId,
+        sender_id: currentUserId,
+        content: caption,
+        created_at: data.created_at,
+        kind: "image",
+        edited_at: null,
+        deleted_at: null,
+        deleted_by: null,
+        reply_to_id: quoting?.id ?? null,
+        media_path: path,
+        media_duration_ms: null,
+        media_expired_at: null,
+      };
+      setMessages((prev) => (prev.some((m) => m.id === sent.id) ? prev : [...prev, sent]));
+    } catch {
+      setSendError("We couldn't read that photo. Try a JPG or PNG.");
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  async function unblockOther() {
+    if (!otherUserId) return;
+    const result = await unblockMember(otherUserId);
+    if (result.error) return showToast(result.error, "error");
+    router.refresh();
+  }
+
   async function confirmDelete() {
     const target = deleting;
     setDeleting(null);
@@ -381,6 +521,7 @@ export function ChatThread({
                 }
                 onDelete={canDeleteMessage(m, currentUserId, canModerate) ? () => setDeleting(m) : undefined}
                 onJumpTo={jumpTo}
+                receipt={isDm && isMine ? receiptStatus(m, otherReadAt) : undefined}
               />
             </div>
           );
@@ -409,7 +550,26 @@ export function ChatThread({
             : null
         }
         onCancelMode={cancelMode}
-        onSendVoice={voiceEnabled ? sendVoice : undefined}
+        onSendVoice={voiceEnabled && !noVoice ? sendVoice : undefined}
+        onPickPhoto={photosEnabled ? sendPhoto : undefined}
+        photoBusy={photoBusy}
+        onTyping={v2 ? announceTyping : undefined}
+        typingText={typingLine(Object.keys(typers).map((id) => person(id).name), isDm)}
+        notice={
+          blockedOther ? (
+            <>
+              You blocked {otherUserId ? person(otherUserId).name : "this person"}.{" "}
+              <button type="button" className="link" onClick={unblockOther}>
+                Unblock to send messages
+              </button>
+            </>
+          ) : !isDm && groupMute ? (
+            <>
+              A pastor has paused your posting in group chats{groupMute.until ? ` until ${formatDateTime(groupMute.until)}` : ""}. Reason: {groupMute.reason}
+              <span className="mt-1 block text-xs text-ink/50">You can still read this channel and use private messages.</span>
+            </>
+          ) : null
+        }
       />
 
       <dialog
@@ -440,4 +600,13 @@ export function ChatThread({
       </dialog>
     </div>
   );
+}
+
+/** "Alice is typing…", "Alice and Bob are typing…", "Several people are typing…" (just "typing…" in a DM). */
+function typingLine(names: string[], isDm: boolean): string | null {
+  if (!names.length) return null;
+  if (isDm) return "typing…";
+  if (names.length === 1) return `${names[0]} is typing…`;
+  if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`;
+  return "Several people are typing…";
 }

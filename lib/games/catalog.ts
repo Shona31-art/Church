@@ -1,6 +1,6 @@
 // The games, their levels and how they score (pure — unit-tested).
 
-export const GAME_KEYS = ["quiz", "crossword", "word_search", "verse_puzzle"] as const;
+export const GAME_KEYS = ["quiz", "crossword", "word_search", "emoji", "scramble", "verse_puzzle", "verse_fill", "who_said", "books_order", "maze"] as const;
 export type GameKey = (typeof GAME_KEYS)[number];
 
 export const LEVELS = ["easy", "medium", "hard"] as const;
@@ -45,6 +45,54 @@ export const GAMES: Record<GameKey, GameInfo> = {
     path: "word-search",
     levels: { easy: "8×8, across and down", medium: "12×12, plus diagonals", hard: "15×15, any direction — even backwards" },
     parSeconds: { easy: 120, medium: 240, hard: 360 },
+  },
+  emoji: {
+    key: "emoji",
+    title: "Emoji stories",
+    summary: "Guess the Bible story from a row of emoji.",
+    path: "emoji",
+    levels: { easy: "Famous stories, four choices", medium: "More stories, four choices", hard: "Lesser-known — type your answer" },
+    parSeconds: { easy: 90, medium: 120, hard: 180 },
+  },
+  scramble: {
+    key: "scramble",
+    title: "Word scramble",
+    summary: "Unscramble the letters to find Bible names, places and words.",
+    path: "scramble",
+    levels: { easy: "5 words, with clues", medium: "8 words, with clues", hard: "10 words, first-letter hints only" },
+    parSeconds: { easy: 90, medium: 180, hard: 300 },
+  },
+  verse_fill: {
+    key: "verse_fill",
+    title: "Fill in the verse",
+    summary: "Find the missing words in well-known verses.",
+    path: "verse-fill",
+    levels: { easy: "One missing word, four choices", medium: "Two missing words, four choices", hard: "Two missing words — type them" },
+    parSeconds: { easy: 90, medium: 120, hard: 180 },
+  },
+  who_said: {
+    key: "who_said",
+    title: "Who said it?",
+    summary: "Match famous Bible sayings to the people who said them.",
+    path: "who-said",
+    levels: { easy: "Well-known sayings", medium: "From the whole Bible", hard: "Harder to place" },
+    parSeconds: { easy: 90, medium: 120, hard: 150 },
+  },
+  books_order: {
+    key: "books_order",
+    title: "Books in order",
+    summary: "Put the books of the Bible back in their order.",
+    path: "books",
+    levels: { easy: "Five books in a row", medium: "Eight books in a row", hard: "A whole section of the Bible" },
+    parSeconds: { easy: 60, medium: 120, hard: 180 },
+  },
+  maze: {
+    key: "maze",
+    title: "Bible maze",
+    summary: "Find the way through — lead the shepherd to the lost sheep and more.",
+    path: "maze",
+    levels: { easy: "Small maze", medium: "Medium maze", hard: "Large maze" },
+    parSeconds: { easy: 45, medium: 90, hard: 180 },
   },
   verse_puzzle: {
     key: "verse_puzzle",

@@ -7,6 +7,21 @@ import { QUIZ_LENGTH, checkQuiz, type QuizKey, type QuizProgress } from "@/lib/g
 import { buildWordSearch, checkWordSearch, type WordSearchPuzzle } from "@/lib/games/word-search";
 import { buildCrossword, checkCrossword, entryCells, type CrosswordPuzzle, type Direction } from "@/lib/games/crossword";
 import { countSolvedVerses, pickRoundForLevel, scrambleOrder, tokenize, type PuzzleVerse, type VerseProgress } from "@/lib/verse-puzzle";
+import { CROSSWORD_CLUES } from "@/lib/games/content/crossword-clues";
+import {
+  buildBooksOrder,
+  buildEmojiSet,
+  buildScramble,
+  buildVerseFillSet,
+  buildWhoSaidSet,
+  checkBooksOrder,
+  checkScramble,
+  setQuestionView,
+  type BooksPuzzle,
+  type ScramblePuzzle,
+  type SetQuestion,
+} from "@/lib/games/word-games";
+import { MAZE_POINTS, MAZE_THEMES, buildMaze, checkMaze, type Maze } from "@/lib/games/maze";
 
 // One entry per game: how to build a puzzle (the full answer key, kept in
 // the server-only game_sessions row, plus the "view" the player is sent),
@@ -31,7 +46,8 @@ export interface ReviewItem {
 }
 
 interface GameEngine {
-  build(level: Level, seed: number, ctx: { supabase: SupabaseClient; churchId: string }): Promise<BuiltGame | { error: string }>;
+  /** `kids`: Kids mode — simpler content only (the level is always Easy). */
+  build(level: Level, seed: number, ctx: { supabase: SupabaseClient; churchId: string; kids: boolean }): Promise<BuiltGame | { error: string }>;
   answers: z.ZodTypeAny;
   check(puzzle: any, progress: any, answers: any): number;
   /** Optional: answers to show once the game is over. */
@@ -45,23 +61,30 @@ export interface QuizView {
 }
 
 const quiz: GameEngine = {
-  async build(level, seed, { supabase, churchId }) {
+  async build(level, seed, { supabase, churchId, kids }) {
     // Global bank + this church's own questions.
     const { data, error } = await supabase
       .from("bible_quiz_questions")
-      .select("id, question, choices, correct_index, difficulty")
+      .select("id, question, choices, correct_index, difficulty, kids_ok")
       .or(`church_id.is.null,church_id.eq.${churchId}`)
       .order("id");
     if (error || !data?.length) return { error: "No quiz questions are available yet." };
 
     const rng = createRng(seed);
     // This level's questions first; top up from other levels if the bank is thin.
-    const atLevel = shuffle(data.filter((q) => q.difficulty === level), rng);
-    const others = shuffle(data.filter((q) => q.difficulty !== level), rng);
+    const fits = (q: (typeof data)[number]) => (kids ? q.kids_ok : q.difficulty === level);
+    const atLevel = shuffle(data.filter(fits), rng);
+    const others = shuffle(data.filter((q) => !fits(q) && (!kids || q.difficulty === "easy")), rng);
     const chosen = [...atLevel, ...others].slice(0, QUIZ_LENGTH);
 
-    const key: QuizKey = { ids: chosen.map((q) => q.id), correct: chosen.map((q) => q.correct_index) };
-    const view: QuizView = { questions: chosen.map((q) => ({ question: q.question, choices: q.choices as string[] })) };
+    // Shuffle each question's choices so the right answer isn't always in the same place.
+    const shuffled = chosen.map((q) => {
+      const choices = q.choices as string[];
+      const order = shuffle(choices.map((_, i) => i), rng);
+      return { question: q.question, choices: order.map((i) => choices[i]), correct: order.indexOf(q.correct_index) };
+    });
+    const key: QuizKey = { ids: chosen.map((q) => q.id), correct: shuffled.map((q) => q.correct) };
+    const view: QuizView = { questions: shuffled.map(({ question, choices }) => ({ question, choices })) };
     return { puzzle: key, view, maxCorrect: chosen.length };
   },
   // Quiz choices are locked in one by one (revealQuizAnswer), so nothing is submitted at the end.
@@ -123,8 +146,8 @@ export interface CrosswordView {
 }
 
 const crossword: GameEngine = {
-  async build(level, seed) {
-    const puzzle = buildCrossword(level, seed);
+  async build(level, seed, { kids }) {
+    const puzzle = buildCrossword(level, seed, kids ? CROSSWORD_CLUES.filter((c) => c.kids) : undefined);
     const shape = Array.from({ length: puzzle.height }, () => Array<string>(puzzle.width).fill("#"));
     for (const e of puzzle.entries) for (const [r, c] of entryCells(e, e.answer.length)) shape[r][c] = ".";
     const view: CrosswordView = {
@@ -148,9 +171,90 @@ const crossword: GameEngine = {
     })),
 };
 
+// --- Question sets: emoji stories, "Who said it?", fill in the verse ------------
+
+/** Progress for question sets: each answer is locked in as it's given. */
+export type SetProgress = Record<string, { answer: number | string; correct: boolean }>;
+
+export interface SetPuzzle {
+  questions: SetQuestion[];
+  /** Typed answers must match exactly (verse fill) rather than contain a keyword. */
+  exact: boolean;
+}
+
+function questionSet(make: (level: Level, rng: ReturnType<typeof createRng>, kids: boolean) => SetQuestion[], exact = false): GameEngine {
+  return {
+    async build(level, seed, { kids }) {
+      const questions = make(level, createRng(seed), kids);
+      if (!questions.length) return { error: "No puzzles are available for this level yet." };
+      return { puzzle: { questions, exact } satisfies SetPuzzle, view: setQuestionView(questions), maxCorrect: questions.length };
+    },
+    // Answered one at a time (answerSetQuestion), so nothing is submitted at the end.
+    answers: z.null().optional(),
+    check: (_puzzle: SetPuzzle, progress: SetProgress) => Object.values(progress ?? {}).filter((p) => p.correct).length,
+    review: (puzzle: SetPuzzle, progress: SetProgress) =>
+      puzzle.questions.map((q, i) => ({ label: `${i + 1}`, prompt: q.prompt, answer: q.answer, reference: q.reference, correct: Boolean(progress?.[String(i)]?.correct) })),
+  };
+}
+
+export type SetView = ReturnType<typeof setQuestionView>;
+
+// --- Word scramble ---------------------------------------------------------------
+
+const scramble: GameEngine = {
+  async build(level, seed, { kids }) {
+    const { puzzle, view } = buildScramble(level, createRng(seed), kids);
+    return { puzzle, view, maxCorrect: puzzle.words.length };
+  },
+  answers: z.array(z.string().max(40)).max(20),
+  check: (puzzle: ScramblePuzzle, _progress, answers) => checkScramble(puzzle, answers),
+  review: (puzzle: ScramblePuzzle, _progress, answers: string[]) =>
+    puzzle.words.map((w, i) => ({ label: `${i + 1}`, prompt: w.clue, answer: w.answer, reference: w.reference, correct: checkScramble({ words: [w] }, [answers[i] ?? ""]) === 1 })),
+};
+
+// --- Books in order ----------------------------------------------------------------
+
+const booksOrder: GameEngine = {
+  async build(level, seed) {
+    const { puzzle, view } = buildBooksOrder(level, createRng(seed));
+    return { puzzle, view, maxCorrect: puzzle.books.length };
+  },
+  answers: z.array(z.string().max(40)).max(20),
+  check: (puzzle: BooksPuzzle, _progress, order) => checkBooksOrder(puzzle, order),
+  review: (puzzle: BooksPuzzle, _progress, order: string[]) =>
+    puzzle.books.map((b, i) => ({ label: `${i + 1}`, prompt: `You put ${order[i] ?? "nothing"}`, answer: b, correct: order[i] === b })),
+};
+
+// --- Maze ----------------------------------------------------------------------
+
+export interface MazeView extends Maze {
+  title: string;
+  start: string;
+  goal: string;
+  reference: string;
+}
+
+const maze: GameEngine = {
+  async build(level, seed) {
+    const built = buildMaze(level, createRng(seed));
+    const theme = MAZE_THEMES[built.theme];
+    const view: MazeView = { ...built, title: theme.title, start: theme.start, goal: theme.goal, reference: theme.reference };
+    return { puzzle: built, view, maxCorrect: MAZE_POINTS };
+  },
+  // The route taken: a string of U/R/D/L moves.
+  answers: z.string().max(4000),
+  check: (puzzle: Maze, _progress, route) => checkMaze(puzzle, route),
+};
+
 export const ENGINES: Record<GameKey, GameEngine> = {
   quiz,
   crossword,
+  emoji: questionSet(buildEmojiSet),
+  who_said: questionSet(buildWhoSaidSet),
+  verse_fill: questionSet(buildVerseFillSet, true),
+  scramble,
+  books_order: booksOrder,
+  maze,
   word_search: wordSearch,
   verse_puzzle: versePuzzle,
 };

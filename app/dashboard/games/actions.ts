@@ -7,9 +7,12 @@ import { getCurrentAppUser } from "@/lib/current-user";
 import { checkModuleAccess } from "@/lib/paywall";
 import { GAMES, isGameKey, isLevel, pointsFor, type GameKey, type Level } from "@/lib/games/catalog";
 import { newSeed } from "@/lib/games/random";
+import { BADGES, currentStreak, dailyGame, dailySeed, earnedBadges, type BadgeKey } from "@/lib/games/progression";
+import { isSetAnswerCorrect } from "@/lib/games/word-games";
+import { localInputToUtcIso, todayInAppZone } from "@/lib/format";
 import type { QuizKey, QuizProgress } from "@/lib/games/quiz";
 import { VERSE_TRIES, isCorrectOrder, tokenize, type PuzzleVerse, type VerseProgress } from "@/lib/verse-puzzle";
-import { ENGINES, type ReviewItem } from "./engine";
+import { ENGINES, type ReviewItem, type SetProgress, type SetPuzzle } from "./engine";
 
 // Starting and finishing games. Server actions are public endpoints, so each
 // one re-checks the session and plan, and every score is worked out here
@@ -23,9 +26,11 @@ const MAX_GAME_MS = 3 * 60 * 60 * 1000;
 /** Generous cap on games started per person per hour — stops a script filling the table. */
 const MAX_STARTS_PER_HOUR = 120;
 
+export type GameMode = "practice" | "daily" | "kids";
+
 export type StartResult =
   | { error: string }
-  | { sessionId: string; game: GameKey; level: Level; timed: boolean; parSeconds: number; view: unknown };
+  | { sessionId: string; game: GameKey; level: Level; timed: boolean; mode: GameMode; parSeconds: number; view: unknown };
 
 export interface FinishResult {
   error?: string;
@@ -35,6 +40,8 @@ export interface FinishResult {
   durationMs?: number;
   /** Answers to show after the game, for games that have them. */
   review?: ReviewItem[];
+  /** Badges earned by this game. */
+  newBadges?: { key: BadgeKey; title: string; description: string }[];
 }
 
 async function requirePlayer() {
@@ -43,11 +50,29 @@ async function requirePlayer() {
   return (await checkModuleAccess("bible_games")).allowed ? me : null;
 }
 
-/** Input: game key, level, timed. Creates the session and returns what the player needs. */
-export async function startGame(game: string, level: string, timed: boolean): Promise<StartResult> {
+/** Start of today in the church's timezone, as a UTC instant. */
+function startOfToday(): string {
+  return localInputToUtcIso(`${todayInAppZone()}T00:00`) ?? new Date().toISOString();
+}
+
+/**
+ * Input: game key, level, timed, mode. Creates the session and returns what
+ * the player needs.
+ *   practice — any game and level.
+ *   kids     — Easy only, untimed, simpler content, kept off the scoreboard.
+ *   daily    — today's game at Medium, timed, the same puzzle for everyone
+ *              in the church, once per person per day.
+ */
+export async function startGame(game: string, level: string, timed: boolean, mode: GameMode = "practice"): Promise<StartResult> {
   const me = await requirePlayer();
   if (!me) return { error: "Your session has expired — sign in again to play." };
-  if (!isGameKey(game) || !isLevel(level) || typeof timed !== "boolean") return { error: "Choose a game and a level." };
+  if (!isGameKey(game) || !isLevel(level) || typeof timed !== "boolean" || !["practice", "daily", "kids"].includes(mode)) {
+    return { error: "Choose a game and a level." };
+  }
+  if (mode === "kids") {
+    level = "easy";
+    timed = false;
+  }
 
   const admin = createAdminClient();
   const { count } = await admin
@@ -57,20 +82,37 @@ export async function startGame(game: string, level: string, timed: boolean): Pr
     .gte("started_at", new Date(Date.now() - 3600_000).toISOString());
   if ((count ?? 0) >= MAX_STARTS_PER_HOUR) return { error: "That's a lot of games! Take a short break and try again soon." };
 
-  const seed = newSeed();
-  const built = await ENGINES[game].build(level, seed, { supabase: createClient(), churchId: me.church_id! });
+  let seed = newSeed();
+  if (mode === "daily") {
+    const today = todayInAppZone();
+    if (game !== dailyGame(today)) return { error: "Today's challenge has changed — go back to the games page." };
+    level = "medium";
+    timed = true;
+    seed = dailySeed(me.church_id!, today);
+    // One try per person per day: the puzzle is the same for everyone, so a
+    // second go would let someone replay it knowing the answers.
+    const { count: played } = await admin
+      .from("game_sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", me.id)
+      .eq("mode", "daily")
+      .gte("started_at", startOfToday());
+    if ((played ?? 0) > 0) return { error: "You've already taken today's challenge. Come back tomorrow for a new one!" };
+  }
+
+  const built = await ENGINES[game].build(level as Level, seed, { supabase: createClient(), churchId: me.church_id!, kids: mode === "kids" });
   if ("error" in built) return { error: built.error };
 
   const { data, error } = await admin
     .from("game_sessions")
-    .insert({ church_id: me.church_id, user_id: me.id, game_type: game, level, timed, seed, puzzle: built.puzzle, max_correct: built.maxCorrect })
+    .insert({ church_id: me.church_id, user_id: me.id, game_type: game, level, timed, mode, seed, puzzle: built.puzzle, max_correct: built.maxCorrect })
     .select("id")
     .single();
   if (error || !data) {
     console.error("[games] start failed:", error?.message);
     return { error: error?.code === "42P01" ? "Games need a database update first — ask your church admin to contact support." : "Couldn't start the game — please try again." };
   }
-  return { sessionId: data.id, game, level, timed, parSeconds: GAMES[game].parSeconds[level], view: built.view };
+  return { sessionId: data.id, game, level: level as Level, timed, mode, parSeconds: GAMES[game].parSeconds[level as Level], view: built.view };
 }
 
 async function loadOwnSession(sessionId: string, userId: string) {
@@ -109,6 +151,36 @@ export async function revealQuizAnswer(sessionId: string, questionIndex: number,
     }
   }
   return { correctIndex: key.correct[questionIndex], chosen: progress[slot] };
+}
+
+/**
+ * Emoji stories, "Who said it?", fill in the verse: locks in one answer (a
+ * choice index, or typed text) and says whether it was right. The first
+ * answer to each question is the one that counts.
+ */
+export async function answerSetQuestion(
+  sessionId: string,
+  index: number,
+  answer: number | string
+): Promise<{ error?: string; correct?: boolean; answer?: string; reference?: string; answerIndex?: number }> {
+  const me = await requirePlayer();
+  if (!me) return { error: "Your session has expired — sign in again." };
+  const session = await loadOwnSession(sessionId, me.id);
+  if (!session || !["emoji", "who_said", "verse_fill"].includes(session.game_type) || session.finished_at) return { error: "This game has ended — start a new one." };
+
+  const puzzle = session.puzzle as SetPuzzle;
+  const question = puzzle.questions[index];
+  if (!Number.isInteger(index) || !question) return { error: "That question isn't in this game." };
+  if (typeof answer === "string" ? answer.length > 200 : !Number.isInteger(answer)) return { error: "That answer couldn't be read." };
+
+  const progress = (session.progress ?? {}) as SetProgress;
+  const slot = String(index);
+  if (!progress[slot]) {
+    progress[slot] = { answer, correct: isSetAnswerCorrect(question, answer, puzzle.exact) };
+    const { error } = await createAdminClient().from("game_sessions").update({ progress }).eq("id", session.id).is("finished_at", null);
+    if (error) return { error: "Couldn't save your answer — check your connection." };
+  }
+  return { correct: progress[slot].correct, answer: question.answer, reference: question.reference, answerIndex: question.answerIndex };
 }
 
 /**
@@ -207,5 +279,53 @@ export async function finishGame(sessionId: string, answers: unknown): Promise<F
   });
   if (attemptError) console.error("[games] scoreboard insert failed:", attemptError.message);
 
-  return { correct, maxCorrect: session.max_correct, points, durationMs, review: engine.review?.(session.puzzle, session.progress, parsed.data) };
+  const newBadges = await awardBadges(me.id, session.church_id, {
+    level,
+    correct,
+    max: session.max_correct,
+    timed: session.timed,
+    durationMs,
+    parSeconds: GAMES[session.game_type as GameKey].parSeconds[level],
+  });
+
+  return { correct, maxCorrect: session.max_correct, points, durationMs, review: engine.review?.(session.puzzle, session.progress, parsed.data), newBadges };
+}
+
+/**
+ * Works out which badges this player has now earned and records new ones.
+ * Best-effort: a failure here never loses the score.
+ */
+async function awardBadges(
+  userId: string,
+  churchId: string,
+  last: { level: string; correct: number; max: number; timed: boolean; durationMs: number; parSeconds: number }
+): Promise<FinishResult["newBadges"]> {
+  const admin = createAdminClient();
+  const [{ data: history, error }, { data: owned }] = await Promise.all([
+    admin.from("bible_quiz_attempts").select("game_type, mode, created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(5000),
+    admin.from("user_badges").select("badge_key").eq("user_id", userId),
+  ]);
+  if (error || !history) return [];
+
+  const days = history.map((a) => todayInAppZone(new Date(a.created_at)));
+  const earned = earnedBadges({
+    totalGames: history.length,
+    gameTypes: new Set(history.map((a) => a.game_type)),
+    crosswords: history.filter((a) => a.game_type === "crossword").length,
+    dailyChallenges: history.filter((a) => a.mode === "daily").length,
+    streak: currentStreak(days, todayInAppZone()),
+    last,
+  });
+  const have = new Set((owned ?? []).map((b) => b.badge_key));
+  const fresh = earned.filter((k) => !have.has(k));
+  if (!fresh.length) return [];
+
+  const { error: insertError } = await admin
+    .from("user_badges")
+    .upsert(fresh.map((badge_key) => ({ user_id: userId, church_id: churchId, badge_key })), { onConflict: "user_id,badge_key", ignoreDuplicates: true });
+  if (insertError) {
+    console.error("[games] awarding badges failed:", insertError.message);
+    return [];
+  }
+  return fresh.map((key) => ({ key, ...BADGES[key] }));
 }

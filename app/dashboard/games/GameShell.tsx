@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, ChevronLeft, LoaderCircle, Timer, Trophy, XCircle } from "lucide-react";
+import { Award, CalendarCheck, CheckCircle2, ChevronLeft, LoaderCircle, Smile, Timer, Trophy, XCircle } from "lucide-react";
 import { GAMES, LEVELS, LEVEL_LABELS, type GameKey, type Level } from "@/lib/games/catalog";
 import { formatDuration } from "@/lib/chat";
 import { Alert } from "@/components/ui/Alert";
-import { finishGame, startGame, type FinishResult } from "./actions";
+import { finishGame, startGame, type FinishResult, type GameMode } from "./actions";
 
 export interface BoardProps<View> {
   sessionId: string;
@@ -32,24 +32,28 @@ type Phase =
 export function GameShell<View>({
   game,
   initialLevel,
+  mode = "practice",
   rules,
   Board,
 }: {
   game: GameKey;
   initialLevel?: Level;
+  /** "daily": today's challenge (Medium, timed, one try). "kids": Easy, untimed, larger text. */
+  mode?: GameMode;
   /** One or two sentences on how to play. */
   rules: string;
   Board: (props: BoardProps<View>) => React.ReactNode;
 }) {
   const info = GAMES[game];
-  const [level, setLevel] = useState<Level>(initialLevel ?? "easy");
-  const [timed, setTimed] = useState(false);
+  const fixedLevel: Level | null = mode === "daily" ? "medium" : mode === "kids" ? "easy" : null;
+  const [level, setLevel] = useState<Level>(fixedLevel ?? initialLevel ?? "easy");
+  const [timed, setTimed] = useState(mode === "daily");
   const [phase, setPhase] = useState<Phase>({ kind: "intro" });
   const [finishError, setFinishError] = useState<string | null>(null);
 
   async function start() {
     setPhase({ kind: "starting" });
-    const result = await startGame(game, level, timed);
+    const result = await startGame(game, level, timed, mode);
     if ("error" in result) return setPhase({ kind: "intro", error: result.error });
     setPhase({ kind: "playing", sessionId: result.sessionId, view: result.view, level: result.level, timed: result.timed, parSeconds: result.parSeconds, startedAt: Date.now() });
   }
@@ -69,11 +73,18 @@ export function GameShell<View>({
   }
 
   return (
-    <div className="max-w-3xl">
-      <Link href="/dashboard/games" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-ink/55 hover:text-ink">
+    // Kids mode: everything a size larger.
+    <div className={`max-w-3xl ${mode === "kids" ? "text-[17px] [&_.btn]:min-h-[48px] [&_.btn]:text-base" : ""}`}>
+      <Link href={mode === "kids" ? "/dashboard/games?kids=1" : "/dashboard/games"} className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-ink/55 hover:text-ink">
         <ChevronLeft aria-hidden className="h-4 w-4" /> Games
       </Link>
       <h1 className="text-[28px] font-semibold leading-tight sm:text-[32px]">{info.title}</h1>
+      {mode !== "practice" && (
+        <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-gold/50 bg-gold/10 px-3 py-1 text-xs font-semibold text-ink/80">
+          {mode === "daily" ? <CalendarCheck aria-hidden className="h-3.5 w-3.5 text-gold" /> : <Smile aria-hidden className="h-3.5 w-3.5 text-gold" />}
+          {mode === "daily" ? "Today's challenge" : "Kids mode"}
+        </p>
+      )}
       <div className="rule-gold mt-3 mb-6" />
 
       {(phase.kind === "intro" || phase.kind === "starting") && (
@@ -81,6 +92,13 @@ export function GameShell<View>({
           {phase.kind === "intro" && phase.error && <Alert tone="error">{phase.error}</Alert>}
           <p className="text-[15px] text-ink/70">{rules}</p>
 
+          {mode === "daily" && (
+            <Alert tone="info" title="One try today">
+              Everyone in your church gets this same puzzle today, on Medium with the clock running. Your score goes on today&apos;s challenge board — and once you start, you can&apos;t restart.
+            </Alert>
+          )}
+
+          {!fixedLevel && (
           <fieldset>
             <legend className="label">Level</legend>
             <div className="mt-2 grid gap-2 sm:grid-cols-3">
@@ -98,7 +116,9 @@ export function GameShell<View>({
               ))}
             </div>
           </fieldset>
+          )}
 
+          {mode === "practice" && (
           <label className="flex items-start gap-3 text-sm">
             <input type="checkbox" checked={timed} onChange={(e) => setTimed(e.target.checked)} className="mt-0.5 accent-[rgb(var(--ember))]" />
             <span>
@@ -108,6 +128,7 @@ export function GameShell<View>({
               </span>
             </span>
           </label>
+          )}
 
           <button type="button" className="btn-primary" onClick={start} disabled={phase.kind === "starting"}>
             {phase.kind === "starting" ? <LoaderCircle aria-hidden className="h-4 w-4 animate-spin" /> : null}
@@ -132,7 +153,9 @@ export function GameShell<View>({
         </div>
       )}
 
-      {phase.kind === "result" && <ResultCard result={phase.result} level={phase.level} timed={phase.timed} onReplay={start} onChangeLevel={() => setPhase({ kind: "intro" })} />}
+      {phase.kind === "result" && (
+        <ResultCard result={phase.result} level={phase.level} timed={phase.timed} mode={mode} onReplay={start} onChangeLevel={() => setPhase({ kind: "intro" })} />
+      )}
     </div>
   );
 }
@@ -155,7 +178,21 @@ function Clock({ startedAt, parSeconds }: { startedAt: number; parSeconds: numbe
   );
 }
 
-function ResultCard({ result, level, timed, onReplay, onChangeLevel }: { result: FinishResult; level: Level; timed: boolean; onReplay: () => void; onChangeLevel: () => void }) {
+function ResultCard({
+  result,
+  level,
+  timed,
+  mode,
+  onReplay,
+  onChangeLevel,
+}: {
+  result: FinishResult;
+  level: Level;
+  timed: boolean;
+  mode: GameMode;
+  onReplay: () => void;
+  onChangeLevel: () => void;
+}) {
   const { correct = 0, maxCorrect = 0, points = 0, durationMs = 0 } = result;
   const perfect = maxCorrect > 0 && correct === maxCorrect;
   return (
@@ -184,6 +221,22 @@ function ResultCard({ result, level, timed, onReplay, onChangeLevel }: { result:
         </div>
       </dl>
       {timed && !perfect && <p className="mt-3 text-xs text-ink/50">Time bonus is for perfect games.</p>}
+      {mode === "kids" && <p className="mt-3 text-xs text-ink/50">Kids mode games don&apos;t go on the church scoreboard.</p>}
+
+      {result.newBadges && result.newBadges.length > 0 && (
+        <div className="mx-auto mt-6 max-w-sm space-y-2">
+          {result.newBadges.map((b) => (
+            <div key={b.key} className="flex items-center gap-3 rounded-xl border border-gold/50 bg-gold/10 px-4 py-3 text-left motion-safe:animate-modal-in">
+              <Award aria-hidden className="h-6 w-6 shrink-0 text-gold" />
+              <span>
+                <span className="block text-xs font-semibold uppercase tracking-wide text-gold">New badge</span>
+                <span className="block font-semibold">{b.title}</span>
+                <span className="block text-xs text-ink/60">{b.description}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       {result.review && result.review.length > 0 && (
         <section className="mt-8 text-left" aria-labelledby="review-heading">
           <h2 id="review-heading" className="eyebrow mb-2">
@@ -208,13 +261,17 @@ function ResultCard({ result, level, timed, onReplay, onChangeLevel }: { result:
         </section>
       )}
       <div className="mt-7 flex flex-wrap justify-center gap-2">
-        <button type="button" className="btn-primary" onClick={onReplay}>
-          Play again
-        </button>
-        <button type="button" className="btn-secondary" onClick={onChangeLevel}>
-          Change level
-        </button>
-        <Link href="/dashboard/games" className="btn-ghost">
+        {mode !== "daily" && (
+          <button type="button" className="btn-primary" onClick={onReplay}>
+            Play again
+          </button>
+        )}
+        {mode === "practice" && (
+          <button type="button" className="btn-secondary" onClick={onChangeLevel}>
+            Change level
+          </button>
+        )}
+        <Link href={mode === "kids" ? "/dashboard/games?kids=1" : "/dashboard/games"} className={mode === "daily" ? "btn-primary" : "btn-ghost"}>
           Back to games
         </Link>
       </div>

@@ -15,6 +15,7 @@ import { RemovePhotoButton } from "./RemovePhotoButton";
 import { ChatRestrictions, type ActiveRestriction } from "./ChatRestrictions";
 import { Avatar } from "@/components/ui/Avatar";
 import { getAvatarUrls } from "@/lib/avatars";
+import { BADGES, type BadgeKey } from "@/lib/games/progression";
 
 const ACTIVITY_LABELS: Record<string, string> = {
   "member.invited": "Added and invited",
@@ -66,6 +67,9 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
   const canChangeAccess = canEditMemberRole(me, member);
   const department = (member as any).departments?.name as string | undefined;
   const photoUrl = (await getAvatarUrls([member.id])).get(member.id) ?? null;
+  // Bible games badges (bible_games_v3.sql); missing table → none shown.
+  const { data: badgeRows } = await supabase.from("user_badges").select("badge_key").eq("user_id", member.id);
+  const badgeTitles = (badgeRows ?? []).map((b) => BADGES[b.badge_key as BadgeKey]?.title).filter(Boolean);
 
   // Active chat restrictions (chat_v2.sql). Missing table → section hidden.
   const nowIso = new Date().toISOString();
@@ -136,6 +140,7 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
               { label: "Department", value: department },
               { label: "Birthday", value: birthday?.birth_date ? formatDate(birthday.birth_date, { weekday: undefined }) : null },
               { label: "Member since", value: formatDate(member.created_at, { weekday: undefined }) },
+              ...(badgeTitles.length ? [{ label: "Game badges", value: badgeTitles.join(" · ") }] : []),
             ]}
           />
         </Section>

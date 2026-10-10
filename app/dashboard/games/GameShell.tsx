@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, LoaderCircle, Timer, Trophy } from "lucide-react";
+import { CheckCircle2, ChevronLeft, LoaderCircle, Timer, Trophy, XCircle } from "lucide-react";
 import { GAMES, LEVELS, LEVEL_LABELS, type GameKey, type Level } from "@/lib/games/catalog";
 import { formatDuration } from "@/lib/chat";
 import { Alert } from "@/components/ui/Alert";
@@ -184,6 +184,29 @@ function ResultCard({ result, level, timed, onReplay, onChangeLevel }: { result:
         </div>
       </dl>
       {timed && !perfect && <p className="mt-3 text-xs text-ink/50">Time bonus is for perfect games.</p>}
+      {result.review && result.review.length > 0 && (
+        <section className="mt-8 text-left" aria-labelledby="review-heading">
+          <h2 id="review-heading" className="eyebrow mb-2">
+            Answers
+          </h2>
+          <ul className="divide-y divide-line rounded-xl border border-line">
+            {result.review.map((item, i) => (
+              <li key={i} className="flex items-start gap-3 px-4 py-2.5 text-sm">
+                {item.correct ? (
+                  <CheckCircle2 aria-label="Correct" className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                ) : (
+                  <XCircle aria-label="Not correct" className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
+                )}
+                <span className="flex-1">
+                  <span className="font-semibold">{item.label}</span> · {item.prompt}
+                  {item.reference && <span className="block text-xs text-ink/50">{item.reference}</span>}
+                </span>
+                <span className="font-semibold tracking-wide">{item.answer}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <div className="mt-7 flex flex-wrap justify-center gap-2">
         <button type="button" className="btn-primary" onClick={onReplay}>
           Play again

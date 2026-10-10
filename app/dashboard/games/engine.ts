@@ -5,6 +5,7 @@ import type { GameKey, Level } from "@/lib/games/catalog";
 import { createRng, shuffle } from "@/lib/games/random";
 import { QUIZ_LENGTH, checkQuiz, type QuizKey, type QuizProgress } from "@/lib/games/quiz";
 import { buildWordSearch, checkWordSearch, type WordSearchPuzzle } from "@/lib/games/word-search";
+import { buildCrossword, checkCrossword, entryCells, type CrosswordPuzzle, type Direction } from "@/lib/games/crossword";
 import { countSolvedVerses, pickRoundForLevel, scrambleOrder, tokenize, type PuzzleVerse, type VerseProgress } from "@/lib/verse-puzzle";
 
 // One entry per game: how to build a puzzle (the full answer key, kept in
@@ -20,10 +21,21 @@ export interface BuiltGame {
   maxCorrect: number;
 }
 
+/** One line of the after-game review: what the answer was and whether you got it. */
+export interface ReviewItem {
+  label: string;
+  prompt: string;
+  answer: string;
+  reference?: string;
+  correct: boolean;
+}
+
 interface GameEngine {
   build(level: Level, seed: number, ctx: { supabase: SupabaseClient; churchId: string }): Promise<BuiltGame | { error: string }>;
   answers: z.ZodTypeAny;
   check(puzzle: any, progress: any, answers: any): number;
+  /** Optional: answers to show once the game is over. */
+  review?(puzzle: any, progress: any, answers: any): ReviewItem[];
 }
 
 // --- Quiz --------------------------------------------------------------------
@@ -100,8 +112,45 @@ const versePuzzle: GameEngine = {
   check: (puzzle: { verses: PuzzleVerse[] }, progress: VerseProgress) => countSolvedVerses(puzzle.verses.length, progress ?? {}),
 };
 
+// --- Crossword ----------------------------------------------------------------
+
+export interface CrosswordView {
+  width: number;
+  height: number;
+  /** One string per row: "#" = no square, "." = a square to fill. */
+  shape: string[];
+  entries: { number: number; direction: Direction; row: number; col: number; length: number; clue: string; reference: string }[];
+}
+
+const crossword: GameEngine = {
+  async build(level, seed) {
+    const puzzle = buildCrossword(level, seed);
+    const shape = Array.from({ length: puzzle.height }, () => Array<string>(puzzle.width).fill("#"));
+    for (const e of puzzle.entries) for (const [r, c] of entryCells(e, e.answer.length)) shape[r][c] = ".";
+    const view: CrosswordView = {
+      width: puzzle.width,
+      height: puzzle.height,
+      shape: shape.map((r) => r.join("")),
+      entries: puzzle.entries.map(({ answer, ...e }) => ({ ...e, length: answer.length })),
+    };
+    return { puzzle, view, maxCorrect: puzzle.entries.length };
+  },
+  // The player's letters, one string per row.
+  answers: z.array(z.string().max(40)).max(40),
+  check: (puzzle: CrosswordPuzzle, _progress, grid) => checkCrossword(puzzle, grid),
+  review: (puzzle: CrosswordPuzzle, _progress, grid: string[]) =>
+    puzzle.entries.map((e) => ({
+      label: `${e.number} ${e.direction === "across" ? "Across" : "Down"}`,
+      prompt: e.clue,
+      answer: e.answer,
+      reference: e.reference,
+      correct: checkCrossword({ ...puzzle, entries: [e] }, grid) === 1,
+    })),
+};
+
 export const ENGINES: Record<GameKey, GameEngine> = {
   quiz,
+  crossword,
   word_search: wordSearch,
   verse_puzzle: versePuzzle,
 };

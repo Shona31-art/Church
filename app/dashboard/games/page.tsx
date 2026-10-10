@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpenText, Grid3x3, ListOrdered, Medal, type LucideIcon } from "lucide-react";
+import { BookOpenText, Grid3x3, ListOrdered, Medal, SquarePen, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
@@ -13,6 +13,7 @@ import { Avatar } from "@/components/ui/Avatar";
 
 const ICONS: Record<GameKey, LucideIcon> = {
   quiz: ListOrdered,
+  crossword: SquarePen,
   word_search: Grid3x3,
   verse_puzzle: BookOpenText,
 };
@@ -80,7 +81,7 @@ export default async function GamesHubPage() {
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {GAME_KEYS.map((key) => {
           const game = GAMES[key];
           const Icon = ICONS[key];

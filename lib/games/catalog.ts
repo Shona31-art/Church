@@ -1,6 +1,6 @@
 // The games, their levels and how they score (pure — unit-tested).
 
-export const GAME_KEYS = ["quiz", "word_search", "verse_puzzle"] as const;
+export const GAME_KEYS = ["quiz", "crossword", "word_search", "verse_puzzle"] as const;
 export type GameKey = (typeof GAME_KEYS)[number];
 
 export const LEVELS = ["easy", "medium", "hard"] as const;
@@ -29,6 +29,14 @@ export const GAMES: Record<GameKey, GameInfo> = {
     path: "quiz",
     levels: { easy: "Well-known stories", medium: "Details and names", hard: "Deeper knowledge" },
     parSeconds: { easy: 90, medium: 120, hard: 150 },
+  },
+  crossword: {
+    key: "crossword",
+    title: "Crossword",
+    summary: "Bible people, places and books — a fresh grid every game.",
+    path: "crossword",
+    levels: { easy: "6 well-known words", medium: "9 words, more names and places", hard: "12 words for keen readers" },
+    parSeconds: { easy: 240, medium: 420, hard: 600 },
   },
   word_search: {
     key: "word_search",

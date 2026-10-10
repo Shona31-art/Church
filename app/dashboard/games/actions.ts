@@ -9,7 +9,7 @@ import { GAMES, isGameKey, isLevel, pointsFor, type GameKey, type Level } from "
 import { newSeed } from "@/lib/games/random";
 import type { QuizKey, QuizProgress } from "@/lib/games/quiz";
 import { VERSE_TRIES, isCorrectOrder, tokenize, type PuzzleVerse, type VerseProgress } from "@/lib/verse-puzzle";
-import { ENGINES } from "./engine";
+import { ENGINES, type ReviewItem } from "./engine";
 
 // Starting and finishing games. Server actions are public endpoints, so each
 // one re-checks the session and plan, and every score is worked out here
@@ -33,6 +33,8 @@ export interface FinishResult {
   maxCorrect?: number;
   points?: number;
   durationMs?: number;
+  /** Answers to show after the game, for games that have them. */
+  review?: ReviewItem[];
 }
 
 async function requirePlayer() {
@@ -205,5 +207,5 @@ export async function finishGame(sessionId: string, answers: unknown): Promise<F
   });
   if (attemptError) console.error("[games] scoreboard insert failed:", attemptError.message);
 
-  return { correct, maxCorrect: session.max_correct, points, durationMs };
+  return { correct, maxCorrect: session.max_correct, points, durationMs, review: engine.review?.(session.puzzle, session.progress, parsed.data) };
 }

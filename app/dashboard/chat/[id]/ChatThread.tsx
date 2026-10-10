@@ -1,74 +1,139 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { showToast } from "@/components/ui/Toaster";
-import { formatDateTime } from "@/lib/format";
+import {
+  MAX_MESSAGE_LENGTH,
+  canDeleteMessage,
+  canEditMessage,
+  dayKey,
+  dayLabel,
+  messagePreview,
+  startsGroup,
+  summarizeReactions,
+  type ChatMessage,
+  type ChatReaction,
+  type Reaction,
+} from "@/lib/chat";
+import { deleteChatMessage, editChatMessage } from "../actions";
+import { MessageBubble } from "./MessageBubble";
+import { Composer } from "./Composer";
 
-interface Message {
-  id: string;
-  channel_id: string;
-  sender_id: string;
-  content: string;
-  created_at: string;
-  sender_name?: string;
+export interface ChatPerson {
+  name: string;
+  photoUrl: string | null;
 }
 
-const MAX_LENGTH = 4000;
+const UNKNOWN_PERSON: ChatPerson = { name: "Former member", photoUrl: null };
 
+/**
+ * A live conversation. Messages and reactions arrive over Supabase Realtime
+ * (needs Realtime enabled — chat_v2.sql adds the tables); without it the
+ * thread still works and updates on refresh.
+ *
+ * `v2` is false until supabase/chat_v2.sql has been run: replies, edits and
+ * reactions are hidden, and the thread behaves like the original text chat.
+ */
 export function ChatThread({
   channelId,
+  isDm,
+  v2,
   initialMessages,
+  quotedMessages,
+  initialReactions,
   truncated,
   currentUserId,
-  currentUserName,
   canModerate,
-  memberNames,
+  directory,
 }: {
   channelId: string;
-  initialMessages: Message[];
+  isDm: boolean;
+  v2: boolean;
+  initialMessages: ChatMessage[];
+  quotedMessages: ChatMessage[];
+  initialReactions: ChatReaction[];
   truncated: boolean;
   currentUserId: string;
-  currentUserName: string;
   canModerate: boolean;
-  memberNames: Record<string, string>;
+  directory: Record<string, ChatPerson>;
 }) {
-  // One client for the component's lifetime. Creating it during render made
-  // the realtime effect re-subscribe on every keystroke, dropping messages.
+  // One client for the component's lifetime, so the realtime subscription
+  // isn't torn down and rebuilt on every render.
   const [supabase] = useState(() => createClient());
-  // Latest names, read inside the long-lived subscription without
-  // re-subscribing when the parent passes a new object.
-  const memberNamesRef = useRef(memberNames);
-  memberNamesRef.current = memberNames;
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [reactions, setReactions] = useState<ChatReaction[]>(initialReactions);
   const [draft, setDraft] = useState("");
-  const [sending, setSending] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
-  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [editing, setEditing] = useState<ChatMessage | null>(null);
+  const [deleting, setDeleting] = useState<ChatMessage | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const bottomRef = useRef<HTMLDivElement>(null);
+  const deleteDialogRef = useRef<HTMLDialogElement>(null);
+
+  const person = useCallback((id: string) => directory[id] ?? UNKNOWN_PERSON, [directory]);
+  const byId = useMemo(() => new Map([...quotedMessages, ...messages].map((m) => [m.id, m])), [messages, quotedMessages]);
+
+  // Re-evaluate the 15-minute edit window once a minute.
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [messages.length]);
 
   useEffect(() => {
-    // Live updates. Needs Realtime enabled for chat_messages (README); without
-    // it the thread still works, it just updates on refresh.
+    if (deleting) deleteDialogRef.current?.showModal();
+    else deleteDialogRef.current?.close();
+  }, [deleting]);
+
+  useEffect(() => {
+    const toMessage = (row: any): ChatMessage => ({
+      id: row.id,
+      channel_id: row.channel_id,
+      sender_id: row.sender_id,
+      content: row.content,
+      created_at: row.created_at,
+      kind: row.kind ?? "text",
+      edited_at: row.edited_at ?? null,
+      deleted_at: row.deleted_at ?? null,
+      deleted_by: row.deleted_by ?? null,
+      reply_to_id: row.reply_to_id ?? null,
+    });
+    const filter = `channel_id=eq.${channelId}`;
+
     const channel = supabase
       .channel(`chat:${channelId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages", filter: `channel_id=eq.${channelId}` }, (payload) => {
-        const msg = payload.new as Message;
-        msg.sender_name = memberNamesRef.current[msg.sender_id] || "Member";
-        setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev.filter((m) => !(m.id.startsWith("optimistic-") && m.content === msg.content && m.sender_id === msg.sender_id)), msg]));
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages", filter }, ({ new: row }) => {
+        const msg = toMessage(row);
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          // Replace my own optimistic copy if the realtime event wins the race.
+          const withoutEcho = prev.filter((m) => !(m.pending && m.sender_id === msg.sender_id && m.content === msg.content));
+          return [...withoutEcho, msg];
+        });
       })
-      // A soft delete (chat_v2.sql) arrives as an UPDATE with deleted_at set.
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_messages", filter: `channel_id=eq.${channelId}` }, (payload) => {
-        const updated = payload.new as Message & { deleted_at?: string | null };
-        if (updated.deleted_at) setMessages((prev) => prev.filter((m) => m.id !== updated.id));
-        else setMessages((prev) => prev.map((m) => (m.id === updated.id ? { ...m, content: updated.content } : m)));
+      // Edits and soft deletes arrive as UPDATEs.
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_messages", filter }, ({ new: row }) => {
+        const msg = toMessage(row);
+        setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, ...msg } : m)));
       })
-      .on("postgres_changes", { event: "DELETE", schema: "public", table: "chat_messages", filter: `channel_id=eq.${channelId}` }, (payload) => {
-        setMessages((prev) => prev.filter((m) => m.id !== (payload.old as Message).id));
+      // Hard deletes now only happen when a member is erased (POPIA).
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "chat_messages", filter }, ({ old }) => {
+        setMessages((prev) => prev.filter((m) => m.id !== (old as ChatMessage).id));
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_message_reactions", filter }, (payload) => {
+        const removed = payload.eventType === "DELETE" ? (payload.old as ChatReaction) : null;
+        const added = payload.eventType !== "DELETE" ? (payload.new as ChatReaction) : null;
+        setReactions((prev) => {
+          const target = removed ?? added!;
+          const rest = prev.filter((r) => !(r.message_id === target.message_id && r.user_id === target.user_id));
+          return added ? [...rest, added] : rest;
+        });
       })
       .subscribe();
     return () => {
@@ -76,113 +141,227 @@ export function ChatThread({
     };
   }, [channelId, supabase]);
 
-  async function sendMessage(e: React.FormEvent) {
-    e.preventDefault();
+  function cancelMode() {
+    if (editing) setDraft("");
+    setReplyTo(null);
+    setEditing(null);
+    setSendError(null);
+  }
+
+  async function submit() {
     const content = draft.trim();
-    if (!content || sending) return;
-    if (content.length > MAX_LENGTH) {
-      setSendError(`Keep messages under ${MAX_LENGTH.toLocaleString()} characters.`);
+    if (!content || busy) return;
+    if (content.length > MAX_MESSAGE_LENGTH) return setSendError(`Keep messages under ${MAX_MESSAGE_LENGTH.toLocaleString()} characters.`);
+    setSendError(null);
+
+    if (editing) {
+      const original = editing;
+      setBusy(true);
+      setMessages((prev) => prev.map((m) => (m.id === original.id ? { ...m, content, edited_at: new Date().toISOString() } : m)));
+      const result = await editChatMessage(original.id, content);
+      setBusy(false);
+      if (result.error) {
+        setMessages((prev) => prev.map((m) => (m.id === original.id ? original : m)));
+        setSendError(result.error);
+        return;
+      }
+      setEditing(null);
+      setDraft("");
       return;
     }
 
-    setSending(true);
-    setSendError(null);
+    const quoting = replyTo;
+    setBusy(true);
     setDraft("");
-    // Shown immediately; replaced by the real row (from the insert or the
-    // realtime event, whichever arrives first).
-    const optimistic: Message = { id: `optimistic-${Date.now()}`, channel_id: channelId, sender_id: currentUserId, content, created_at: new Date().toISOString(), sender_name: currentUserName };
+    setReplyTo(null);
+    // Shown immediately; swapped for the real row when the insert (or the
+    // realtime event, whichever is first) comes back.
+    const optimistic: ChatMessage = {
+      id: `pending-${Date.now()}`,
+      channel_id: channelId,
+      sender_id: currentUserId,
+      content,
+      created_at: new Date().toISOString(),
+      kind: "text",
+      edited_at: null,
+      deleted_at: null,
+      deleted_by: null,
+      reply_to_id: quoting?.id ?? null,
+      pending: true,
+    };
     setMessages((prev) => [...prev, optimistic]);
 
-    const { data, error } = await supabase.from("chat_messages").insert({ channel_id: channelId, sender_id: currentUserId, content }).select("id, created_at").single();
+    // Before chat_v2.sql there's no reply_to_id column to write.
+    const row: Record<string, unknown> = { channel_id: channelId, sender_id: currentUserId, content };
+    if (v2) row.reply_to_id = quoting?.id ?? null;
+    const { data, error } = await supabase.from("chat_messages").insert(row).select("id, created_at").single();
+    setBusy(false);
     if (error || !data) {
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
       setDraft(content);
-      setSendError(/JWT|session/i.test(error?.message ?? "") ? "Your session has expired — sign in again. Your message is still in the box." : "Couldn't send — check your connection and try again. Your message is still in the box.");
-    } else {
-      setMessages((prev) => (prev.some((m) => m.id === data.id) ? prev.filter((m) => m.id !== optimistic.id) : prev.map((m) => (m.id === optimistic.id ? { ...optimistic, id: data.id, created_at: data.created_at } : m))));
-    }
-    setSending(false);
-  }
-
-  async function deleteMessage(id: string) {
-    setConfirmingDelete(null);
-    // chat_v2.sql replaces hard deletes with delete_chat_message() (a soft
-    // delete). Until that migration is installed the function doesn't exist
-    // (PGRST202), so fall back to the old hard delete.
-    const { error: rpcError } = await supabase.rpc("delete_chat_message", { target_message: id });
-    const fallback = rpcError?.code === "PGRST202" ? await supabase.from("chat_messages").delete({ count: "exact" }).eq("id", id) : null;
-    const error = fallback ? fallback.error : rpcError;
-    const count = fallback ? fallback.count : 1;
-    if (error || !count) {
-      showToast("Couldn't delete that message — you may not have permission.", "error");
+      setReplyTo(quoting);
+      setSendError(
+        /JWT|session/i.test(error?.message ?? "")
+          ? "Your session has expired — sign in again. Your message is still in the box."
+          : /row-level security/i.test(error?.message ?? "")
+          ? "You can't send messages here right now. Your message is still in the box."
+          : "Couldn't send — check your connection and try again. Your message is still in the box."
+      );
       return;
     }
-    setMessages((prev) => prev.filter((m) => m.id !== id));
-    showToast("Message deleted.");
+    setMessages((prev) =>
+      prev.some((m) => m.id === data.id)
+        ? prev.filter((m) => m.id !== optimistic.id)
+        : prev.map((m) => (m.id === optimistic.id ? { ...optimistic, id: data.id, created_at: data.created_at, pending: false } : m))
+    );
   }
 
+  async function confirmDelete() {
+    const target = deleting;
+    setDeleting(null);
+    if (!target) return;
+    const result = await deleteChatMessage(target.id);
+    if (result.error) return showToast(result.error, "error");
+    setMessages((prev) => prev.map((m) => (m.id === target.id ? { ...m, content: "", deleted_at: new Date().toISOString(), deleted_by: currentUserId } : m)));
+    setReactions((prev) => prev.filter((r) => r.message_id !== target.id));
+    if (editing?.id === target.id || replyTo?.id === target.id) cancelMode();
+  }
+
+  async function react(message: ChatMessage, emoji: Reaction) {
+    const mine = reactions.find((r) => r.message_id === message.id && r.user_id === currentUserId);
+    const previous = reactions;
+    const removing = mine?.emoji === emoji;
+    // Optimistic: tapping your current reaction removes it; anything else replaces it.
+    setReactions((prev) => [
+      ...prev.filter((r) => !(r.message_id === message.id && r.user_id === currentUserId)),
+      ...(removing ? [] : [{ message_id: message.id, user_id: currentUserId, emoji }]),
+    ]);
+    const { error } = removing
+      ? await supabase.from("chat_message_reactions").delete().eq("message_id", message.id).eq("user_id", currentUserId)
+      : await supabase
+          .from("chat_message_reactions")
+          .upsert({ message_id: message.id, user_id: currentUserId, channel_id: channelId, emoji }, { onConflict: "message_id,user_id" });
+    if (error) {
+      setReactions(previous);
+      showToast("Couldn't save your reaction — try again.", "error");
+    }
+  }
+
+  function jumpTo(messageId: string) {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (!el) return showToast("That message is older than what's shown here.", "info");
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.animate?.([{ backgroundColor: "rgb(var(--gold) / 0.18)" }, { backgroundColor: "transparent" }], { duration: 1400 });
+  }
+
+  const deletingOthers = deleting && deleting.sender_id !== currentUserId;
+
   return (
-    <div className="card-elevated rounded-2xl flex flex-col h-[calc(100dvh-14rem)] min-h-[24rem]">
-      <div className="flex-1 overflow-y-auto p-4 space-y-3" role="log" aria-live="polite" aria-label="Messages">
-        {truncated && <p className="text-center text-xs text-ink/50">Showing the most recent messages.</p>}
-        {messages.map((m) => {
+    <div className="card-elevated flex h-[calc(100dvh-15rem)] min-h-[26rem] flex-col overflow-hidden rounded-2xl">
+      <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-5" role="log" aria-live="polite" aria-label="Messages">
+        {truncated && <p className="mb-2 text-center text-xs text-ink/50">Showing the most recent messages.</p>}
+
+        {messages.map((m, i) => {
+          const previous = messages[i - 1];
+          const newDay = !previous || dayKey(previous.created_at) !== dayKey(m.created_at);
           const isMine = m.sender_id === currentUserId;
-          const canDelete = (isMine || canModerate) && !m.id.startsWith("optimistic-");
+          const quoted = m.reply_to_id ? byId.get(m.reply_to_id) : undefined;
+          const messageReactions = reactions.filter((r) => r.message_id === m.id);
+          const myReaction = messageReactions.find((r) => r.user_id === currentUserId)?.emoji ?? null;
+
           return (
-            <div key={m.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-              <div className={`rounded-2xl px-3.5 py-2 text-sm max-w-[80%] ${isMine ? "bg-ember text-on-ember" : "bg-parchment border border-line"}`}>
-                {!isMine && <p className="text-xs font-semibold opacity-70 mb-0.5">{m.sender_name}</p>}
-                <p className="whitespace-pre-wrap break-words">{m.content}</p>
-                <div className={`mt-1 flex items-center gap-3 text-[11px] ${isMine ? "text-on-ember/70" : "text-ink/50"}`}>
-                  <time dateTime={m.created_at}>{m.id.startsWith("optimistic-") ? "Sending…" : formatDateTime(m.created_at, { weekday: undefined })}</time>
-                  {canDelete &&
-                    (confirmingDelete === m.id ? (
-                      <span className="flex gap-2">
-                        <button type="button" onClick={() => deleteMessage(m.id)} className="font-semibold underline">
-                          Delete message
-                        </button>
-                        <button type="button" onClick={() => setConfirmingDelete(null)} className="underline">
-                          Keep
-                        </button>
-                      </span>
-                    ) : (
-                      <button type="button" onClick={() => setConfirmingDelete(m.id)} className="underline-offset-2 hover:underline">
-                        Delete<span className="sr-only"> message from {m.sender_name ?? "you"}</span>
-                      </button>
-                    ))}
+            <div key={m.id}>
+              {newDay && (
+                <div className="my-4 flex justify-center" role="separator" aria-label={dayLabel(m.created_at)}>
+                  <span className="rounded-full border border-line bg-parchment px-3 py-1 text-[11px] font-medium text-ink/55">{dayLabel(m.created_at)}</span>
                 </div>
-              </div>
+              )}
+              <MessageBubble
+                message={m}
+                isMine={isMine}
+                isDm={isDm}
+                showHeader={newDay || startsGroup(m, previous)}
+                sender={person(m.sender_id)}
+                quoted={quoted}
+                quotedSenderName={quoted ? (quoted.sender_id === currentUserId ? "You" : person(quoted.sender_id).name) : undefined}
+                reactions={summarizeReactions(messageReactions, currentUserId)}
+                myReaction={myReaction}
+                onReact={v2 ? (emoji) => react(m, emoji) : undefined}
+                onReply={
+                  v2
+                    ? () => {
+                        setEditing(null);
+                        setReplyTo(m);
+                      }
+                    : undefined
+                }
+                onEdit={
+                  v2 && canEditMessage(m, currentUserId, now)
+                    ? () => {
+                        setReplyTo(null);
+                        setEditing(m);
+                        setDraft(m.content);
+                      }
+                    : undefined
+                }
+                onDelete={canDeleteMessage(m, currentUserId, canModerate) ? () => setDeleting(m) : undefined}
+                onJumpTo={jumpTo}
+              />
             </div>
           );
         })}
-        {!messages.length && <p className="text-ink/60 text-sm text-center mt-8">No messages yet — say hello 👋</p>}
+
+        {!messages.length && (
+          <div className="flex h-full flex-col items-center justify-center text-center">
+            <p className="font-display text-lg font-semibold">No messages yet</p>
+            <p className="mt-1 text-sm text-ink/60">Say hello — {isDm ? "only the two of you can read this." : "everyone in this channel will see it."}</p>
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={sendMessage} className="border-t border-line p-3">
-        {sendError && (
-          <p role="alert" className="text-xs text-danger mb-2">
-            {sendError}
+      <Composer
+        value={draft}
+        onChange={setDraft}
+        onSubmit={submit}
+        busy={busy}
+        error={sendError}
+        mode={
+          editing
+            ? { kind: "edit" }
+            : replyTo
+            ? { kind: "reply", name: replyTo.sender_id === currentUserId ? "yourself" : person(replyTo.sender_id).name, preview: messagePreview(replyTo) }
+            : null
+        }
+        onCancelMode={cancelMode}
+      />
+
+      <dialog
+        ref={deleteDialogRef}
+        onClose={() => setDeleting(null)}
+        aria-labelledby="delete-message-title"
+        className="w-[calc(100%-2rem)] max-w-md rounded-2xl border border-line p-0 shadow-pop backdrop:bg-ink/45 backdrop:backdrop-blur-[2px]"
+      >
+        <div className="p-6">
+          <h2 id="delete-message-title" className="text-xl font-semibold">
+            {deletingOthers ? "Remove this message?" : "Delete message?"}
+          </h2>
+          <p className="mt-2 text-sm text-ink/70">
+            {deletingOthers
+              ? `It will show as "Removed by a moderator" for everyone. This is recorded in the activity log.`
+              : `It will show as "This message was deleted" for everyone in this chat.`}
           </p>
-        )}
-        <div className="flex gap-2">
-          <label htmlFor="chat-message" className="sr-only">
-            Message
-          </label>
-          <input
-            id="chat-message"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            maxLength={MAX_LENGTH}
-            placeholder="Type a message…"
-            autoComplete="off"
-            className="input flex-1"
-          />
-          <button type="submit" disabled={sending || !draft.trim()} className="btn-primary">
-            Send
-          </button>
+          <div className="mt-6 flex flex-wrap justify-end gap-2">
+            {/* Cancel first, so a reflexive Enter is safe. */}
+            <button type="button" autoFocus className="btn-secondary" onClick={() => setDeleting(null)}>
+              Cancel
+            </button>
+            <button type="button" className="btn-danger" onClick={confirmDelete}>
+              {deletingOthers ? "Remove" : "Delete for everyone"}
+            </button>
+          </div>
         </div>
-      </form>
+      </dialog>
     </div>
   );
 }

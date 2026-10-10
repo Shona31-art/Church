@@ -5,6 +5,9 @@ import { moduleGate } from "@/lib/gate";
 import { PageHeader, Section } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Alert } from "@/components/ui/Alert";
+import { Avatar } from "@/components/ui/Avatar";
+import { getAvatarUrls } from "@/lib/avatars";
+import { Hash, Users } from "lucide-react";
 
 export default async function ChatsPage() {
   const gate = await moduleGate("dept_chats");
@@ -21,12 +24,17 @@ export default async function ChatsPage() {
   ]);
 
   const dmIds = (myDms ?? []).map((m: any) => m.channel_id as string);
-  let dmThreads: { channelId: string; otherName: string }[] = [];
+  let dmThreads: { channelId: string; otherId: string | null; otherName: string }[] = [];
   if (dmIds.length) {
     const { data: others } = await supabase.from("chat_channel_members").select("channel_id, user_id, app_users(name)").in("channel_id", dmIds).neq("user_id", me.id);
-    dmThreads = dmIds.map((id) => ({ channelId: id, otherName: (others?.find((o: any) => o.channel_id === id) as any)?.app_users?.name ?? "Former member" }));
+    dmThreads = dmIds.map((id) => {
+      const other = others?.find((o: any) => o.channel_id === id) as any;
+      return { channelId: id, otherId: other?.user_id ?? null, otherName: other?.app_users?.name ?? "Former member" };
+    });
     dmThreads.sort((a, b) => a.otherName.localeCompare(b.otherName));
   }
+
+  const photos = await getAvatarUrls(dmThreads.map((t) => t.otherId).filter((id): id is string => Boolean(id)));
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -50,7 +58,9 @@ export default async function ChatsPage() {
             {channels.map((c) => (
               <li key={c.id}>
                 <Link href={`/dashboard/chat/${c.id}`} className="flex items-center gap-3 py-3 hover:bg-ink/[0.02] -mx-2 px-2 rounded-lg">
-                  <span aria-hidden>{c.department_id ? "🗂️" : "💬"}</span>
+                  <span aria-hidden className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-parchment text-ink/55">
+                    {c.department_id ? <Users className="h-4 w-4" /> : <Hash className="h-4 w-4" />}
+                  </span>
                   <span className="font-medium">{c.name}</span>
                   {!c.department_id && (
                     <span className="ml-auto">
@@ -72,7 +82,7 @@ export default async function ChatsPage() {
             {dmThreads.map((t) => (
               <li key={t.channelId}>
                 <Link href={`/dashboard/chat/${t.channelId}`} className="flex items-center gap-3 py-3 hover:bg-ink/[0.02] -mx-2 px-2 rounded-lg">
-                  <span aria-hidden>👤</span>
+                  <Avatar name={t.otherName} src={t.otherId ? photos.get(t.otherId) : null} />
                   <span className="font-medium">{t.otherName}</span>
                 </Link>
               </li>

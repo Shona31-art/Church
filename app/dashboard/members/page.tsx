@@ -12,6 +12,8 @@ import { Alert } from "@/components/ui/Alert";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { MemberStatusBadge } from "./MemberBadges";
 import { NAV_ICONS } from "@/components/ui/NavIcon";
+import { Avatar } from "@/components/ui/Avatar";
+import { getAvatarUrls } from "@/lib/avatars";
 
 type Search = { q?: string; role?: string; status?: string; department?: string; page?: string };
 
@@ -49,6 +51,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
     supabase.from("departments").select("id, name").eq("church_id", me.church_id).order("name"),
   ]);
   if (error) console.error("[members] list failed:", error.message);
+  const photos = await getAvatarUrls((members ?? []).map((m: any) => m.id));
 
   const total = count ?? 0;
   const filtered = Boolean(q || role || status || department);
@@ -137,10 +140,15 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
                 {members.map((m: any) => (
                   <tr key={m.id} className="hover:bg-ink/[0.02]">
                     <td className="px-4 py-3">
-                      <Link href={`/dashboard/members/${m.id}`} className="font-medium hover:underline">
-                        {m.name}
-                      </Link>
-                      <p className="text-xs text-ink/50">{m.email}</p>
+                      <div className="flex items-center gap-3">
+                        <Avatar name={m.name} src={photos.get(m.id)} />
+                        <div className="min-w-0">
+                          <Link href={`/dashboard/members/${m.id}`} className="font-medium hover:underline">
+                            {m.name}
+                          </Link>
+                          <p className="text-xs text-ink/50">{m.email}</p>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3">{roleLabel(m.role)}</td>
                     <td className="px-4 py-3">{m.departments?.name ?? <span className="text-ink/40">—</span>}</td>
@@ -162,7 +170,8 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
             {members.map((m: any) => (
               <li key={m.id}>
                 <Link href={`/dashboard/members/${m.id}`} className="card-elevated rounded-xl p-4 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
+                  <Avatar name={m.name} src={photos.get(m.id)} />
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium truncate">{m.name}</p>
                     <p className="text-xs text-ink/50 truncate">{m.email}</p>
                     <p className="text-xs text-ink/60 mt-1">

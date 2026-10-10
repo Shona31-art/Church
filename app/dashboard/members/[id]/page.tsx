@@ -11,6 +11,9 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { MemberStatusBadge } from "../MemberBadges";
 import { MemberAccountActions } from "./MemberAccountActions";
+import { RemovePhotoButton } from "./RemovePhotoButton";
+import { Avatar } from "@/components/ui/Avatar";
+import { getAvatarUrls } from "@/lib/avatars";
 
 const ACTIVITY_LABELS: Record<string, string> = {
   "member.invited": "Added and invited",
@@ -21,6 +24,7 @@ const ACTIVITY_LABELS: Record<string, string> = {
   "member.reactivated": "Reactivated",
   "member.exported": "Personal data exported",
   "member.self_export": "Exported their own data",
+  "member.photo_removed": "Profile photo removed",
 };
 
 export default async function MemberProfilePage({ params }: { params: { id: string } }) {
@@ -58,12 +62,18 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
   const canEdit = member.role !== "church_admin" || me.role === "church_admin";
   const canChangeAccess = canEditMemberRole(me, member);
   const department = (member as any).departments?.name as string | undefined;
+  const photoUrl = (await getAvatarUrls([member.id])).get(member.id) ?? null;
 
   return (
     <div className="max-w-4xl space-y-6">
       <PageHeader
         back={{ href: "/dashboard/members", label: "Members" }}
-        title={member.name}
+        title={
+          <span className="flex items-center gap-4">
+            <Avatar name={member.name} src={photoUrl} size="lg" />
+            {member.name}
+          </span>
+        }
         meta={
           <>
             <StatusBadge tone="neutral">{roleLabel(member.role)}</StatusBadge>
@@ -76,6 +86,7 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
             <Link href={`/dashboard/pastoral-care/new?member=${member.id}`} className="btn-secondary">
               Record pastoral care
             </Link>
+            {photoUrl && canChangeAccess && <RemovePhotoButton memberId={member.id} memberName={member.name} />}
             {canEdit && (
               <Link href={`/dashboard/members/${member.id}/edit`} className="btn-primary">
                 Edit

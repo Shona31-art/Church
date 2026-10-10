@@ -12,6 +12,7 @@ import { flash } from "@/lib/flash";
 import { assignableRoles, can, canEditMemberRole } from "@/lib/permissions";
 import { memberCreateSchema, memberUpdateSchema } from "@/lib/member-schemas";
 import { FormState, SESSION_EXPIRED, formValues, invalid, optionalField } from "@/lib/forms";
+import { AVATAR_BUCKET } from "@/lib/avatar-path";
 
 // Every member mutation. Each action re-checks who's asking (server actions
 // are public endpoints), validates input with Zod, and is backed by the
@@ -355,6 +356,15 @@ export async function deleteMemberPermanently(_prev: FormState, formData: FormDa
   const { error: careError } = await admin.from("pastoral_care_logs").delete().eq("church_id", me.church_id).eq("member_id", target.id);
   if (careError) return { error: "Couldn't remove this person's care records, so nothing was deleted. Try again." };
 
+  // Files in Storage aren't covered by database cascades: remove the person's
+  // profile photos (the whole folder, in case an old one was left behind).
+  const photoFolder = `${me.church_id}/${target.id}`;
+  const { data: photos } = await admin.storage.from(AVATAR_BUCKET).list(photoFolder);
+  if (photos?.length) {
+    const { error: photoError } = await admin.storage.from(AVATAR_BUCKET).remove(photos.map((f) => `${photoFolder}/${f.name}`));
+    if (photoError) return { error: "Couldn't remove this person's profile photo, so nothing was deleted. Try again." };
+  }
+
   const { error } = await admin.auth.admin.deleteUser(target.id);
   if (error) {
     console.error("[members] delete failed:", error.message);
@@ -366,4 +376,39 @@ export async function deleteMemberPermanently(_prev: FormState, formData: FormDa
   revalidatePath("/dashboard/members");
   flash("The member and their personal data were permanently deleted.");
   redirect("/dashboard/members");
+}
+
+/**
+ * Removes a member's profile photo (e.g. an inappropriate picture). Pastors
+ * and church admins; a pastor can't act on a church admin. The record is
+ * cleared with the caller's own session (the database only lets others
+ * *clear* a photo), the file is removed with the service role, and the
+ * action is logged. Form fields: member_id.
+ */
+export async function removeMemberPhoto(_prev: FormState, formData: FormData): Promise<FormState> {
+  const me = await requireMemberManager();
+  if (!me) return { error: "Only pastors and church admins can remove a member's photo." };
+
+  const memberId = uuid.safeParse(formData.get("member_id"));
+  if (!memberId.success) return { error: "That member couldn't be found." };
+  const target = await loadMember(memberId.data, me.church_id!);
+  if (!target) return { error: "That member couldn't be found in your church." };
+  if (!canEditMemberRole(me, target)) return { error: "You can't change this person's profile." };
+
+  const supabase = createClient();
+  const { data: before } = await supabase.from("app_users").select("avatar_path").eq("id", target.id).maybeSingle();
+  if (!before?.avatar_path) return { ok: true };
+
+  const { error } = await supabase.from("app_users").update({ avatar_path: null }).eq("id", target.id);
+  if (error) {
+    console.error("[members] photo removal failed:", error.message);
+    return { error: "Couldn't remove the photo — please try again." };
+  }
+  const { error: fileError } = await createAdminClient().storage.from(AVATAR_BUCKET).remove([before.avatar_path]);
+  if (fileError) console.error("[members] photo file not removed:", fileError.message);
+
+  await logAudit({ churchId: me.church_id, actorId: me.id, action: "member.photo_removed", targetTable: "app_users", targetId: target.id });
+  revalidatePath(`/dashboard/members/${target.id}`);
+  flash("Profile photo removed.");
+  return { ok: true };
 }

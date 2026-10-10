@@ -8,6 +8,8 @@ import { SignOutButton } from "./SignOutButton";
 import { Toaster } from "@/components/ui/Toaster";
 import { NavIcon } from "@/components/ui/NavIcon";
 import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
+import { Avatar } from "@/components/ui/Avatar";
+import { initials } from "@/lib/initials";
 import { activeHref, type NavGroup } from "@/lib/navigation";
 
 export interface AccountBanner {
@@ -22,17 +24,12 @@ const BANNER: Record<AccountBanner["tone"], { className: string; Icon: typeof In
   error: { className: "bg-danger-tint text-danger border-danger-line", Icon: CircleAlert },
 };
 
-/** "Grace Church of Kami" → "GK"; used for the church monogram and the avatar. */
-function initials(name: string): string {
-  const words = name.trim().split(/\s+/).filter((w) => /^[A-Za-z0-9]/.test(w) && !/^(of|the|and)$/i.test(w));
-  return (words.length > 1 ? words[0][0] + words[words.length - 1][0] : (words[0] ?? "?").slice(0, 2)).toUpperCase();
-}
-
 export function DashboardChrome({
   navGroups,
   churchName,
   userName,
   userRole,
+  userPhotoUrl,
   banner,
   children,
 }: {
@@ -40,6 +37,7 @@ export function DashboardChrome({
   churchName: string;
   userName: string;
   userRole: string;
+  userPhotoUrl: string | null;
   banner: AccountBanner | null;
   children: React.ReactNode;
 }) {
@@ -64,7 +62,7 @@ export function DashboardChrome({
   }, [mobileOpen]);
 
   const sidebar = (
-    <Sidebar groups={navGroups} current={current} churchName={churchName} userName={userName} userRole={userRole} />
+    <Sidebar groups={navGroups} current={current} churchName={churchName} userName={userName} userRole={userRole} userPhotoUrl={userPhotoUrl} />
   );
 
   return (
@@ -99,7 +97,7 @@ export function DashboardChrome({
           <span className="truncate font-display text-base font-semibold">{churchName}</span>
         </Link>
         <Link href="/dashboard/account" aria-label="My account" className="rounded-full">
-          <Avatar name={userName} />
+          <Avatar name={userName} src={userPhotoUrl} />
         </Link>
       </header>
 
@@ -148,12 +146,14 @@ function Sidebar({
   churchName,
   userName,
   userRole,
+  userPhotoUrl,
 }: {
   groups: NavGroup[];
   current: string | null;
   churchName: string;
   userName: string;
   userRole: string;
+  userPhotoUrl: string | null;
 }) {
   return (
     <>
@@ -197,7 +197,7 @@ function Sidebar({
 
       <div className="space-y-3 border-t border-line p-3">
         <Link href="/dashboard/account" className="flex items-center gap-3 rounded-xl p-2 hover:bg-ink/[0.04]" title="My account">
-          <Avatar name={userName} />
+          <Avatar name={userName} src={userPhotoUrl} />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold leading-tight">{userName}</p>
             <p className="truncate text-xs leading-tight text-ink/55">{userRole}</p>
@@ -222,14 +222,6 @@ function Monogram({ text, small = false }: { text: string; small?: boolean }) {
     >
       {text}
       {!small && <span className="absolute bottom-1.5 left-1/2 h-px w-3 -translate-x-1/2 bg-gold" />}
-    </span>
-  );
-}
-
-function Avatar({ name }: { name: string }) {
-  return (
-    <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface-raised text-xs font-semibold text-ink/80">
-      {initials(name)}
     </span>
   );
 }

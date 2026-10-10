@@ -6,6 +6,7 @@ import { getChurchAccess } from "@/lib/paywall";
 import { buildNavigation } from "@/lib/navigation";
 import { can, roleLabel } from "@/lib/permissions";
 import { DashboardChrome, type AccountBanner } from "./DashboardChrome";
+import { getAvatarUrls } from "@/lib/avatars";
 
 // `modal` is the @modal parallel route: form pages opened as popups over the
 // current page (components/ui/RouteModal.tsx).
@@ -80,6 +81,7 @@ export default async function DashboardLayout({ children, modal }: { children: R
       churchName={churchName}
       userName={me.name}
       userRole={roleLabel(me.role)}
+      userPhotoUrl={(await getAvatarUrls([me.id])).get(me.id) ?? null}
       banner={banner}
     >
       {children}

@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
 import { can } from "@/lib/permissions";
-import { APP_TIMEZONE, formatDate, formatTime } from "@/lib/format";
+import { APP_TIMEZONE, formatDate, formatTime, todayInAppZone } from "@/lib/format";
+import { monthRangeUtc, parseMonth } from "@/lib/calendar-grid";
 import { RSVP_LABELS, type RsvpStatus } from "@/lib/events";
 import { PAGE_SIZE, buildQuery, pageFrom } from "@/lib/list";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -11,13 +12,75 @@ import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { MonthView, type MonthEvent } from "./MonthView";
 
-export default async function CalendarPage({ searchParams }: { searchParams: { when?: string; page?: string } }) {
+const TABS = [
+  { key: "month", label: "Month" },
+  { key: "upcoming", label: "Upcoming" },
+  { key: "past", label: "Past" },
+] as const;
+
+export default async function CalendarPage({ searchParams }: { searchParams: { when?: string; page?: string; month?: string } }) {
   const gate = await moduleGate("calendar");
   if (gate) return gate;
 
   const me = (await getCurrentAppUser())!;
-  const past = searchParams.when === "past";
+  const view = searchParams.when === "past" ? "past" : searchParams.when === "upcoming" ? "upcoming" : "month";
+  const canCreate = can(me.role, "createEvents");
+  const createButton = canCreate ? (
+    <Link href="/dashboard/calendar/new" className="btn-primary">
+      Create event
+    </Link>
+  ) : null;
+
+  const tabs = (
+    <nav aria-label="Calendar view" className="mb-4 flex gap-1 border-b border-line">
+      {TABS.map((t) => {
+        const active = t.key === view;
+        return (
+          <Link
+            key={t.key}
+            href={buildQuery({ when: t.key === "month" ? undefined : t.key })}
+            aria-current={active ? "page" : undefined}
+            className={`px-3 py-2 text-sm -mb-px border-b-2 ${active ? "border-ember font-semibold" : "border-transparent text-ink/60 hover:text-ink"}`}
+          >
+            {t.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+
+  if (view === "month") {
+    const today = todayInAppZone();
+    const ym = parseMonth(searchParams.month, today);
+    const { start, end } = monthRangeUtc(ym);
+    // Anything that starts before the month ends and hasn't finished before it
+    // begins — so a camp that started last month still shows on its last days.
+    const { data, error } = await createClient()
+      .from("events")
+      .select("id, title, start_time, end_time, cancelled_at")
+      .eq("church_id", me.church_id)
+      .lt("start_time", end)
+      .or(`start_time.gte.${start},end_time.gte.${start}`)
+      .order("start_time", { ascending: true })
+      .limit(500);
+    if (error) console.error("[calendar] month failed:", error.message);
+
+    return (
+      <div className="max-w-5xl">
+        <PageHeader title="Calendar" description="Services, meetings and events for your church." actions={createButton} />
+        {tabs}
+        {error ? (
+          <Alert tone="error" title="Couldn't load the calendar">Refresh the page to try again.</Alert>
+        ) : (
+          <MonthView ym={ym} today={today} events={(data ?? []) as MonthEvent[]} />
+        )}
+      </div>
+    );
+  }
+
+  const past = view === "past";
   const page = pageFrom(searchParams.page);
 
   let query = createClient()
@@ -33,13 +96,6 @@ export default async function CalendarPage({ searchParams }: { searchParams: { w
 
   const events: any[] = (data ?? []).slice(0, PAGE_SIZE);
   const hasMore = (data?.length ?? 0) > PAGE_SIZE;
-  const canCreate = can(me.role, "createEvents");
-  const createButton = canCreate ? (
-    <Link href="/dashboard/calendar/new" className="btn-primary">
-      Create event
-    </Link>
-  ) : null;
-
   // Group by month for scanning ("October 2026").
   const groups = new Map<string, any[]>();
   for (const e of events) {
@@ -51,24 +107,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: { w
     <div className="max-w-3xl">
       <PageHeader title="Calendar" description="Services, meetings and events for your church." actions={createButton} />
 
-      <nav aria-label="Which events" className="mb-4 flex gap-1 border-b border-line">
-        {[
-          { key: "upcoming", label: "Upcoming" },
-          { key: "past", label: "Past" },
-        ].map((t) => {
-          const active = (t.key === "past") === past;
-          return (
-            <Link
-              key={t.key}
-              href={buildQuery({ when: t.key === "past" ? "past" : undefined })}
-              aria-current={active ? "page" : undefined}
-              className={`px-3 py-2 text-sm -mb-px border-b-2 ${active ? "border-ember font-semibold" : "border-transparent text-ink/60 hover:text-ink"}`}
-            >
-              {t.label}
-            </Link>
-          );
-        })}
-      </nav>
+      {tabs}
 
       {error ? (
         <Alert tone="error" title="Couldn't load the calendar">Refresh the page to try again.</Alert>
@@ -126,7 +165,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: { w
         </div>
       )}
 
-      <Pagination page={page} hasMore={hasMore} hrefFor={(p) => buildQuery({ when: past ? "past" : undefined, page: p })} />
+      <Pagination page={page} hasMore={hasMore} hrefFor={(p) => buildQuery({ when: view, page: p })} />
     </div>
   );
 }

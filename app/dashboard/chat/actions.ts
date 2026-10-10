@@ -10,6 +10,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 import { MAX_MESSAGE_LENGTH, MUTE_OPTIONS, muteUntil, type MuteOption } from "@/lib/chat";
 import { revalidatePath } from "next/cache";
+import type { FormState } from "@/lib/forms";
+import { can } from "@/lib/permissions";
 
 /**
  * Opens (or reuses) a direct message with someone in the same church.
@@ -206,4 +208,114 @@ export async function unblockMember(userId: string): Promise<ChatActionResult> {
   revalidatePath("/dashboard/chat", "layout");
   revalidatePath("/dashboard/account");
   return {};
+}
+
+// ---------------------------------------------------------------------------
+// Channels: create / edit (pastors & admins), delete (church admins)
+// ---------------------------------------------------------------------------
+
+/**
+ * Form fields: channel_id (when editing), name, description?, audience
+ * ("everyone" | "members"), member_ids (repeated). The database functions
+ * re-check the caller's role and keep members inside the church.
+ */
+export async function saveChannel(_prev: FormState, formData: FormData): Promise<FormState> {
+  const me = await requireChatUser();
+  if (!me || !can(me.role, "manageChatChannels")) return { error: "Only pastors and church admins can manage channels." };
+
+  const parsed = z
+    .object({
+      channelId: z.string().uuid().optional(),
+      name: z.string().trim().min(2, "Give the channel a name (at least 2 characters).").max(60, "Keep the name to 60 characters."),
+      description: z.string().trim().max(200, "Keep the description to 200 characters.").optional(),
+      audience: z.enum(["everyone", "members"]),
+      memberIds: z.array(z.string().uuid()).max(500),
+    })
+    .safeParse({
+      channelId: formData.get("channel_id") || undefined,
+      name: formData.get("name") ?? "",
+      description: formData.get("description") || undefined,
+      audience: formData.get("audience"),
+      memberIds: formData.getAll("member_ids"),
+    });
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return { error: "Please fix the highlighted field.", fieldErrors: { [String(issue.path[0] ?? "name")]: issue.message } };
+  }
+  const { channelId, name, description, audience, memberIds } = parsed.data;
+  const onlyMembers = audience === "members";
+  if (onlyMembers && memberIds.length === 0 && !channelId) return { error: "Choose at least one member, or make the channel open to everyone.", fieldErrors: { member_ids: "Choose at least one member." } };
+
+  const supabase = createClient();
+  let id = channelId;
+  if (channelId) {
+    const { error } = await supabase.rpc("update_chat_channel", { target_channel: channelId, channel_name: name, channel_description: description ?? null, only_members: onlyMembers, member_ids: memberIds });
+    if (error) {
+      console.error("[chat] update channel failed:", error.message);
+      return { error: /Only/.test(error.message) ? "You can't change this channel." : "Couldn't save the channel — please try again." };
+    }
+  } else {
+    const { data, error } = await supabase.rpc("create_chat_channel", { channel_name: name, channel_description: description ?? null, only_members: onlyMembers, member_ids: memberIds });
+    if (error || !data) {
+      console.error("[chat] create channel failed:", error?.message);
+      return { error: error?.code === "PGRST202" ? "Channels need a database update first — ask your church admin to contact support." : "Couldn't create the channel — please try again." };
+    }
+    id = data as string;
+  }
+
+  await logAudit({ churchId: me.church_id, actorId: me.id, action: channelId ? "chat.channel_updated" : "chat.channel_created", targetTable: "chat_channels", targetId: id, metadata: { members_only: onlyMembers, member_count: memberIds.length } });
+  revalidatePath("/dashboard/chat", "layout");
+  flash(channelId ? "Channel saved." : "Channel created.");
+  redirect(`/dashboard/chat/${id}`);
+}
+
+/** Removes a deleted conversation's voice notes / photos from Storage (service role; paths from the database). */
+async function removeChatFiles(paths: unknown, churchId: string) {
+  const own = (Array.isArray(paths) ? paths : []).filter((p): p is string => typeof p === "string" && p.startsWith(`${churchId}/`));
+  if (!own.length) return;
+  const { error } = await createAdminClient().storage.from(CHAT_MEDIA_BUCKET).remove(own);
+  if (error) console.error("[chat] files not removed:", error.message);
+}
+
+/** Church admins: permanently delete a department or extra channel. Logged. */
+export async function deleteChannel(channelId: string): Promise<ChatActionResult> {
+  const me = await requireChatUser();
+  if (!me?.church_id || !can(me.role, "deleteChatChannels")) return { error: "Only church admins can delete channels." };
+  if (!z.string().uuid().safeParse(channelId).success) return { error: "That channel couldn't be found." };
+
+  const { data: paths, error } = await createClient().rpc("delete_chat_channel", { target_channel: channelId });
+  if (error) {
+    console.error("[chat] delete channel failed:", error.message);
+    return { error: /can't be deleted/.test(error.message) ? "The church-wide General channel can't be deleted." : "Couldn't delete the channel — please try again." };
+  }
+  await removeChatFiles(paths, me.church_id);
+  await logAudit({ churchId: me.church_id, actorId: me.id, action: "chat.channel_deleted", targetTable: "chat_channels", targetId: channelId });
+  revalidatePath("/dashboard/chat", "layout");
+  return {};
+}
+
+/**
+ * Either person in a DM: delete it for both, permanently. Logged without any
+ * message content (who deleted which conversation, and when).
+ */
+export async function deleteDirectMessageForBoth(channelId: string): Promise<ChatActionResult> {
+  const me = await requireChatUser();
+  if (!me?.church_id) return { error: "Your session has expired — sign in again." };
+  if (!z.string().uuid().safeParse(channelId).success) return { error: "That conversation couldn't be found." };
+
+  const { data: paths, error } = await createClient().rpc("delete_direct_message", { target_channel: channelId });
+  if (error) {
+    console.error("[chat] delete DM failed:", error.message);
+    return { error: "Couldn't delete the conversation — please try again." };
+  }
+  await removeChatFiles(paths, me.church_id);
+  await logAudit({ churchId: me.church_id, actorId: me.id, action: "chat.dm_deleted", targetTable: "chat_channels", targetId: channelId });
+  revalidatePath("/dashboard/chat", "layout");
+  return {};
+}
+
+/** "Delete for me": hide the chat from my list and clear my copy. It comes back if a new message arrives. */
+export async function hideChatForMe(channelId: string): Promise<ChatActionResult> {
+  const now = new Date().toISOString();
+  return saveMySettings(channelId, { hidden_at: now, cleared_at: now });
 }

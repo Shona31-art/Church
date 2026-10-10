@@ -58,6 +58,8 @@ const CAPABILITIES = {
   pastoralCare: SHEPHERDS,
   moderatePrayerWall: SHEPHERDS,
   moderateChat: SHEPHERDS, // delete others' messages in church and department channels (never DMs)
+  manageChatChannels: SHEPHERDS, // create extra channels, rename them, choose members
+  deleteChatChannels: ADMIN, // permanently delete department/extra channels (never General)
   reviewCounseling: SHEPHERDS, // flagged / shared AI-counseling conversations
   configureCounseling: SHEPHERDS,
   manageQuizQuestions: SHEPHERDS,

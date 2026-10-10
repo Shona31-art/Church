@@ -60,6 +60,7 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 23 | `plan_basic_v2.sql` | Basic = 50 members and only features with no running cost: adds Bible reader, Service planner, Pastor booking and text chat to Basic; new `ai_assist` (AI writing help) and `chat_voice` (voice notes) switches kept on every other plan that had them |
 | 24 | `bible_games_v3.sql` | Game levels and server-checked scores: `game_sessions` (answers kept server-side, no member access), scoreboard points/level/time, members can no longer post scores directly; empty content-bank and badge tables for upcoming games |
 | 25 | `bible_games_content.sql` | 150 more original quiz questions (50 per level), Kids-mode flags. Safe to re-run (skips questions that already exist) |
+| 26 | `chat_v3.sql` | Create/edit extra chat channels (open or members-only), church admins can delete department/extra channels (never General), delete a DM for both or hide it for yourself |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so
@@ -180,6 +181,9 @@ live data — ask the Supabase org owner for a second project for dev/preview.
 | Pin announcements, post church-wide | – | – | ✓ | ✓ | – |
 | Sermons, service plans, approve bookings | – | – | ✓ | ✓ | – |
 | Pastoral care log, counseling review, prayer-wall & chat moderation | – | – | ✓ | ✓ | **no** (by design) |
+| Create/edit chat channels (open or members-only) | – | – | ✓ | ✓ | – |
+| Delete department or extra chat channels (never General) | – | – | – | ✓ | – |
+| Delete own DM for both people, or hide it for yourself | ✓ | ✓ | ✓ | ✓ | – |
 | Members: add, edit, deactivate (not church admins) | – | – | ✓ | ✓ | – |
 | Grant/remove church admin; delete departments | – | – | – | ✓ | – |
 | Permanently delete member / export their data (POPIA) | – | – | – | ✓ | – |

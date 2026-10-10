@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Ban, BellOff, Bell, EllipsisVertical, Eraser, Pin, PinOff } from "lucide-react";
+import { Ban, BellOff, Bell, EllipsisVertical, Eraser, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 import { MUTE_OPTIONS, muteLabel, type MuteOption } from "@/lib/chat";
 import { showToast } from "@/components/ui/Toaster";
-import { blockMember, clearMyChatHistory, setChatMute, setChatPinned, unblockMember } from "../actions";
+import { blockMember, clearMyChatHistory, deleteChannel, deleteDirectMessageForBoth, hideChatForMe, setChatMute, setChatPinned, unblockMember } from "../actions";
 
-type Confirming = "clear" | "block" | null;
+type Confirming = "clear" | "block" | "hide" | "deleteBoth" | "deleteChannel" | null;
 
 /**
  * The ⋮ menu at the top of a conversation: pin, mute, clear my copy of the
@@ -18,8 +19,16 @@ export function ChatMenu({
   mutedUntil,
   pinned,
   dmWith,
+  canEdit = false,
+  canDelete = false,
+  channelName,
 }: {
   channelId: string;
+  /** Pastors/admins on a channel created in the app. */
+  canEdit?: boolean;
+  /** Church admins on a department or extra channel (never General). */
+  canDelete?: boolean;
+  channelName?: string;
   /** Null when not muted. */
   mutedUntil: string | null;
   pinned: boolean;
@@ -36,7 +45,7 @@ export function ChatMenu({
 
   useEffect(() => {
     if (!open) return;
-    const items = () => [...(menuRef.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem]") ?? [])];
+    const items = () => [...(menuRef.current?.querySelectorAll<HTMLElement>("[role=menuitem]") ?? [])];
     items()[0]?.focus();
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -45,7 +54,7 @@ export function ChatMenu({
       } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
         const list = items();
-        const index = list.indexOf(document.activeElement as HTMLButtonElement);
+        const index = list.indexOf(document.activeElement as HTMLElement);
         list[(index + (e.key === "ArrowDown" ? 1 : -1) + list.length) % list.length]?.focus();
       }
     }
@@ -65,7 +74,8 @@ export function ChatMenu({
     else dialogRef.current?.close();
   }, [confirming]);
 
-  async function run(action: () => Promise<{ error?: string }>, done: string) {
+  /** `leave`: the chat is gone (deleted or hidden), so go back to the list. */
+  async function run(action: () => Promise<{ error?: string }>, done: string, leave = false) {
     setOpen(false);
     setConfirming(null);
     setBusy(true);
@@ -73,8 +83,42 @@ export function ChatMenu({
     setBusy(false);
     if (result.error) return showToast(result.error, "error");
     showToast(done);
-    router.refresh();
+    if (leave) router.push("/dashboard/chat");
+    else router.refresh();
   }
+
+  const confirmCopy: Record<Exclude<Confirming, null>, { title: string; body: string; button: string; run: () => void }> = {
+    clear: {
+      title: "Clear your chat history?",
+      body: "Messages sent before now will disappear from your view of this chat. Nobody else's copy changes, and this can't be undone.",
+      button: "Clear history",
+      run: () => run(() => clearMyChatHistory(channelId), "Chat history cleared for you."),
+    },
+    block: {
+      title: `Block ${dmWith?.name}?`,
+      body: "Neither of you will be able to send messages in this chat, and they can't start a new one with you. They won't be told. You can unblock them any time.",
+      button: "Block",
+      run: () => dmWith && run(() => blockMember(dmWith.id), `${dmWith.name} is blocked.`),
+    },
+    hide: {
+      title: "Delete this chat for you?",
+      body: `It disappears from your chat list and your copy of the messages is cleared. ${dmWith?.name ?? "The other person"} keeps theirs. If they message you again, the chat comes back with just the new messages.`,
+      button: "Delete for me",
+      run: () => run(() => hideChatForMe(channelId), "Chat deleted for you.", true),
+    },
+    deleteBoth: {
+      title: "Delete this chat for both of you?",
+      body: `Every message and voice note will be permanently deleted for you and ${dmWith?.name ?? "the other person"}. This can't be undone. It's recorded in the activity log (without any message content).`,
+      button: "Delete for both",
+      run: () => run(() => deleteDirectMessageForBoth(channelId), "Chat deleted for both of you.", true),
+    },
+    deleteChannel: {
+      title: `Delete ${channelName ?? "this channel"}?`,
+      body: "The channel and every message, voice note and reaction in it will be permanently deleted for everyone. This can't be undone, and it's recorded in the activity log.",
+      button: "Delete channel",
+      run: () => run(() => deleteChannel(channelId), "Channel deleted.", true),
+    },
+  };
 
   const item = "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm hover:bg-ink/5 focus-visible:bg-ink/5";
 
@@ -134,6 +178,32 @@ export function ChatMenu({
                 <Ban aria-hidden className="h-4 w-4" /> Block {dmWith.name}
               </button>
             ))}
+
+          {dmWith && (
+            <div className="mt-1 border-t border-line pt-1">
+              <button type="button" role="menuitem" className={`${item} text-danger`} onClick={() => (setOpen(false), setConfirming("hide"))}>
+                <Trash2 aria-hidden className="h-4 w-4" /> Delete chat for me
+              </button>
+              <button type="button" role="menuitem" className={`${item} text-danger`} onClick={() => (setOpen(false), setConfirming("deleteBoth"))}>
+                <Trash2 aria-hidden className="h-4 w-4" /> Delete for both of us
+              </button>
+            </div>
+          )}
+
+          {(canEdit || canDelete) && (
+            <div className="mt-1 border-t border-line pt-1">
+              {canEdit && (
+                <Link href={`/dashboard/chat/${channelId}/edit`} role="menuitem" className={item} onClick={() => setOpen(false)}>
+                  <Pencil aria-hidden className="h-4 w-4 text-ink/50" /> Edit channel
+                </Link>
+              )}
+              {canDelete && (
+                <button type="button" role="menuitem" className={`${item} text-danger`} onClick={() => (setOpen(false), setConfirming("deleteChannel"))}>
+                  <Trash2 aria-hidden className="h-4 w-4" /> Delete channel
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -145,27 +215,15 @@ export function ChatMenu({
       >
         <div className="p-6">
           <h2 id="chat-confirm-title" className="text-xl font-semibold">
-            {confirming === "block" ? `Block ${dmWith?.name}?` : "Clear your chat history?"}
+            {confirming && confirmCopy[confirming].title}
           </h2>
-          <p className="mt-2 text-sm text-ink/70">
-            {confirming === "block"
-              ? "Neither of you will be able to send messages in this chat, and they can't start a new one with you. They won't be told. You can unblock them any time."
-              : "Messages sent before now will disappear from your view of this chat. Nobody else's copy changes, and this can't be undone."}
-          </p>
+          <p className="mt-2 text-sm text-ink/70">{confirming && confirmCopy[confirming].body}</p>
           <div className="mt-6 flex flex-wrap justify-end gap-2">
             <button type="button" autoFocus className="btn-secondary" onClick={() => setConfirming(null)}>
               Cancel
             </button>
-            <button
-              type="button"
-              className="btn-danger"
-              onClick={() =>
-                confirming === "block" && dmWith
-                  ? run(() => blockMember(dmWith.id), `${dmWith.name} is blocked.`)
-                  : run(() => clearMyChatHistory(channelId), "Chat history cleared for you.")
-              }
-            >
-              {confirming === "block" ? "Block" : "Clear history"}
+            <button type="button" className="btn-danger" onClick={() => confirming && confirmCopy[confirming].run()}>
+              {confirming && confirmCopy[confirming].button}
             </button>
           </div>
         </div>

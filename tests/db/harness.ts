@@ -38,6 +38,7 @@ export const MIGRATION_ORDER = [
   "plan_basic_v2.sql",
   "bible_games_v3.sql",
   "bible_games_content.sql",
+  "chat_v3.sql",
 ];
 
 const SUPABASE_STUBS = `

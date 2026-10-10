@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { BellOff, Hash, Pin, Users } from "lucide-react";
+import { BellOff, Hash, Lock, Pin, Plus, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
 import { getAvatarUrls } from "@/lib/avatars";
+import { can } from "@/lib/permissions";
 import { isMuted, messagePreview } from "@/lib/chat";
 import { formatTime, formatDate } from "@/lib/format";
 import { PageHeader, Section } from "@/components/ui/PageHeader";
@@ -14,7 +15,8 @@ import { Avatar } from "@/components/ui/Avatar";
 interface ChatRow {
   channelId: string;
   name: string;
-  kind: "church" | "department" | "dm";
+  kind: "church" | "department" | "custom" | "dm";
+  membersOnly: boolean;
   otherId: string | null;
   pinnedAt: string | null;
   muted: boolean;
@@ -31,11 +33,17 @@ export default async function ChatsPage() {
 
   // RLS shows the church-wide channel, your own department's channel (or all
   // of them for pastors/admins), and only the DMs you're part of.
+  // is_custom / members_only arrive with chat_v3.sql; fall back without them.
+  const channelQuery = async () => {
+    const full = await supabase.from("chat_channels").select("id, name, department_id, is_custom, members_only").eq("church_id", me.church_id).eq("is_dm", false).order("department_id", { nullsFirst: true });
+    if (full.error?.code !== "42703") return full;
+    return (await supabase.from("chat_channels").select("id, name, department_id").eq("church_id", me.church_id).eq("is_dm", false).order("department_id", { nullsFirst: true })) as typeof full;
+  };
   const [{ data: channels, error }, { data: myDms }, { data: settingsRows }] = await Promise.all([
-    supabase.from("chat_channels").select("id, name, department_id").eq("church_id", me.church_id).eq("is_dm", false).order("department_id", { nullsFirst: true }),
+    channelQuery(),
     supabase.from("chat_channel_members").select("channel_id, chat_channels!inner(is_dm)").eq("user_id", me.id).eq("chat_channels.is_dm", true),
     // Missing table (chat_v2.sql not run) → no settings, no unread counts.
-    supabase.from("chat_member_settings").select("channel_id, muted_until, pinned_at, cleared_at, last_read_at").eq("user_id", me.id),
+    supabase.from("chat_member_settings").select("*").eq("user_id", me.id),
   ]);
   const settings = new Map((settingsRows ?? []).map((s) => [s.channel_id, s]));
 
@@ -45,10 +53,16 @@ export default async function ChatsPage() {
     : { data: [] };
 
   const base: Omit<ChatRow, "unread" | "last" | "pinnedAt" | "muted">[] = [
-    ...(channels ?? []).map((c) => ({ channelId: c.id, name: c.name, kind: (c.department_id ? "department" : "church") as ChatRow["kind"], otherId: null })),
+    ...(channels ?? []).map((c: any) => ({
+      channelId: c.id,
+      name: c.name,
+      kind: (c.is_custom ? "custom" : c.department_id ? "department" : "church") as ChatRow["kind"],
+      membersOnly: Boolean(c.members_only),
+      otherId: null,
+    })),
     ...dmIds.map((id) => {
       const other = others?.find((o: any) => o.channel_id === id) as any;
-      return { channelId: id, name: other?.app_users?.name ?? "Former member", kind: "dm" as const, otherId: other?.user_id ?? null };
+      return { channelId: id, name: other?.app_users?.name ?? "Former member", kind: "dm" as const, membersOnly: false, otherId: other?.user_id ?? null };
     }),
   ];
 
@@ -70,8 +84,13 @@ export default async function ChatsPage() {
   // Pinned first (most recently pinned on top), then most recent activity.
   const order = (a: ChatRow, b: ChatRow) =>
     (b.pinnedAt ?? "").localeCompare(a.pinnedAt ?? "") || (b.last?.created_at ?? "").localeCompare(a.last?.created_at ?? "") || a.name.localeCompare(b.name);
-  const groupChats = rows.filter((r) => r.kind !== "dm").sort(order);
-  const dmChats = rows.filter((r) => r.kind === "dm").sort(order);
+  // "Delete for me" hides a chat until something new arrives after that.
+  const visible = rows.filter((r) => {
+    const hiddenAt = (settings.get(r.channelId) as any)?.hidden_at as string | undefined;
+    return !hiddenAt || (r.last && r.last.created_at > hiddenAt);
+  });
+  const groupChats = visible.filter((r) => r.kind !== "dm").sort(order);
+  const dmChats = visible.filter((r) => r.kind === "dm").sort(order);
   const photos = await getAvatarUrls(dmChats.map((t) => t.otherId).filter((id): id is string => Boolean(id)));
 
   return (
@@ -80,9 +99,16 @@ export default async function ChatsPage() {
         title="Chats"
         description="Talk with your whole church, your department, or one person privately."
         actions={
-          <Link href="/dashboard/chat/dm/new" className="btn-primary">
-            New message
-          </Link>
+          <>
+            {can(me.role, "manageChatChannels") && (
+              <Link href="/dashboard/chat/channels/new" className="btn-secondary">
+                <Plus aria-hidden className="h-4 w-4" /> New channel
+              </Link>
+            )}
+            <Link href="/dashboard/chat/dm/new" className="btn-primary">
+              New message
+            </Link>
+          </>
         }
       />
 
@@ -116,13 +142,14 @@ function ChatList({ rows, photos }: { rows: ChatRow[]; photos: Map<string, strin
                 <Avatar name={r.name} src={r.otherId ? photos.get(r.otherId) : null} size="md" />
               ) : (
                 <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-line bg-parchment text-ink/55">
-                  {r.kind === "department" ? <Users className="h-5 w-5" /> : <Hash className="h-5 w-5" />}
+                  {r.kind === "department" ? <Users className="h-5 w-5" /> : r.membersOnly ? <Lock className="h-5 w-5" /> : <Hash className="h-5 w-5" />}
                 </span>
               )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className={`truncate ${showCount ? "font-semibold" : "font-medium"}`}>{r.name}</span>
                   {r.kind === "church" && <StatusBadge tone="neutral">Church-wide</StatusBadge>}
+                  {r.membersOnly && <StatusBadge tone="neutral">Members only</StatusBadge>}
                 </div>
                 <p className={`truncate text-sm ${showCount ? "text-ink/80" : "text-ink/55"}`}>{r.last ? messagePreview(r.last) : "No messages yet"}</p>
               </div>

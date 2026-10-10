@@ -28,8 +28,18 @@ export default async function ChatChannelPage({ params }: { params: { id: string
   const supabase = createClient();
 
   // RLS: only channels this person may see (and only DMs they're part of).
-  const { data: channel } = await supabase.from("chat_channels").select("id, name, is_dm, department_id").eq("id", params.id).maybeSingle();
+  // Extra channel details arrive with chat_v3.sql; fall back without them.
+  let { data: channel, error: channelError } = await supabase
+    .from("chat_channels")
+    .select("id, name, is_dm, department_id, is_custom, members_only, description")
+    .eq("id", params.id)
+    .maybeSingle();
+  if (channelError?.code === "42703") {
+    ({ data: channel } = (await supabase.from("chat_channels").select("id, name, is_dm, department_id").eq("id", params.id).maybeSingle()) as any);
+  }
   if (!channel) notFound();
+  const isCustom = Boolean((channel as any).is_custom);
+  const membersOnly = Boolean((channel as any).members_only);
 
   let otherUserId: string | null = null;
   if (channel.is_dm) {
@@ -136,6 +146,10 @@ export default async function ChatChannelPage({ params }: { params: { id: string
         description={
           channel.is_dm
             ? [otherAbout?.about, "Private — only the two of you can read this."].filter(Boolean).join(" · ")
+            : (channel as any).description
+            ? `${(channel as any).description}${membersOnly ? " · Members only" : ""}`
+            : membersOnly
+            ? "Members only — pastors and admins can also read it."
             : channel.department_id
             ? "Department channel"
             : "Everyone in the church can read this channel."
@@ -155,6 +169,9 @@ export default async function ChatChannelPage({ params }: { params: { id: string
               mutedUntil={mutedUntil}
               pinned={Boolean(settings?.pinned_at)}
               dmWith={otherUserId ? { id: otherUserId, name: title, blockedByMe: Boolean(myBlock) } : null}
+              channelName={channel.is_dm ? undefined : channel.name}
+              canEdit={!channel.is_dm && isCustom && can(me.role, "manageChatChannels")}
+              canDelete={!channel.is_dm && (isCustom || Boolean(channel.department_id)) && can(me.role, "deleteChatChannels")}
             />
           ) : undefined
         }

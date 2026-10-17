@@ -245,6 +245,7 @@ every server action, and is enforced again by Postgres RLS. Menus only hide link
 | Nightly voice-note expiry | `app/api/cron/expire-chat-media/route.ts`, schedule in `vercel.json` |
 | Bible game content (clues, emoji stories, quotes, books; quiz questions are in SQL) | `lib/games/content/*.ts` — every item has a Bible reference for checking; quiz questions in `supabase/bible_games_content.sql` |
 | Bible reader | Text files: `public/bibles/` (built by `scripts/build-bibles.mjs`; book list `lib/bible/canon.json`). Reader: `components/bible/BibleReader.tsx` (verses `ChapterText.tsx`, picker `PassagePicker.tsx`, action bar, notes, settings). "Go to" parsing: `lib/bible/reference.ts`. Highlights/bookmarks/notes: `app/dashboard/bible/read/actions.ts`. Search: `lib/bible/search.ts` + `components/bible/BibleSearch.tsx`. Offline: `lib/bible/offline.ts` + `public/sw.js`. Why it's built this way: `docs/adr/0001-bible-text-hosting-and-offline.md` |
+| Notifications | Who gets told: the triggers in `supabase/notifications.sql` (tests `tests/db/notifications.test.ts`). Bell, panel, live badge: `components/notifications/NotificationBell.tsx` (list rows `NotificationList.tsx`). Full page + mark read/clear: `app/dashboard/notifications/`. Pop-ups: `lib/push.ts`, webhook `app/api/notifications/push/route.ts`, device/preference settings `components/notifications/PushSettings.tsx` + `app/dashboard/account/notification-actions.ts`, display in `public/sw.js`. 90-day clean-up: `app/api/cron/expire-chat-media/route.ts`. Why: `docs/adr/0002-notifications.md` |
 | Bible games | Rules, levels, points and puzzle generators: `lib/games/` (tested). Starting/finishing/marking: `app/dashboard/games/actions.ts` + `engine.ts`. Shared intro/timer/results frame: `app/dashboard/games/GameShell.tsx`; which board each game uses: `GameScreen.tsx`. Daily challenge, streaks, badges: `lib/games/progression.ts` |
 | Any AI behaviour, model, timeout | `lib/ai.ts`; rate limit `lib/ai-quota.ts` |
 | Billing / Stripe webhook | `app/dashboard/billing/`, `app/api/stripe/webhook/route.ts`, `lib/billing.ts` |
@@ -296,11 +297,15 @@ the Aperture default). Conventions every screen follows:
 - **Chat "typing…" uses an open Realtime broadcast** keyed by the chat's random ID.
   It carries only a user ID (never message text), but isn't permission-checked the
   way messages are. Supabase "private channels" (Realtime Authorization) would close
-  this; worth enabling if chats become sensitive. Chat mute only hides unread counts,
-  because there are no chat notifications yet. Read ticks (✓✓) show in DMs only.
-- **Notifications are in-app only** unless you set `NOTIFY_WEBHOOK_URL`. Crisis
-  escalations are recorded and shown to pastors on the Counseling page, but no
-  email/WhatsApp is sent without the webhook.
+  this; worth enabling if chats become sensitive. Muting a chat stops its unread
+  counts, bell items and pop-ups. Read ticks (✓✓) show in DMs only.
+- **Notifications**: the bell (in-app) always works after migration #28. Phone
+  pop-ups need VAPID keys and a Supabase Database Webhook (see "Notification
+  pop-ups"), HTTPS, and on iPhone a Home Screen install; they're untested on a
+  real device until a Vercel Preview exists. Email/WhatsApp only via the
+  separate `NOTIFY_WEBHOOK_URL` (Make.com), which still covers crisis alerts.
+  The Realtime free tier (200 concurrent connections, shared with chat) is the
+  first limit a growing platform will hit.
 - **One timezone per deployment** (`NEXT_PUBLIC_APP_TIMEZONE`). Per-church
   timezones would need a `churches.timezone` column.
 - **Member email changes** aren't supported in the app (email is the sign-in;

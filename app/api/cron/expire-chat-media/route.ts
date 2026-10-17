@@ -11,8 +11,13 @@ import { CHAT_MEDIA_BUCKET, mediaExpiryCutoff } from "@/lib/chat";
  * marks their messages "expired", so the chat shows "Voice note expired".
  * Keeps storage — and cost — flat as a church's chat history grows.
  *
+ * Also deletes bell notifications older than 90 days
+ * (the notifications page promises 90). Kept in this one job because Vercel's
+ * free plan allows only daily cron jobs; a failure there is logged and never
+ * blocks the media clean-up.
+ *
  * Request:  header `Authorization: Bearer <CRON_SECRET>` (Vercel adds it).
- * Response: 200 { expired: number } · 401 bad/missing secret ·
+ * Response: 200 { expired: number, notificationsDeleted: number } · 401 bad/missing secret ·
  *           500 { error } (files that couldn't be deleted are left as they
  *           are and retried the next night).
  */
@@ -22,6 +27,7 @@ import { CHAT_MEDIA_BUCKET, mediaExpiryCutoff } from "@/lib/chat";
 export const maxDuration = 60;
 const TIME_BUDGET_MS = 45_000;
 const BATCH = 200;
+const NOTIFICATION_RETENTION_DAYS = 90;
 
 function authorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
@@ -75,5 +81,12 @@ export async function GET(request: Request) {
   }
 
   if (expired) console.info(`[cron] expire-chat-media: ${expired} file(s) expired`);
-  return NextResponse.json({ expired });
+
+  let notificationsDeleted = 0;
+  const notificationCutoff = new Date(Date.now() - NOTIFICATION_RETENTION_DAYS * 86_400_000).toISOString();
+  const { error: notifyError, count } = await admin.from("notifications").delete({ count: "exact" }).lt("created_at", notificationCutoff);
+  if (notifyError) console.error("[cron] delete old notifications failed (retries tomorrow):", notifyError.message);
+  else notificationsDeleted = count ?? 0;
+
+  return NextResponse.json({ expired, notificationsDeleted });
 }

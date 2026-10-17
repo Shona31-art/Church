@@ -1,6 +1,6 @@
 # Plan: notification bell and phone pop-ups
 
-Status: **approved 2026-10-17**, in progress. Decision record:
+Status: **built 2026-10-17** (steps 1–4 on `dev`; pop-ups awaiting real-device testing). Decision record:
 [`docs/adr/0002-notifications.md`](../adr/0002-notifications.md).
 
 ## Agreed scope

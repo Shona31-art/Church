@@ -4,12 +4,12 @@ import { z } from "zod";
 import { generateText } from "@/lib/ai";
 import { consumeAiQuota } from "@/lib/ai-quota";
 import { checkModuleAccess } from "@/lib/paywall";
-import { fetchVerse } from "@/lib/bible";
+import { fetchVerse } from "@/lib/bible/text";
 
 // Bible Study AI (ported from the Android Bible Assistant). Four modes.
 // Scripture text shown to the user always comes from the World English Bible
-// via bible-api.com (public domain) — the AI explains it, but never quotes
-// copyrighted modern translations.
+// (public domain, self-hosted in public/bibles/ — lib/bible/text.ts) — the AI
+// explains it, but never quotes copyrighted modern translations.
 
 const MODES = {
   explain:

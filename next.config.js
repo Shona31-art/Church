@@ -1,6 +1,17 @@
 /** @type {import('next').NextConfig} */
 module.exports = {
   reactStrictMode: true,
+  experimental: {
+    // Server code that reads Bible text from disk (lib/bible/text.ts) needs the
+    // files bundled with its route: on Vercel, public/ is served by the CDN and
+    // isn't in server functions by default. WEB only — it's the version used
+    // for the daily verse and the AI study passage.
+    outputFileTracingIncludes: {
+      "/dashboard": ["./public/bibles/web/**"],
+      "/dashboard/bible": ["./public/bibles/web/**"],
+      "/dashboard/bible/study": ["./public/bibles/web/**"],
+    },
+  },
   async headers() {
     return [
       {

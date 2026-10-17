@@ -288,8 +288,8 @@ the Aperture default). Conventions every screen follows:
   Review with a mental-health professional; helplines are South African.
 - **Bible text**: the reader and search use public-domain KJV, WEB, ASV and
   YLT files shipped in `public/bibles/` (rebuild with
-  `node scripts/build-bibles.mjs`). The dashboard's daily verse and the AI
-  study tool still fetch from bible-api.com until Bible step 7 switches them.
+  `node scripts/build-bibles.mjs`); the daily verse and AI study tool read the
+  same files on the server (`lib/bible/text.ts`). No outside Bible service is used.
   Licensed versions (NIV, ESV, Afrikaans…) would need a publisher licence and
   a licensed API, online-only.
 - **Offline Bible** needs the service worker (`public/sw.js`), which is

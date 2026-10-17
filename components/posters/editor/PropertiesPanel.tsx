@@ -1,7 +1,7 @@
 "use client";
 
 import { AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowUp, Copy, Lock, LockOpen, Trash2, type LucideIcon } from "lucide-react";
-import type { PosterDesign, PosterElement, ShapeElement, TextElement } from "@/lib/posters/design";
+import type { GroupElement, ImageElement, ImageSource, PosterDesign, PosterElement, ShapeElement, TextElement } from "@/lib/posters/design";
 import { POSTER_FONTS } from "@/lib/posters/fonts";
 
 type Change = (changes: Partial<PosterElement>, key: string) => void;
@@ -16,6 +16,7 @@ export function PropertiesPanel({
   design,
   element,
   onChange,
+  onChildChange,
   onBackgroundChange,
   onDuplicate,
   onDelete,
@@ -24,6 +25,8 @@ export function PropertiesPanel({
   design: PosterDesign;
   element: PosterElement | undefined;
   onChange: Change;
+  /** Edit a part of a group (e.g. a speaker's name). */
+  onChildChange: (childId: string, changes: Partial<PosterElement>, key: string) => void;
   onBackgroundChange: (background: PosterDesign["background"], key: string) => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -46,18 +49,8 @@ export function PropertiesPanel({
 
       {element.type === "text" && <TextSettings element={element} onChange={onChange} />}
       {element.type === "shape" && <ShapeSettings element={element} onChange={onChange} />}
-      {element.type === "image" && element.src.kind === "placeholder" && (
-        <Field label="Photo slot label" id="prop-placeholder">
-          <input
-            id="prop-placeholder"
-            className="input py-2"
-            value={element.src.label}
-            maxLength={60}
-            onChange={(e) => onChange({ src: { kind: "placeholder", label: e.target.value } } as Partial<PosterElement>, `${element.id}:label`)}
-          />
-          <p className="hint">Adding real photos arrives with the Photos panel.</p>
-        </Field>
-      )}
+      {element.type === "image" && <ImageSettings element={element} onChange={onChange} />}
+      {element.type === "group" && <GroupSettings element={element} onChildChange={onChildChange} />}
 
       <fieldset className="space-y-3 border-t border-line pt-4">
         <legend className="eyebrow mb-2">Position and size</legend>
@@ -176,6 +169,111 @@ function TextSettings({ element, onChange }: { element: TextElement; onChange: C
   );
 }
 
+function ImageSettings({ element, onChange }: { element: ImageElement; onChange: Change }) {
+  const set = (changes: Partial<ImageElement>, key: string) => onChange(changes as Partial<PosterElement>, `${element.id}:${key}`);
+  return (
+    <div className="space-y-4">
+      {element.src.kind === "placeholder" ? (
+        <>
+          <Field label="Photo slot label" id="prop-placeholder">
+            <input id="prop-placeholder" className="input py-2" value={element.src.label} maxLength={60} onChange={(e) => set({ src: { kind: "placeholder", label: e.target.value } }, "label")} />
+          </Field>
+          <p className="hint">Open Photos and pick a photo to fill this slot.</p>
+        </>
+      ) : (
+        <PhotoCredit src={element.src} />
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Shape" id="prop-image-shape">
+          <select id="prop-image-shape" className="input py-2" value={element.shape} onChange={(e) => set({ shape: e.target.value as ImageElement["shape"] }, "shape")}>
+            <option value="rect">Square corners</option>
+            <option value="rounded">Rounded</option>
+            <option value="circle">Circle</option>
+          </select>
+        </Field>
+        <Field label="Fit" id="prop-image-fit">
+          <select id="prop-image-fit" className="input py-2" value={element.fit} onChange={(e) => set({ fit: e.target.value as ImageElement["fit"] }, "fit")}>
+            <option value="cover">Fill (crop)</option>
+            <option value="contain">Fit (stretch)</option>
+          </select>
+        </Field>
+      </div>
+      {element.shape === "rounded" && <NumberField label="Corner rounding" value={element.cornerRadius} min={0} max={2000} onChange={(cornerRadius) => set({ cornerRadius }, "radius")} />}
+      <OverlayFields overlay={element.overlay} onChange={(overlay) => set({ overlay }, "overlay")} idPrefix="prop-image" />
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={Boolean(element.border)} onChange={(e) => set({ border: e.target.checked ? { color: "#ffffff", width: Math.max(2, Math.round(element.width / 60)) } : undefined }, "border")} />
+        Border
+      </label>
+      {element.border && (
+        <div className="grid grid-cols-2 gap-2">
+          <ColorField label="Border colour" id="prop-image-border" value={element.border.color} onChange={(color) => set({ border: { ...element.border!, color } }, "borderc")} />
+          <NumberField label="Border width" value={element.border.width} min={0} max={100} onChange={(width) => set({ border: { ...element.border!, width } }, "borderw")} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GroupSettings({ element, onChildChange }: { element: GroupElement; onChildChange: (childId: string, changes: Partial<PosterElement>, key: string) => void }) {
+  return (
+    <div className="space-y-3">
+      {element.children.map((child) =>
+        child.type === "text" ? (
+          <Field key={child.id} label={child.name ?? "Text"} id={`prop-child-${child.id}`}>
+            <textarea
+              id={`prop-child-${child.id}`}
+              className="input min-h-[2.75rem] resize-y py-2"
+              rows={1}
+              value={child.text}
+              maxLength={1000}
+              onChange={(e) => onChildChange(child.id, { text: e.target.value }, `${child.id}:text`)}
+            />
+          </Field>
+        ) : child.type === "image" ? (
+          <p key={child.id} className="text-sm text-ink/60">
+            {child.src.kind === "placeholder" ? "Open Photos and pick a photo for this speaker." : "To change the photo, pick another one in Photos."}
+          </p>
+        ) : null,
+      )}
+      <p className="hint">Drag a corner handle to resize the whole block evenly.</p>
+    </div>
+  );
+}
+
+function OverlayFields({ overlay, onChange, idPrefix }: { overlay?: { color: string; opacity: number }; onChange: (o: { color: string; opacity: number } | undefined) => void; idPrefix: string }) {
+  return (
+    <div className="space-y-3">
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={Boolean(overlay)} onChange={(e) => onChange(e.target.checked ? { color: "#000000", opacity: 0.4 } : undefined)} />
+        Darken or tint (keeps text readable)
+      </label>
+      {overlay && (
+        <div className="grid grid-cols-2 gap-2">
+          <ColorField label="Tint colour" id={`${idPrefix}-overlay`} value={overlay.color} onChange={(color) => onChange({ ...overlay, color })} />
+          <RangeField label="Strength" value={overlay.opacity} min={0} max={0.9} step={0.05} format={(v) => `${Math.round(v * 100)}%`} onChange={(opacity) => onChange({ ...overlay, opacity })} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Pexels asks for photographer credit where possible. */
+function PhotoCredit({ src }: { src: ImageSource }) {
+  if (src.kind !== "stock") return null;
+  return (
+    <p className="text-xs text-ink/55">
+      Photo by{" "}
+      <a href={src.photographerUrl} target="_blank" rel="noopener noreferrer" className="link">
+        {src.photographer}
+      </a>{" "}
+      on{" "}
+      <a href={src.pageUrl} target="_blank" rel="noopener noreferrer" className="link">
+        Pexels
+      </a>
+    </p>
+  );
+}
+
 function ShapeSettings({ element, onChange }: { element: ShapeElement; onChange: Change }) {
   const set = (changes: Partial<ShapeElement>, key: string) => onChange(changes as Partial<PosterElement>, `${element.id}:${key}`);
   const isLine = element.shape === "line";
@@ -213,6 +311,19 @@ function BackgroundSettings({ design, onChange }: { design: PosterDesign; onChan
         />
         Gradient
       </label>
+      {bg.image && (
+        <div className="space-y-3 rounded-xl border border-line p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold">Background photo</p>
+            <button type="button" className="btn-ghost btn-sm text-danger" onClick={() => onChange({ ...bg, image: undefined }, "bg:image")}>
+              Remove
+            </button>
+          </div>
+          <PhotoCredit src={bg.image.src} />
+          <OverlayFields overlay={bg.image.overlay} idPrefix="prop-bg" onChange={(overlay) => onChange({ ...bg, image: { ...bg.image!, overlay } }, "bg:overlay")} />
+        </div>
+      )}
+      {!bg.image && <p className="text-sm text-ink/55">To use a photo as the background, open Photos and choose “Background” under any photo.</p>}
       {bg.gradient && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">

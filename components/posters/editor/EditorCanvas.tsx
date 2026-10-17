@@ -55,6 +55,7 @@ export function EditorCanvas({
   }, [selected, editingId, readOnly, design]);
 
   const isLine = selected?.type === "shape" && selected.shape === "line";
+  const isGroup = selected?.type === "group";
   // Finger-sized handles on touch screens (the handles are drawn in screen pixels).
   const touch = useCoarsePointer();
 
@@ -94,7 +95,8 @@ export function EditorCanvas({
             name="transformer"
             rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
             rotationSnapTolerance={4}
-            enabledAnchors={isLine ? ["middle-left", "middle-right"] : undefined}
+            enabledAnchors={isLine ? ["middle-left", "middle-right"] : isGroup ? ["top-left", "top-right", "bottom-left", "bottom-right"] : undefined}
+            keepRatio={isGroup ? true : undefined}
             anchorSize={touch ? 22 : 10}
             padding={touch ? 6 : 0}
             anchorCornerRadius={5}

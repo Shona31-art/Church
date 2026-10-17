@@ -206,3 +206,27 @@ describe("template text contrast", () => {
     expect(failures).toEqual([]);
   });
 });
+
+describe("speaker blocks", () => {
+  test("a new speaker is a valid group whose parts scale together", async () => {
+    const { createSpeaker, updateChild } = await import("@/lib/posters/elements");
+    const base = blankDesign("square");
+    const speaker = createSpeaker(base, "Manrope");
+    let d = addElement(base, speaker);
+    expect(PosterDesignSchema.safeParse(d).success).toBe(true);
+    if (speaker.type !== "group") throw new Error("expected a group");
+
+    const bigger = applyResize(speaker, 2, 2) as typeof speaker;
+    expect(bigger.width).toBe(speaker.width * 2);
+    const [photoBefore, nameBefore] = speaker.children as unknown as [{ width: number }, { fontSize: number; y: number }];
+    const [photoAfter, nameAfter] = bigger.children as unknown as [{ width: number }, { fontSize: number; y: number }];
+    expect(photoAfter.width).toBe(photoBefore.width * 2);
+    expect(nameAfter.fontSize).toBe(nameBefore.fontSize * 2);
+    expect(nameAfter.y).toBe(nameBefore.y * 2);
+
+    d = updateChild(d, speaker.id, `${speaker.id}-name`, { text: "Pastor Thabo" } as never);
+    const group = d.elements[0] as typeof speaker;
+    expect((group.children[1] as { text: string }).text).toBe("Pastor Thabo");
+    expect(PosterDesignSchema.safeParse(d).success).toBe(true);
+  });
+});

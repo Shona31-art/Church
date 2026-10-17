@@ -73,6 +73,102 @@ export function addElement(design: PosterDesign, element: PosterElement): Poster
   return { ...design, elements: [...design.elements, element] };
 }
 
+/**
+ * A speaker block: round photo slot, name and title, grouped so they move and
+ * resize together. Sized relative to the poster.
+ */
+export function createSpeaker(design: PosterDesign, fontFamily: string): PosterElement {
+  const u = Math.min(design.width, design.height) / 1080;
+  const width = Math.round(420 * u);
+  const photo = Math.round(240 * u);
+  const dark = luminance(design.background.color) > 0.5;
+  const id = newId("speaker");
+  return {
+    id,
+    type: "group",
+    role: "speaker",
+    name: "Speaker",
+    x: Math.round((design.width - width) / 2),
+    y: Math.round(design.height * 0.45),
+    width,
+    height: Math.round(380 * u),
+    rotation: 0,
+    opacity: 1,
+    children: [
+      {
+        id: `${id}-photo`,
+        type: "image",
+        name: "Speaker photo",
+        x: Math.round((width - photo) / 2),
+        y: 0,
+        width: photo,
+        height: photo,
+        rotation: 0,
+        opacity: 1,
+        src: { kind: "placeholder", label: "Speaker photo" },
+        fit: "cover",
+        shape: "circle",
+        cornerRadius: 0,
+        border: { color: dark ? "#14161a" : "#ffffff", width: Math.max(2, Math.round(6 * u)) },
+      },
+      {
+        id: `${id}-name`,
+        type: "text",
+        name: "Speaker name",
+        x: 0,
+        y: Math.round(262 * u),
+        width,
+        height: Math.round(52 * u),
+        rotation: 0,
+        opacity: 1,
+        text: "Speaker Name",
+        fontFamily,
+        fontSize: Math.round(44 * u),
+        fontWeight: 700,
+        italic: false,
+        fill: dark ? "#14161a" : "#ffffff",
+        align: "center",
+        lineHeight: 1.15,
+        letterSpacing: 0,
+        uppercase: false,
+      },
+      {
+        id: `${id}-title`,
+        type: "text",
+        name: "Speaker title",
+        x: 0,
+        y: Math.round(320 * u),
+        width,
+        height: Math.round(36 * u),
+        rotation: 0,
+        opacity: 1,
+        text: "Title or church",
+        fontFamily,
+        fontSize: Math.round(30 * u),
+        fontWeight: 500,
+        italic: false,
+        fill: dark ? "#5b616e" : "#e6e3dc",
+        align: "center",
+        lineHeight: 1.15,
+        letterSpacing: 0,
+        uppercase: false,
+      },
+    ],
+  };
+}
+
+/** Changes one child inside a group (e.g. the speaker's name). */
+export function updateChild(design: PosterDesign, groupId: string, childId: string, changes: Partial<PosterElement>): PosterDesign {
+  return {
+    ...design,
+    elements: design.elements.map((e) =>
+      e.id === groupId && e.type === "group"
+        ? { ...e, children: e.children.map((c) => (c.id === childId ? ({ ...c, ...changes, id: c.id, type: c.type } as typeof c) : c)) }
+        : e,
+    ),
+  };
+}
+
 /** Merges changes into one element (top level). The type can't change. */
 export function updateElement(design: PosterDesign, id: string, changes: Partial<PosterElement>): PosterDesign {
   return {
@@ -122,6 +218,23 @@ export function reorderElement(design: PosterDesign, id: string, where: "forward
 export function applyResize(element: PosterElement, scaleX: number, scaleY: number): Partial<PosterElement> {
   const width = Math.max(5, Math.round(element.width * scaleX));
   const height = Math.max(element.type === "shape" && element.shape === "line" ? 0 : 5, Math.round(element.height * scaleY));
+  if (element.type === "group") {
+    // Groups (speaker blocks) resize in proportion (corner handles only), so
+    // everything inside scales together: positions, sizes, text, borders.
+    const k = Math.max(0.05, (scaleX + scaleY) / 2);
+    const round = (n: number) => Math.round(n * k * 10) / 10;
+    return {
+      width: Math.max(5, Math.round(element.width * k)),
+      height: Math.max(5, Math.round(element.height * k)),
+      children: element.children.map((c) => {
+        const child = { ...c, x: round(c.x), y: round(c.y), width: round(c.width), height: round(c.height) };
+        if (child.type === "text") return { ...child, fontSize: clamp(round(child.fontSize), 6, 1200), letterSpacing: round(child.letterSpacing) };
+        if (child.type === "image") return { ...child, cornerRadius: round(child.cornerRadius), border: child.border ? { ...child.border, width: round(child.border.width) } : undefined };
+        if (child.type === "shape") return { ...child, strokeWidth: round(child.strokeWidth), cornerRadius: round(child.cornerRadius) };
+        return child;
+      }),
+    } as Partial<PosterElement>;
+  }
   if (element.type === "text") {
     const even = Math.abs(scaleX - scaleY) < 0.01;
     return even

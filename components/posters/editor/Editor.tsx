@@ -3,20 +3,22 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type Konva from "konva";
-import { ChevronLeft, Download, Layers, Plus, Redo2, SlidersHorizontal, Undo2, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronLeft, Download, ImageIcon, Layers, Plus, Redo2, SlidersHorizontal, Undo2, ZoomIn, ZoomOut } from "lucide-react";
 import { showToast } from "@/components/ui/Toaster";
 import { savePosterDesign } from "@/app/dashboard/posters/editor-actions";
 import { POSTER_SIZES, POSTER_SIZE_KEYS, type PosterDesign, type PosterElement, type PosterSize, type TextElement } from "@/lib/posters/design";
-import { addElement, createShape, createText, duplicateElement, findElement, newId, removeElement, reorderElement, updateElement } from "@/lib/posters/elements";
+import { addElement, createShape, createSpeaker, createText, duplicateElement, findElement, newId, removeElement, reorderElement, updateChild, updateElement } from "@/lib/posters/elements";
 import { createHistory, recordCoalesced, redo, undo } from "@/lib/posters/history";
 import { resizeDesign } from "@/lib/posters/layout";
 import { DEFAULT_FONT, fontsInDesign, loadFonts } from "@/lib/posters/fonts";
 import { EditorCanvas } from "./EditorCanvas";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { InsertPanel, LayersPanel } from "./SidePanels";
+import { PhotosPanel, type PhotoChoice } from "./PhotosPanel";
 import { TextEditOverlay } from "./TextEditOverlay";
 
-type Panel = "add" | "layers" | "edit";
+type Panel = "add" | "photos" | "layers" | "edit";
+type RailTab = "add" | "photos" | "layers";
 const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
 /**
@@ -50,6 +52,10 @@ export function Editor({
   const [zoom, setZoom] = useState(1);
   const [fit, setFit] = useState(0.4);
   const [panel, setPanel] = useState<Panel>("add");
+  const [railTab, setRailTab] = useState<RailTab>("add");
+  // Signed links for the church's uploaded photos (from the server, then the Photos panel).
+  const [urls, setUrls] = useState<Record<string, string>>(imageUrls ?? {});
+  const addUrls = useCallback((more: Record<string, string>) => setUrls((prev) => ({ ...prev, ...more })), []);
   const [saving, setSaving] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [fontVersion, setFontVersion] = useState(0);
@@ -128,6 +134,36 @@ export function Editor({
     change((d) => addElement(d, element));
     select(element.id);
   }
+
+  /** A chosen photo fills the selected photo or speaker photo; otherwise it's added as a new photo. */
+  function usePhoto(choice: PhotoChoice) {
+    const target = selected;
+    if (target?.type === "image" && !target.locked) {
+      change((d) => updateElement(d, target.id, { src: choice.src } as Partial<PosterElement>));
+      return;
+    }
+    if (target?.type === "group") {
+      const slot = target.children.find((c) => c.type === "image");
+      if (slot) {
+        change((d) => updateChild(d, target.id, slot.id, { src: choice.src } as Partial<PosterElement>));
+        return;
+      }
+    }
+    addAndSelect(photoElement(design, choice));
+  }
+
+  function setBackgroundPhoto(choice: PhotoChoice) {
+    change((d) => ({ ...d, background: { ...d.background, image: { src: choice.src, overlay: d.background.image?.overlay ?? { color: "#000000", opacity: 0.35 } } } }));
+    setSelectedId(null);
+    showToast("Background photo set. Adjust the darkness under Background.", "info");
+  }
+
+  const photoTarget =
+    selected?.type === "image"
+      ? "Clicking a photo replaces the selected photo."
+      : selected?.type === "group" && selected.children.some((c) => c.type === "image")
+        ? "Clicking a photo sets the selected speaker's photo."
+        : "Clicking a photo adds it to the poster. Select a photo slot first to fill it.";
 
   function changeSize(size: PosterSize) {
     change((d) => resizeDesign(d, size));
@@ -306,13 +342,37 @@ export function Editor({
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         {/* Desktop left rail */}
-        <aside className="hidden w-64 shrink-0 space-y-6 overflow-y-auto border-r border-line bg-surface p-4 lg:block" aria-label="Add to poster">
-          <InsertPanel
-            onAddText={(preset) => addAndSelect(createText(design, preset, DEFAULT_FONT))}
-            onAddShape={(shape) => addAndSelect(createShape(design, shape))}
-            onAddPhotoSlot={() => addAndSelect(photoSlot(design))}
-          />
-          <LayersPanel design={design} selectedId={selectedId} onSelect={select} />
+        <aside className="hidden w-72 shrink-0 overflow-y-auto border-r border-line bg-surface p-4 lg:block" aria-label="Poster tools">
+          <div role="group" aria-label="Tools" className="mb-4 flex gap-1 rounded-xl border border-line bg-surface-raised p-1">
+            {(
+              [
+                ["add", "Add"],
+                ["photos", "Photos"],
+                ["layers", "Layers"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={railTab === key}
+                onClick={() => setRailTab(key)}
+                className={`flex-1 rounded-lg px-2 py-1.5 text-sm ${railTab === key ? "bg-surface font-semibold shadow-xs" : "text-ink/60 hover:text-ink"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {railTab === "add" && (
+            <InsertPanel
+              onAddText={(preset) => addAndSelect(createText(design, preset, DEFAULT_FONT))}
+              onAddShape={(shape) => addAndSelect(createShape(design, shape))}
+              onAddPhotoSlot={() => addAndSelect(photoSlot(design))}
+              onAddSpeaker={() => addAndSelect(createSpeaker(design, DEFAULT_FONT))}
+              onOpenPhotos={() => setRailTab("photos")}
+            />
+          )}
+          {railTab === "photos" && <PhotosPanel targetLabel={photoTarget} onUse={usePhoto} onBackground={setBackgroundPhoto} onUrls={addUrls} />}
+          {railTab === "layers" && <LayersPanel design={design} selectedId={selectedId} onSelect={select} />}
         </aside>
 
         {/* Canvas */}
@@ -330,7 +390,7 @@ export function Editor({
               selectedId={selectedId}
               editingId={editingId}
               fontVersion={fontVersion}
-              imageUrls={imageUrls}
+              imageUrls={urls}
               stageRef={stageRef}
               onSelect={select}
               onChange={(id, changes) => change((d) => updateElement(d, id, changes))}
@@ -353,6 +413,7 @@ export function Editor({
             design={design}
             element={selected}
             onChange={updateSelected}
+            onChildChange={(childId, changes, key) => selectedId && change((d) => updateChild(d, selectedId, childId, changes), key)}
             onBackgroundChange={(background, key) => change((d) => ({ ...d, background }), key)}
             onDuplicate={duplicateSelected}
             onDelete={deleteSelected}
@@ -367,6 +428,7 @@ export function Editor({
             {(
               [
                 ["add", Plus, "Add"],
+                ["photos", ImageIcon, "Photos"],
                 ["layers", Layers, "Layers"],
                 ["edit", SlidersHorizontal, selected ? "Edit" : "Background"],
               ] as const
@@ -389,14 +451,18 @@ export function Editor({
                 onAddText={(preset) => addAndSelect(createText(design, preset, DEFAULT_FONT))}
                 onAddShape={(shape) => addAndSelect(createShape(design, shape))}
                 onAddPhotoSlot={() => addAndSelect(photoSlot(design))}
+                onAddSpeaker={() => addAndSelect(createSpeaker(design, DEFAULT_FONT))}
+                onOpenPhotos={() => setPanel("photos")}
               />
             )}
+            {panel === "photos" && <PhotosPanel targetLabel={photoTarget} onUse={usePhoto} onBackground={setBackgroundPhoto} onUrls={addUrls} />}
             {panel === "layers" && <LayersPanel design={design} selectedId={selectedId} onSelect={select} />}
             {panel === "edit" && (
               <PropertiesPanel
                 design={design}
                 element={selected}
                 onChange={updateSelected}
+                onChildChange={(childId, changes, key) => selectedId && change((d) => updateChild(d, selectedId, childId, changes), key)}
                 onBackgroundChange={(background, key) => change((d) => ({ ...d, background }), key)}
                 onDuplicate={duplicateSelected}
                 onDelete={deleteSelected}
@@ -408,6 +474,29 @@ export function Editor({
       </div>
     </div>
   );
+}
+
+/** A chosen photo as a new element: up to half the poster, keeping its shape, centred. */
+function photoElement(design: PosterDesign, choice: PhotoChoice): PosterElement {
+  const max = Math.min(design.width, design.height) * 0.5;
+  const ratio = choice.width / choice.height || 1;
+  const width = Math.round(ratio >= 1 ? max : max * ratio);
+  const height = Math.round(ratio >= 1 ? max / ratio : max);
+  return {
+    id: newId("photo"),
+    type: "image",
+    name: "Photo",
+    x: Math.round((design.width - width) / 2),
+    y: Math.round((design.height - height) / 2),
+    width,
+    height,
+    rotation: 0,
+    opacity: 1,
+    src: choice.src,
+    fit: "cover",
+    shape: "rect",
+    cornerRadius: 0,
+  };
 }
 
 function photoSlot(design: PosterDesign): PosterElement {

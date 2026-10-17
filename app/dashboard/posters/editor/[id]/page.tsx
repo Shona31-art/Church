@@ -4,7 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
 import { can, isShepherd } from "@/lib/permissions";
-import { PosterDesignSchema } from "@/lib/posters/design";
+import { PosterDesignSchema, assetPaths } from "@/lib/posters/design";
+import { signPosterAssets } from "@/lib/posters/assets";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { Alert } from "@/components/ui/Alert";
 import { EditorLoader } from "@/components/posters/editor/EditorLoader";
@@ -43,9 +44,13 @@ export default async function EditPosterDesignPage({ params }: { params: { id: s
     );
   }
 
+  // Short-lived links for this poster's uploaded photos (the bucket has no browser access).
+  const imageUrls = await signPosterAssets(assetPaths(design.data), me.church_id!);
+
   return (
     <EditorLoader
       initialDesign={design.data}
+      imageUrls={imageUrls}
       initialTitle={poster.title ?? poster.event_title}
       posterId={poster.id}
       initialUpdatedAt={poster.updated_at}

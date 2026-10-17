@@ -107,6 +107,7 @@ shared prayer and care note. It refuses to run without `SEED_CONFIRM=yes` —
 | `CRON_SECRET` | yes in production | Lets Vercel Cron call `/api/cron/expire-chat-media` (deletes voice notes after 90 days). Blank = the job refuses to run |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | no | Phone/computer pop-ups for the notification bell (Web Push). Blank = bell only. See below |
 | `NOTIFICATIONS_WEBHOOK_SECRET` | with pop-ups | Secret the Supabase Database Webhook sends to `/api/notifications/push` |
+| `PEXELS_API_KEY` | no | Free stock photo search in the poster editor (free key from pexels.com/api). Blank = uploads only |
 
 ### Stripe (optional)
 

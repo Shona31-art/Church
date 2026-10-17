@@ -9,7 +9,8 @@ import { normalizePosterStyle } from "@/lib/posters";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PosterPreview } from "../PosterCanvas";
 import { DeletePosterButton } from "../DeletePosterButton";
-import { PosterDesignSchema } from "@/lib/posters/design";
+import { PosterDesignSchema, assetPaths } from "@/lib/posters/design";
+import { signPosterAssets } from "@/lib/posters/assets";
 import { PosterViewer } from "@/components/posters/editor/PosterViewer";
 
 export default async function PosterDetailPage({ params }: { params: { id: string } }) {
@@ -25,6 +26,7 @@ export default async function PosterDetailPage({ params }: { params: { id: strin
   // Editor posters (Poster Studio v2) carry a design; older ones use the fixed layouts.
   const design = poster.design ? PosterDesignSchema.safeParse(poster.design) : null;
   const title = poster.title ?? poster.event_title;
+  const imageUrls = design?.success ? await signPosterAssets(assetPaths(design.data), poster.church_id) : {};
 
   return (
     <div className={design ? "max-w-3xl" : "max-w-xl"}>
@@ -44,7 +46,7 @@ export default async function PosterDetailPage({ params }: { params: { id: strin
       />
       {design ? (
         design.success ? (
-          <PosterViewer design={design.data} title={title} />
+          <PosterViewer design={design.data} title={title} imageUrls={imageUrls} />
         ) : (
           <p className="text-sm text-danger">This poster&apos;s design couldn&apos;t be read. Contact support and mention poster {poster.id}.</p>
         )

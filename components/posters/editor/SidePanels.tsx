@@ -1,6 +1,6 @@
 "use client";
 
-import { Circle, ImageIcon, Lock, Minus, Square, Triangle, Type } from "lucide-react";
+import { Circle, ImageIcon, Lock, Minus, Square, Triangle, Type, UserRound } from "lucide-react";
 import type { PosterDesign, ShapeElement } from "@/lib/posters/design";
 import { TEXT_PRESETS } from "@/lib/posters/elements";
 import { labelFor } from "./PropertiesPanel";
@@ -10,10 +10,14 @@ export function InsertPanel({
   onAddText,
   onAddShape,
   onAddPhotoSlot,
+  onAddSpeaker,
+  onOpenPhotos,
 }: {
   onAddText: (preset: keyof typeof TEXT_PRESETS) => void;
   onAddShape: (shape: ShapeElement["shape"]) => void;
   onAddPhotoSlot: () => void;
+  onAddSpeaker: () => void;
+  onOpenPhotos: () => void;
 }) {
   return (
     <div className="space-y-5">
@@ -65,10 +69,24 @@ export function InsertPanel({
         <h2 id="insert-photo" className="eyebrow mb-2">
           Photos
         </h2>
-        <AddButton onClick={onAddPhotoSlot} className="text-sm">
-          <ImageIcon aria-hidden className="h-4 w-4 shrink-0 text-ink/45" /> Add a photo slot
+        <div className="space-y-1.5">
+          <AddButton onClick={onOpenPhotos} className="text-sm">
+            <ImageIcon aria-hidden className="h-4 w-4 shrink-0 text-ink/45" /> Upload or find a photo
+          </AddButton>
+          <AddButton onClick={onAddPhotoSlot} className="text-sm">
+            <Square aria-hidden className="h-4 w-4 shrink-0 text-ink/45" /> Add an empty photo slot
+          </AddButton>
+        </div>
+      </section>
+
+      <section aria-labelledby="insert-speakers">
+        <h2 id="insert-speakers" className="eyebrow mb-2">
+          Speakers
+        </h2>
+        <AddButton onClick={onAddSpeaker} className="text-sm">
+          <UserRound aria-hidden className="h-4 w-4 shrink-0 text-ink/45" /> Add a speaker
         </AddButton>
-        <p className="hint">Uploads, speaker photos and stock photos come next.</p>
+        <p className="hint">Photo, name and title that move together. Add as many as you need.</p>
       </section>
     </div>
   );

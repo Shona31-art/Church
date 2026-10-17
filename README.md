@@ -104,6 +104,8 @@ shared prayer and care note. It refuses to run without `SEED_CONFIRM=yes` —
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_BASIC`, `STRIPE_PRICE_PREMIUM` | no | Billing and giving (Stripe test mode is free) |
 | `NOTIFY_WEBHOOK_URL`, `NOTIFY_WEBHOOK_SECRET` | no | Send alerts via a Make.com/n8n webhook; blank = in-app only |
 | `CRON_SECRET` | yes in production | Lets Vercel Cron call `/api/cron/expire-chat-media` (deletes voice notes after 90 days). Blank = the job refuses to run |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | no | Phone/computer pop-ups for the notification bell (Web Push). Blank = bell only. See below |
+| `NOTIFICATIONS_WEBHOOK_SECRET` | with pop-ups | Secret the Supabase Database Webhook sends to `/api/notifications/push` |
 
 ### Stripe (optional)
 
@@ -118,6 +120,26 @@ events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`
 Stripe, Billing shows "not set up" and plan changes go through Super Admin.
 Plan prices shown in the app come from the `plans` table — keep them equal to
 the Stripe prices.
+
+### Notification pop-ups (optional)
+
+The bell works on its own (migration #28). Pop-ups need two things per
+environment (dev and production each get their own keys and webhook):
+
+1. **Keys.** Run `pnpm exec web-push generate-vapid-keys`. Put the public key
+   in `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, the private key in `VAPID_PRIVATE_KEY`,
+   `mailto:you@yourchurch.org` in `VAPID_SUBJECT`, and a random string in
+   `NOTIFICATIONS_WEBHOOK_SECRET`. Add all four in Vercel → Settings →
+   Environment Variables, then redeploy. **Don't change the keys later:**
+   every device would have to turn pop-ups on again.
+2. **Webhook.** Supabase → Database → Webhooks → Create: table
+   `notifications`, event **Insert** only, type HTTP Request, method POST,
+   URL `https://<your-domain>/api/notifications/push`, add header
+   `x-webhook-secret` = your `NOTIFICATIONS_WEBHOOK_SECRET`.
+
+Then on a phone: open the live site (HTTPS) → My account → Notifications →
+Turn on → Send a test. On iPhone, add the app to the Home Screen first (iOS 16.4+).
+Pop-ups don't work in `pnpm dev` (the service worker is production-only).
 
 ### Creating a Super Admin
 

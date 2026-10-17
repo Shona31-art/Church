@@ -13,6 +13,9 @@
 // Everything else (other pages, server actions, Supabase, POSTs) goes straight
 // to the network, untouched.
 //
+// It also shows phone pop-ups for the notification bell (push and
+// notificationclick handlers at the bottom of this file).
+//
 // Turning it off: replace this file's contents with a worker that deletes its
 // caches and unregisters itself, and deploy.
 
@@ -101,3 +104,49 @@ async function trimStatic(cache) {
   const keys = (await cache.keys()).filter((r) => new URL(r.url).pathname.startsWith("/_next/static/"));
   for (const old of keys.slice(0, Math.max(0, keys.length - MAX_STATIC_ENTRIES))) await cache.delete(old);
 }
+
+// ---------------------------------------------------------------------------
+// Phone pop-ups (Web Push) for the notification bell — sent by lib/push.ts.
+// The payload is { title, body, url, tag }. Only in-app links are followed.
+// BRAND PLACEHOLDER: no icon yet, so browsers show their default; add the
+// logo as `icon` once it exists.
+// ---------------------------------------------------------------------------
+
+function safeUrl(url) {
+  return typeof url === "string" && url.startsWith("/dashboard") && !url.startsWith("//") ? url : "/dashboard/notifications";
+}
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    // Not JSON: show a generic pop-up rather than nothing.
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "Grace-bound", {
+      body: data.body || "",
+      // Same tag (e.g. one chat) replaces the older pop-up instead of stacking.
+      tag: data.tag || undefined,
+      renotify: Boolean(data.tag),
+      data: { url: safeUrl(data.url) },
+    }),
+  );
+});
+
+// Tapping a pop-up: reuse an open app window if there is one, otherwise open it.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = safeUrl(event.notification.data && event.notification.data.url);
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const existing = windows.find((w) => new URL(w.url).origin === self.location.origin);
+      if (existing) {
+        await existing.focus();
+        return existing.navigate(url);
+      }
+      return self.clients.openWindow(url);
+    })(),
+  );
+});

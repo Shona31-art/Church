@@ -7,6 +7,7 @@ import { ProfilePhotoForm } from "./ProfilePhotoForm";
 import { ChatPrivacyForm } from "./ChatPrivacyForm";
 import { getAvatarUrls } from "@/lib/avatars";
 import { Alert } from "@/components/ui/Alert";
+import { PushSettings } from "@/components/notifications/PushSettings";
 
 export default async function MyAccountPage() {
   const me = (await getCurrentAppUser())!;
@@ -27,6 +28,16 @@ export default async function MyAccountPage() {
   const { data: blockRows } = photosReady ? await supabase.from("chat_blocks").select("blocked_id, app_users!chat_blocks_blocked_id_fkey(name)").eq("blocker_id", me.id) : { data: [] };
   const blockedIds = (blockRows ?? []).map((b: any) => b.blocked_id as string);
   const blockedPhotos = await getAvatarUrls(blockedIds);
+  // Pop-up preferences: no row means the defaults (all on). If migration #28
+  // hasn't run, the section is hidden rather than breaking the page.
+  const prefsRes = await supabase.from("notification_preferences").select("push_church_news, push_messages, push_prayer_care, push_alerts").eq("user_id", me.id).maybeSingle();
+  const pushPrefs = {
+    church_news: prefsRes.data?.push_church_news ?? true,
+    messages: prefsRes.data?.push_messages ?? true,
+    prayer_care: prefsRes.data?.push_prayer_care ?? true,
+    alerts: prefsRes.data?.push_alerts ?? true,
+  };
+
   const blocked = (blockRows ?? []).map((b: any) => ({ id: b.blocked_id, name: b.app_users?.name ?? "Former member", photoUrl: blockedPhotos.get(b.blocked_id) ?? null }));
 
   return (
@@ -57,6 +68,14 @@ export default async function MyAccountPage() {
             blocked={blocked}
           />
         </Section>
+      )}
+
+      {!prefsRes.error && (
+        <div id="notifications" className="scroll-mt-24">
+          <Section title="Notifications" description="Get a pop-up on your phone or computer when something happens, even when the app is closed.">
+            <PushSettings initialPreferences={pushPrefs} />
+          </Section>
+        </div>
       )}
 
       <Section title="My details">

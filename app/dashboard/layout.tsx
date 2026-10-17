@@ -10,6 +10,13 @@ import { getAvatarUrls } from "@/lib/avatars";
 import { getMemberLimitStatus } from "@/lib/member-limit";
 import { ServiceWorker } from "@/components/ServiceWorker";
 
+/** Unread bell count for the first paint. 0 (and a log) if it can't be read, e.g. before migration #28 runs. */
+async function unreadNotifications(userId: string): Promise<number> {
+  const { count, error } = await createClient().from("notifications").select("id", { count: "exact", head: true }).eq("user_id", userId).is("read_at", null);
+  if (error) console.error("[notifications] unread count failed:", error.message);
+  return count ?? 0;
+}
+
 // `modal` is the @modal parallel route: form pages opened as popups over the
 // current page (components/ui/RouteModal.tsx).
 export default async function DashboardLayout({ children, modal }: { children: React.ReactNode; modal: React.ReactNode }) {
@@ -97,6 +104,8 @@ export default async function DashboardLayout({ children, modal }: { children: R
     <DashboardChrome
       navGroups={navGroups}
       churchName={churchName}
+      userId={me.id}
+      initialUnread={await unreadNotifications(me.id)}
       userName={me.name}
       userRole={roleLabel(me.role)}
       userPhotoUrl={(await getAvatarUrls([me.id])).get(me.id) ?? null}

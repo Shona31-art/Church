@@ -11,6 +11,7 @@ import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
 import { Avatar } from "@/components/ui/Avatar";
 import { initials } from "@/lib/initials";
 import { activeHref, type NavGroup } from "@/lib/navigation";
+import { NotificationBell, NotificationsProvider } from "@/components/notifications/NotificationBell";
 
 export interface AccountBanner {
   tone: "info" | "warning" | "error";
@@ -27,6 +28,8 @@ const BANNER: Record<AccountBanner["tone"], { className: string; Icon: typeof In
 export function DashboardChrome({
   navGroups,
   churchName,
+  userId,
+  initialUnread,
   userName,
   userRole,
   userPhotoUrl,
@@ -35,6 +38,9 @@ export function DashboardChrome({
 }: {
   navGroups: NavGroup[];
   churchName: string;
+  userId: string;
+  /** Unread notifications when the page was rendered; the bell keeps it live after that. */
+  initialUnread: number;
   userName: string;
   userRole: string;
   userPhotoUrl: string | null;
@@ -66,62 +72,67 @@ export function DashboardChrome({
   );
 
   return (
-    <div className="min-h-screen md:flex">
-      <a
-        href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2 focus:shadow-pop"
-      >
-        Skip to content
-      </a>
-
-      {/* Desktop: a fixed sidebar holds navigation, identity and account. */}
-      <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col md:sticky md:top-0 md:h-screen border-r border-line bg-surface">
-        {sidebar}
-      </aside>
-
-      {/* Phones: a slim top bar with the menu button. */}
-      <header className="md:hidden sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-line bg-surface/85 px-3 py-2.5 backdrop-blur-md">
-        <button
-          ref={menuButtonRef}
-          type="button"
-          onClick={() => setMobileOpen((o) => !o)}
-          className="btn-ghost btn-icon"
-          aria-label={mobileOpen ? "Close menu" : "Open menu"}
-          aria-expanded={mobileOpen}
-          aria-controls="mobile-nav"
+    <NotificationsProvider userId={userId} initialUnread={initialUnread}>
+      <div className="min-h-screen md:flex">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2 focus:shadow-pop"
         >
-          <Menu aria-hidden className="h-5 w-5" />
-        </button>
-        <Link href="/dashboard" className="flex min-w-0 items-center gap-2">
-          <Monogram text={initials(churchName)} small />
-          <span className="truncate font-display text-base font-semibold">{churchName}</span>
-        </Link>
-        <Link href="/dashboard/account" aria-label="My account" className="rounded-full">
-          <Avatar name={userName} src={userPhotoUrl} />
-        </Link>
-      </header>
+          Skip to content
+        </a>
 
-      {mobileOpen && (
-        <div className="fixed inset-0 z-30 md:hidden">
-          <div className="absolute inset-0 bg-ink/40 backdrop-blur-[2px] motion-safe:animate-fade-in" onClick={() => setMobileOpen(false)} aria-hidden />
-          <aside id="mobile-nav" className="absolute bottom-0 left-0 top-0 flex w-72 max-w-[85vw] flex-col bg-surface shadow-pop motion-safe:animate-modal-in">
-            <button type="button" onClick={() => setMobileOpen(false)} className="btn-ghost btn-icon absolute right-2 top-3 z-10" aria-label="Close menu">
-              <X aria-hidden className="h-5 w-5" />
-            </button>
-            {sidebar}
-          </aside>
+        {/* Desktop: a fixed sidebar holds navigation, identity and account. */}
+        <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col md:sticky md:top-0 md:h-screen border-r border-line bg-surface">
+          {sidebar}
+        </aside>
+
+        {/* Phones: a slim top bar with the menu button. */}
+        <header className="md:hidden sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-line bg-surface/85 px-3 py-2.5 backdrop-blur-md">
+          <button
+            ref={menuButtonRef}
+            type="button"
+            onClick={() => setMobileOpen((o) => !o)}
+            className="btn-ghost btn-icon"
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-nav"
+          >
+            <Menu aria-hidden className="h-5 w-5" />
+          </button>
+          <Link href="/dashboard" className="flex min-w-0 items-center gap-2">
+            <Monogram text={initials(churchName)} small />
+            <span className="truncate font-display text-base font-semibold">{churchName}</span>
+          </Link>
+          <div className="flex shrink-0 items-center gap-1">
+            <NotificationBell />
+            <Link href="/dashboard/account" aria-label="My account" className="rounded-full">
+              <Avatar name={userName} src={userPhotoUrl} />
+            </Link>
+          </div>
+        </header>
+
+        {mobileOpen && (
+          <div className="fixed inset-0 z-30 md:hidden">
+            <div className="absolute inset-0 bg-ink/40 backdrop-blur-[2px] motion-safe:animate-fade-in" onClick={() => setMobileOpen(false)} aria-hidden />
+            <aside id="mobile-nav" className="absolute bottom-0 left-0 top-0 flex w-72 max-w-[85vw] flex-col bg-surface shadow-pop motion-safe:animate-modal-in">
+              <button type="button" onClick={() => setMobileOpen(false)} className="btn-ghost btn-icon absolute right-2 top-3 z-10" aria-label="Close menu">
+                <X aria-hidden className="h-5 w-5" />
+              </button>
+              {sidebar}
+            </aside>
+          </div>
+        )}
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          {banner && <Banner banner={banner} />}
+          <main id="main" className="flex-1 px-4 py-6 sm:px-8 sm:py-8 lg:px-12 lg:py-10 motion-safe:animate-fade-in">
+            {children}
+          </main>
         </div>
-      )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        {banner && <Banner banner={banner} />}
-        <main id="main" className="flex-1 px-4 py-6 sm:px-8 sm:py-8 lg:px-12 lg:py-10 motion-safe:animate-fade-in">
-          {children}
-        </main>
+        <Toaster />
       </div>
-
-      <Toaster />
-    </div>
+    </NotificationsProvider>
   );
 }
 
@@ -159,13 +170,17 @@ function Sidebar({
     <>
       {/* Church identity. The monogram stands in until the church uploads a
           logo — flagged in the README's placeholder list. */}
-      <Link href="/dashboard" className="flex items-center gap-3 px-5 pb-4 pt-5">
-        <Monogram text={initials(churchName)} />
-        <div className="min-w-0">
-          <p className="truncate font-display text-[17px] font-semibold leading-tight">{churchName}</p>
-          <p className="eyebrow mt-0.5">Grace-bound</p>
-        </div>
-      </Link>
+      <div className="flex items-center gap-1 pb-4 pl-5 pr-2 pt-5">
+        <Link href="/dashboard" className="flex min-w-0 flex-1 items-center gap-3">
+          <Monogram text={initials(churchName)} />
+          <div className="min-w-0">
+            <p className="truncate font-display text-[17px] font-semibold leading-tight">{churchName}</p>
+            <p className="eyebrow mt-0.5">Grace-bound</p>
+          </div>
+        </Link>
+        {/* Desktop only: on phones the bell lives in the top bar, not the menu drawer. */}
+        <NotificationBell className="hidden shrink-0 md:inline-flex" />
+      </div>
 
       <nav aria-label="Main" className="flex-1 space-y-6 overflow-y-auto px-3 py-3">
         {groups.map((group) => (

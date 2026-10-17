@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BackLink } from "@/components/ui/PageHeader";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { togglePrayed, deletePrayerComment, removeFromWall } from "../actions";
@@ -54,6 +55,7 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
 
   return (
     <div className="max-w-2xl">
+      <BackLink href="/dashboard/prayer-board" label="Prayer board" />
       <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
         <h1 className="text-2xl font-semibold">Church prayer wall</h1>
         <Link href="/dashboard/prayer-board/new" className="btn-primary">

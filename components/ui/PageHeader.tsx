@@ -22,11 +22,7 @@ export function PageHeader({
 }) {
   return (
     <header className="mb-8">
-      {back && (
-        <Link href={back.href} data-page-back className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-ink/55 hover:text-ink">
-          <ChevronLeft aria-hidden className="h-4 w-4" /> {back.label}
-        </Link>
-      )}
+      {back && <BackLink href={back.href} label={back.label} />}
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
           <h1 className="text-[28px] font-semibold leading-tight break-words sm:text-[32px]">{title}</h1>
@@ -37,6 +33,19 @@ export function PageHeader({
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
     </header>
+  );
+}
+
+/**
+ * "‹ Parent page" link at the top of a page. Used by PageHeader, and on its
+ * own by pages with a custom header (e.g. the Bible reader). Hidden when the
+ * page opens as a popup, which has its own close button (RouteModal).
+ */
+export function BackLink({ href, label, className = "mb-3" }: { href: string; label: string; className?: string }) {
+  return (
+    <Link href={href} data-page-back className={`inline-flex items-center gap-1 text-sm font-medium text-ink/55 hover:text-ink ${className}`}>
+      <ChevronLeft aria-hidden className="h-4 w-4" /> {label}
+    </Link>
   );
 }
 

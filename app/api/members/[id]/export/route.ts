@@ -34,6 +34,10 @@ const SOURCES: [string, string][] = [
   ["bible_bookmarks", "user_id"],
   ["bible_notes", "user_id"],
   ["bible_highlights", "user_id"],
+  ["notifications", "user_id"],
+  // push_subscriptions deliberately left out: only device endpoints and encryption
+  // keys (technical secrets, not personal content). Deleted with the member.
+  ["notification_preferences", "user_id"],
   ["bible_quiz_attempts", "user_id"],
   ["pastor_bookings", "requested_by"],
   ["support_tickets", "created_by"],
@@ -54,6 +58,7 @@ const NO_CHURCH_COLUMN = new Set([
   "bible_bookmarks",
   "bible_notes",
   "bible_highlights",
+  "notification_preferences",
   "chat_messages",
   "chat_message_reactions",
   "chat_member_settings",

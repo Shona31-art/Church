@@ -40,6 +40,7 @@ export const MIGRATION_ORDER = [
   "bible_games_content.sql",
   "chat_v3.sql",
   "bible_reader_v2.sql",
+  "notifications.sql",
 ];
 
 const SUPABASE_STUBS = `

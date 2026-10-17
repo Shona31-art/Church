@@ -3,7 +3,7 @@
 import { Bookmark, NotebookPen } from "lucide-react";
 import type { HighlightColor } from "@/lib/bible/annotations";
 import type { ReaderSettings } from "@/lib/bible/reader-prefs";
-import { HIGHLIGHT_BG } from "./VerseActionBar";
+import { HIGHLIGHT_BG } from "./highlight-styles";
 import { VerseText } from "./VerseText";
 
 const SIZE: Record<ReaderSettings["textSize"], string> = {

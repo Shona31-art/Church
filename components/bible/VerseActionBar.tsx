@@ -2,15 +2,7 @@
 
 import { Bookmark, BookmarkCheck, Copy, Eraser, NotebookPen, Share2, X } from "lucide-react";
 import { HIGHLIGHT_COLORS, HIGHLIGHT_LABELS, type HighlightColor } from "@/lib/bible/annotations";
-
-/** Swatch classes written out in full so Tailwind generates them. Also used by the reader. */
-export const HIGHLIGHT_BG: Record<HighlightColor, string> = {
-  yellow: "bg-hl-yellow",
-  green: "bg-hl-green",
-  blue: "bg-hl-blue",
-  pink: "bg-hl-pink",
-  purple: "bg-hl-purple",
-};
+import { HIGHLIGHT_BG } from "./highlight-styles";
 
 /**
  * Appears at the bottom of the screen while verses are selected: highlight

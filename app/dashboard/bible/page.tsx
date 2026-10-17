@@ -13,7 +13,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { ContinueReading } from "@/components/bible/ContinueReading";
 import { GoToPassage } from "@/components/bible/GoToPassage";
 import { OfflineDownloads } from "@/components/bible/OfflineDownloads";
-import { HIGHLIGHT_BG } from "@/components/bible/VerseActionBar";
+import { HIGHLIGHT_BG } from "@/components/bible/highlight-styles";
 
 type SavedVerse = { book: string; chapter: number; verse: number; color?: HighlightColor };
 

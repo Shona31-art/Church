@@ -35,6 +35,14 @@
   --info: 36 80 143;
   --info-tint: 234 240 250;
   --info-line: 188 205 234;
+
+  /* Bible verse highlights (member-chosen, so pastel in light mode and
+     deep in dark mode; text stays ink on all of them, AA contrast). */
+  --hl-yellow: 254 240 150;
+  --hl-green: 198 240 213;
+  --hl-blue: 200 222 252;
+  --hl-pink: 251 211 233;
+  --hl-purple: 224 216 252;
 }
 
 /* Dark: deep navy-black surfaces, warm off-white text, champagne actions.
@@ -65,6 +73,12 @@
   --info: 138 176 240;
   --info-tint: 21 33 56;
   --info-line: 45 70 112;
+
+  --hl-yellow: 92 76 22;
+  --hl-green: 24 78 54;
+  --hl-blue: 30 58 104;
+  --hl-pink: 98 32 68;
+  --hl-purple: 64 48 116;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -93,6 +107,12 @@
     --info: 138 176 240;
     --info-tint: 21 33 56;
     --info-line: 45 70 112;
+
+    --hl-yellow: 92 76 22;
+    --hl-green: 24 78 54;
+    --hl-blue: 30 58 104;
+    --hl-pink: 98 32 68;
+    --hl-purple: 64 48 116;
   }
 }
 

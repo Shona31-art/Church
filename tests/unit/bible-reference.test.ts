@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { booksMatching, findBook, formatReference, parseReference } from "@/lib/bible/reference";
+import { booksMatching, findBook, formatReference, parseReference, verseRanges } from "@/lib/bible/reference";
 import { BOOKS, nextChapter, previousChapter } from "@/lib/bible/books";
 
 const idx = (name: string) => BOOKS.findIndex((b) => b.name === name);
@@ -68,5 +68,14 @@ describe("chapter navigation", () => {
     expect(nextChapter({ bookIndex: idx("John"), chapter: 3 })).toEqual({ bookIndex: idx("John"), chapter: 4 });
     expect(previousChapter({ bookIndex: 0, chapter: 1 })).toBeNull();
     expect(nextChapter({ bookIndex: 65, chapter: 22 })).toBeNull();
+  });
+});
+
+describe("verseRanges", () => {
+  test("joins runs of verses into ranges", () => {
+    expect(verseRanges([16])).toBe("16");
+    expect(verseRanges([16, 17, 18, 20])).toBe("16-18, 20");
+    expect(verseRanges([1, 3, 5, 6])).toBe("1, 3, 5-6");
+    expect(verseRanges([])).toBe("");
   });
 });

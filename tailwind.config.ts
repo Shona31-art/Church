@@ -34,6 +34,8 @@ const config: Config = {
         warning: { DEFAULT: token("warning"), tint: token("warning-tint"), line: token("warning-line") },
         danger: { DEFAULT: token("danger"), tint: token("danger-tint"), line: token("danger-line") },
         info: { DEFAULT: token("info"), tint: token("info-tint"), line: token("info-line") },
+        // Bible verse highlights only (components/bible/) — a member's own colour choice, not state.
+        hl: { yellow: token("hl-yellow"), green: token("hl-green"), blue: token("hl-blue"), pink: token("hl-pink"), purple: token("hl-purple") },
       },
       fontFamily: {
         // Loaded with next/font in app/layout.tsx (self-hosted, no layout shift).

@@ -2,31 +2,43 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Bookmark, ChevronDown, ChevronLeft, ChevronRight, NotebookPen } from "lucide-react";
 import { Alert } from "@/components/ui/Alert";
+import { showToast } from "@/components/ui/Toaster";
 import { BOOKS, bookIndexByName, nextChapter, previousChapter, readerHref, type BookText, type ChapterRef } from "@/lib/bible/books";
-import { formatReference, type Reference } from "@/lib/bible/reference";
+import { formatReference, verseRanges, type Reference } from "@/lib/bible/reference";
 import { VERSIONS, versionById } from "@/lib/bible/versions";
 import { BookLoadError, loadBook } from "@/lib/bible/load-book";
 import { readLastPlace, writeLastPlace } from "@/lib/bible/reader-prefs";
+import type { ChapterNote, HighlightColor } from "@/lib/bible/annotations";
 import { PassagePicker } from "./PassagePicker";
 import { VerseText } from "./VerseText";
+import { HIGHLIGHT_BG, VerseActionBar } from "./VerseActionBar";
+import { NoteDialog } from "./NoteDialog";
+import { ChapterNotes } from "./ChapterNotes";
+import { useChapterAnnotations } from "./useChapterAnnotations";
 
 const JOHN = BOOKS.findIndex((b) => b.name === "John");
 
 type Load = { status: "loading" } | { status: "ready"; book: BookText } | { status: "error"; offline: boolean };
+type NoteEditor = { noteId?: string; verse: number | null; initialText: string } | null;
 
 /**
  * The Bible reader. The passage lives in the URL (?v=web&book=John&chapter=3&verse=16),
  * so links, refresh and the browser Back button all work. Moving between
  * chapters updates the URL with history.pushState — no server round trip —
  * and the text comes from the static files in public/bibles/.
+ *
+ * Tapping verses selects them and shows the action bar (highlight, bookmark,
+ * note, copy, share). Highlights, bookmarks and notes are the member's own,
+ * loaded per chapter through server actions (useChapterAnnotations).
  */
 export function BibleReader() {
   const params = useSearchParams();
   const version = versionById(params.get("v"));
   const requestedBook = bookIndexByName(params.get("book"));
   const bookIndex = requestedBook >= 0 ? requestedBook : JOHN;
+  const bookName = BOOKS[bookIndex].name;
   const chapter = clamp(Number(params.get("chapter")) || 1, 1, BOOKS[bookIndex].chapters);
   const verse = Number(params.get("verse")) || undefined;
   const verseEnd = Number(params.get("to")) || undefined;
@@ -34,6 +46,9 @@ export function BibleReader() {
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [selected, setSelected] = useState<number[]>([]);
+  const [noteEditor, setNoteEditor] = useState<NoteEditor>(null);
+  const annotations = useChapterAnnotations(bookName, chapter, true);
 
   const go = useCallback(
     (to: Partial<Reference> & { versionId?: string }, { replace = false } = {}) => {
@@ -62,18 +77,19 @@ export function BibleReader() {
 
   useEffect(() => {
     writeLastPlace({ versionId: version.id, bookIndex, chapter });
+    setSelected([]);
   }, [version.id, bookIndex, chapter]);
 
   useEffect(() => {
     let cancelled = false;
-    setLoad((current) => (current.status === "ready" && current.book.book === BOOKS[bookIndex].name ? current : { status: "loading" }));
+    setLoad((current) => (current.status === "ready" && current.book.book === bookName ? current : { status: "loading" }));
     loadBook(version.id, bookIndex)
       .then((book) => !cancelled && setLoad({ status: "ready", book }))
       .catch((error) => !cancelled && setLoad({ status: "error", offline: error instanceof BookLoadError && error.offline }));
     return () => {
       cancelled = true;
     };
-  }, [version.id, bookIndex, attempt]);
+  }, [version.id, bookIndex, bookName, attempt]);
 
   // Jump to the requested verse once its chapter is on screen.
   const ready = load.status === "ready";
@@ -85,24 +101,72 @@ export function BibleReader() {
   const previous = previousChapter({ bookIndex, chapter });
   const next = nextChapter({ bookIndex, chapter });
 
-  // ← and → move between chapters, unless someone is typing or a popup is open.
+  // ← and → move between chapters; Escape clears a selection. Not while
+  // typing or while a popup is open.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || pickerOpen) return;
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || pickerOpen || noteEditor) return;
       const target = e.target as HTMLElement;
       if (target.closest("input, textarea, select, [contenteditable], dialog")) return;
       if (e.key === "ArrowLeft" && previous) go(previous);
       if (e.key === "ArrowRight" && next) go(next);
+      if (e.key === "Escape") setSelected([]);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [previous, next, go, pickerOpen]);
+  }, [previous, next, go, pickerOpen, noteEditor]);
 
   const title = formatReference({ bookIndex, chapter });
   const verses = load.status === "ready" ? load.book.chapters[chapter - 1] ?? [] : [];
+  const a = annotations.state.status === "ready" ? annotations.state.data : null;
+  const notedVerses = new Set(a?.notes.map((n) => n.verse) ?? []);
+
+  function toggle(n: number) {
+    setSelected((s) => (s.includes(n) ? s.filter((v) => v !== n) : [...s, n].sort((x, y) => x - y)));
+  }
+
+  const selectionLabel = `${bookName} ${chapter}:${verseRanges(selected)}`;
+  const selectedColors = new Set(selected.map((n) => a?.highlights[n] ?? null));
+  const activeColor = selectedColors.size === 1 ? ([...selectedColors][0] as HighlightColor | null) : null;
+  const allBookmarked = Boolean(a) && selected.length > 0 && selected.every((n) => a!.bookmarks.includes(n));
+
+  function passageText() {
+    const words = selected.map((n) => verses[n - 1]?.replace(/[[\]]/g, "")).filter(Boolean).join(" ");
+    return `“${words}” ${selectionLabel} (${version.abbreviation})`;
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(passageText());
+      showToast("Copied.");
+      setSelected([]);
+    } catch {
+      showToast("Couldn't copy on this device. Select the text and copy it instead.", "error");
+    }
+  }
+
+  async function share() {
+    const text = passageText();
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: selectionLabel, text });
+        setSelected([]);
+      } catch (error) {
+        // Closing the share sheet isn't an error.
+        if ((error as Error).name !== "AbortError") showToast("Couldn't open sharing. Try Copy instead.", "error");
+      }
+    } else {
+      await copy();
+    }
+  }
+
+  function openNoteFor(verseNumber: number | null, existing?: ChapterNote) {
+    const note = existing ?? a?.notes.find((n) => n.verse === verseNumber);
+    setNoteEditor(note ? { noteId: note.id, verse: note.verse, initialText: note.note } : { verse: verseNumber, initialText: "" });
+  }
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className={`mx-auto max-w-2xl ${selected.length ? "pb-56 md:pb-40" : ""}`}>
       {/* Toolbar: sticks under the phone header (57px) or to the top on desktop. */}
       <div className="card-elevated sticky top-[65px] z-10 mb-8 flex items-center gap-1 rounded-2xl bg-surface/95 p-1.5 backdrop-blur md:top-4">
         <ChapterButton target={previous} direction="previous" onGo={go} />
@@ -149,6 +213,21 @@ export function BibleReader() {
         </h1>
         <div className="rule-gold mb-6 mt-3" />
 
+        {annotations.state.status === "error" && load.status === "ready" && (
+          <p className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink/60" role="status">
+            {annotations.state.message}
+            {annotations.state.signedOut ? (
+              <a className="link" href={`/login?next=${encodeURIComponent(readerHref({ versionId: version.id, bookIndex, chapter }))}`}>
+                Sign in
+              </a>
+            ) : (
+              <button type="button" className="link" onClick={annotations.retry}>
+                Try again
+              </button>
+            )}
+          </p>
+        )}
+
         {load.status === "loading" && <ChapterSkeleton />}
 
         {load.status === "error" && (
@@ -168,30 +247,66 @@ export function BibleReader() {
         )}
 
         {load.status === "ready" && (
-          <div className="space-y-2.5 text-[17px] leading-[1.8] text-ink/90">
-            {verses.map((text, i) => {
-              const n = i + 1;
-              const focused = verse !== undefined && n >= verse && n <= (verseEnd ?? verse);
-              return (
-                <p
-                  key={`${version.id}-${bookIndex}-${chapter}-${n}`}
-                  id={`v${n}`}
-                  className={`scroll-mt-40 rounded-lg px-1.5 -mx-1.5 ${focused ? "bg-gold/15" : ""}`}
-                >
-                  <sup className="tabular mr-1.5 text-[0.68em] font-semibold text-gold">{n}</sup>
-                  {text ? (
-                    <VerseText text={text} />
-                  ) : (
-                    <span className="text-[0.88em] italic text-ink/50">
-                      This verse isn&apos;t in the {version.abbreviation} text. Older versions such as the KJV include it.
-                    </span>
-                  )}
-                </p>
-              );
-            })}
-          </div>
+          <>
+            <p className="sr-only">Select a verse to highlight, bookmark, add a note, copy or share it.</p>
+            <div className="space-y-1.5 text-[17px] leading-[1.8] text-ink/90">
+              {verses.map((text, i) => {
+                const n = i + 1;
+                const color = a?.highlights[n];
+                const focused = verse !== undefined && n >= verse && n <= (verseEnd ?? verse);
+                const isSelected = selected.includes(n);
+                const bookmarked = a?.bookmarks.includes(n);
+                const noted = notedVerses.has(n);
+                return (
+                  <p
+                    key={`${version.id}-${bookIndex}-${chapter}-${n}`}
+                    id={`v${n}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isSelected}
+                    onClick={() => toggle(n)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        toggle(n);
+                      }
+                    }}
+                    className={`-mx-2 cursor-pointer scroll-mt-40 rounded-lg px-2 py-0.5 ${color ? HIGHLIGHT_BG[color] : focused ? "bg-gold/15" : "hover:bg-ink/[0.03]"} ${
+                      isSelected ? "underline decoration-ember/70 decoration-dotted decoration-2 underline-offset-[5px]" : ""
+                    }`}
+                  >
+                    <sup className="tabular mr-1.5 text-[0.68em] font-semibold text-gold">{n}</sup>
+                    {bookmarked && (
+                      <>
+                        <Bookmark aria-hidden className="mr-1 inline h-3.5 w-3.5 -translate-y-px fill-current text-gold" />
+                        <span className="sr-only">Bookmarked. </span>
+                      </>
+                    )}
+                    {color && <span className="sr-only">Highlighted {color}. </span>}
+                    {text ? (
+                      <VerseText text={text} />
+                    ) : (
+                      <span className="text-[0.88em] italic text-ink/50">
+                        This verse isn&apos;t in the {version.abbreviation} text. Older versions such as the KJV include it.
+                      </span>
+                    )}
+                    {noted && (
+                      <>
+                        <NotebookPen aria-hidden className="ml-1.5 inline h-3.5 w-3.5 -translate-y-px text-ink/45" />
+                        <span className="sr-only"> Has a note.</span>
+                      </>
+                    )}
+                  </p>
+                );
+              })}
+            </div>
+          </>
         )}
       </article>
+
+      {load.status === "ready" && a && (
+        <ChapterNotes notes={a.notes} chapterLabel={title} onAdd={() => openNoteFor(null)} onEdit={(n) => openNoteFor(n.verse, n)} />
+      )}
 
       <nav aria-label="Chapters" className="mt-10 grid grid-cols-2 gap-3">
         {previous ? (
@@ -213,6 +328,43 @@ export function BibleReader() {
       <p className="mt-8 text-xs text-ink/45">
         {version.name} ({version.abbreviation}, {version.year}). {version.licence}.
       </p>
+
+      {selected.length > 0 && (
+        <VerseActionBar
+          label={selectionLabel}
+          annotationsReady={Boolean(a)}
+          unavailableReason={annotations.state.status === "error" ? annotations.state.message : "Loading your highlights…"}
+          activeColor={activeColor}
+          anyHighlighted={selected.some((n) => a?.highlights[n])}
+          allBookmarked={allBookmarked}
+          onHighlight={(color) => {
+            annotations.highlight(selected, color);
+            setSelected([]);
+          }}
+          onBookmark={() => {
+            annotations.bookmark(selected, !allBookmarked);
+            setSelected([]);
+          }}
+          onNote={() => openNoteFor(selected[0])}
+          onCopy={copy}
+          onShare={share}
+          onClear={() => setSelected([])}
+        />
+      )}
+
+      <NoteDialog
+        open={noteEditor !== null}
+        title={noteEditor?.verse ? `Note on ${bookName} ${chapter}:${noteEditor.verse}` : `Note on ${title}`}
+        initialText={noteEditor?.initialText ?? ""}
+        canDelete={Boolean(noteEditor?.noteId)}
+        onSave={async (text) => {
+          const problem = await annotations.writeNote({ id: noteEditor?.noteId, verse: noteEditor?.verse ?? null, note: text });
+          if (!problem) setSelected([]);
+          return problem;
+        }}
+        onDelete={() => (noteEditor?.noteId ? annotations.removeNote(noteEditor.noteId) : Promise.resolve(false))}
+        onClose={() => setNoteEditor(null)}
+      />
 
       <PassagePicker
         open={pickerOpen}

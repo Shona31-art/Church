@@ -90,3 +90,15 @@ export function formatReference({ bookIndex, chapter, verse, verseEnd }: Referen
   if (verse && verseEnd && verseEnd > verse) text += `-${verseEnd}`;
   return text;
 }
+
+/** [16, 17, 18, 20] → "16-18, 20" */
+export function verseRanges(verses: number[]): string {
+  const parts: string[] = [];
+  for (let i = 0; i < verses.length; i++) {
+    let j = i;
+    while (j + 1 < verses.length && verses[j + 1] === verses[j] + 1) j++;
+    parts.push(j > i ? `${verses[i]}-${verses[j]}` : String(verses[i]));
+    i = j;
+  }
+  return parts.join(", ");
+}

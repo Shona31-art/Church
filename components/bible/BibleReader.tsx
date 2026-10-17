@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ChevronDown, ChevronLeft, ChevronRight, Type } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, ChevronLeft, ChevronRight, Search, Type } from "lucide-react";
 import { Alert } from "@/components/ui/Alert";
 import { BackLink } from "@/components/ui/PageHeader";
 import { showToast } from "@/components/ui/Toaster";
@@ -203,7 +204,13 @@ export function BibleReader() {
 
   return (
     <div className={`mx-auto max-w-2xl ${selected.length ? "pb-56 md:pb-40" : ""}`}>
-      <BackLink href="/dashboard/bible" label="Bible" />
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <BackLink href="/dashboard/bible" label="Bible" className="" />
+        <Link href={`/dashboard/bible/search?v=${version.id}`} className="btn-ghost btn-sm">
+          <Search aria-hidden className="h-4 w-4" />
+          Search
+        </Link>
+      </div>
       {/* Toolbar: sticks under the phone header (57px) or to the top on desktop. */}
       <div className="card-elevated sticky top-[65px] z-10 mb-8 flex items-center gap-1 rounded-2xl bg-surface/95 p-1.5 backdrop-blur md:top-4">
         <ChapterButton target={previous} direction="previous" onGo={go} />

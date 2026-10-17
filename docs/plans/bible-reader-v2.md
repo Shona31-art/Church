@@ -1,6 +1,6 @@
 # Plan: Bible reader v2
 
-Status: **approved 2026-10-17**, in progress. Decision record:
+Status: **built 2026-10-17** (steps 1–7 on `dev`; awaiting device testing). Decision record:
 [`docs/adr/0001-bible-text-hosting-and-offline.md`](../adr/0001-bible-text-hosting-and-offline.md).
 
 ## Agreed scope

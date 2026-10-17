@@ -59,7 +59,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Everything except static files, images and the Stripe webhook (which has
-  // no user session and verifies its own signature).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/stripe/webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // Everything except static files, images, the Stripe webhook (which has
+  // no user session and verifies its own signature) and the public-domain
+  // Bible text in /bibles/ — no personal data, and a session check on each of
+  // the 66 files would slow reading and break offline downloads.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/stripe/webhook|bibles/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };

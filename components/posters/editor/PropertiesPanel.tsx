@@ -51,6 +51,9 @@ export function PropertiesPanel({
       {element.type === "shape" && <ShapeSettings element={element} onChange={onChange} />}
       {element.type === "image" && <ImageSettings element={element} onChange={onChange} />}
       {element.type === "group" && <GroupSettings element={element} onChildChange={onChildChange} />}
+      {element.type === "icon" && (
+        <ColorField label="Colour" id="prop-icon-fill" value={element.fill} onChange={(fill) => onChange({ fill } as Partial<PosterElement>, `${element.id}:fill`)} />
+      )}
 
       <fieldset className="space-y-3 border-t border-line pt-4">
         <legend className="eyebrow mb-2">Position and size</legend>

@@ -5,9 +5,10 @@ import Link from "next/link";
 import type Konva from "konva";
 import { ChevronLeft, Download, ImageIcon, Layers, Plus, Redo2, SlidersHorizontal, Undo2, ZoomIn, ZoomOut } from "lucide-react";
 import { showToast } from "@/components/ui/Toaster";
-import { savePosterDesign } from "@/app/dashboard/posters/editor-actions";
-import { POSTER_SIZES, POSTER_SIZE_KEYS, type PosterDesign, type PosterElement, type PosterSize, type TextElement } from "@/lib/posters/design";
-import { addElement, createShape, createSpeaker, createText, duplicateElement, findElement, newId, removeElement, reorderElement, updateChild, updateElement } from "@/lib/posters/elements";
+import { requestThumbnailUpload, savePosterDesign, setPosterThumbnail } from "@/app/dashboard/posters/editor-actions";
+import { createClient } from "@/lib/supabase/client";
+import { POSTER_SIZES, POSTER_SIZE_KEYS, PosterDesignSchema, type PosterDesign, type PosterElement, type PosterSize, type TextElement } from "@/lib/posters/design";
+import { addElement, createIcon, createShape, createSpeaker, createText, duplicateElement, findElement, newId, removeElement, reorderElement, updateChild, updateElement } from "@/lib/posters/elements";
 import { createHistory, recordCoalesced, redo, undo } from "@/lib/posters/history";
 import { resizeDesign } from "@/lib/posters/layout";
 import { DEFAULT_FONT, fontsInDesign, loadFonts } from "@/lib/posters/fonts";
@@ -16,6 +17,39 @@ import { PropertiesPanel } from "./PropertiesPanel";
 import { InsertPanel, LayersPanel } from "./SidePanels";
 import { PhotosPanel, type PhotoChoice } from "./PhotosPanel";
 import { TextEditOverlay } from "./TextEditOverlay";
+
+// Unsaved work is kept on this device so a closed tab, crash or expired
+// session never loses a poster. Keyed by poster (or "new"); a draft is only
+// offered back if it was based on the version that's being opened.
+interface Draft {
+  design: unknown;
+  title: string;
+  baseUpdatedAt: string | null;
+  savedAt: number;
+}
+const draftKey = (posterId: string | null) => `poster-draft:${posterId ?? "new"}`;
+function readDraft(posterId: string | null): Draft | null {
+  try {
+    const draft = JSON.parse(localStorage.getItem(draftKey(posterId)) ?? "null") as Draft | null;
+    return draft && typeof draft.title === "string" && typeof draft.savedAt === "number" ? draft : null;
+  } catch {
+    return null;
+  }
+}
+function writeDraft(posterId: string | null, draft: Draft) {
+  try {
+    localStorage.setItem(draftKey(posterId), JSON.stringify(draft));
+  } catch {
+    // storage full or blocked: recovery is a safety net, not required
+  }
+}
+function clearDraft(posterId: string | null) {
+  try {
+    localStorage.removeItem(draftKey(posterId));
+  } catch {
+    // ignore
+  }
+}
 
 type Panel = "add" | "photos" | "layers" | "edit";
 type RailTab = "add" | "photos" | "layers";
@@ -60,7 +94,10 @@ export function Editor({
   const [conflict, setConflict] = useState(false);
   const [fontVersion, setFontVersion] = useState(0);
   const saved = useRef({ design: initialDesign, title: initialTitle });
+  const [recoverable, setRecoverable] = useState<{ design: PosterDesign; title: string; savedAt: number } | null>(null);
   const lastChange = useRef({ key: "", at: 0 });
+  // The latest preview maker (it reads the current zoom), for use inside the memoised save.
+  const makeThumbnail = useRef<(id: string) => void>(() => undefined);
   const stageRef = useRef<Konva.Stage>(null);
   const canvasArea = useRef<HTMLDivElement>(null);
 
@@ -99,6 +136,24 @@ export function Editor({
       cancelled = true;
     };
   }, [fontKey]);
+
+  // Offer back unsaved work from a previous visit (only if it's based on this version).
+  useEffect(() => {
+    const draft = readDraft(initialPosterId);
+    if (!draft || draft.baseUpdatedAt !== initialUpdatedAt) return;
+    const design = PosterDesignSchema.safeParse(draft.design);
+    if (!design.success) return clearDraft(initialPosterId);
+    if (JSON.stringify(design.data) === JSON.stringify(initialDesign) && draft.title === initialTitle) return clearDraft(initialPosterId);
+    setRecoverable({ design: design.data, title: draft.title, savedAt: draft.savedAt });
+    // Only when the editor opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!dirty || recoverable) return;
+    const timer = setTimeout(() => writeDraft(posterId, { design, title, baseUpdatedAt: updatedAt, savedAt: Date.now() }), 800);
+    return () => clearTimeout(timer);
+  }, [dirty, design, title, posterId, updatedAt, recoverable]);
 
   // Don't lose work by closing the tab.
   useEffect(() => {
@@ -193,12 +248,40 @@ export function Editor({
       setPosterId(res.id);
       setUpdatedAt(res.updatedAt);
       setConflict(false);
+      clearDraft(posterId);
+      clearDraft(res.id);
+      makeThumbnail.current(res.id);
       // Give a new poster its own address without reloading the editor.
       if (res.id !== posterId) window.history.replaceState(null, "", `/dashboard/posters/editor/${res.id}`);
       showToast(asCopy ? "Saved as a copy." : "Poster saved.");
     },
     [saving, design, posterId, title, updatedAt],
   );
+
+  /**
+   * Small JPEG preview for the posters list, made after each save. Best effort:
+   * a failure only means the list shows the poster's name instead.
+   */
+  async function updateThumbnail(id: string) {
+    const stage = stageRef.current;
+    if (!stage) return;
+    try {
+      const handles = stage.findOne(".transformer");
+      handles?.hide();
+      const dataUrl = stage.toDataURL({ pixelRatio: 480 / (design.width * scale), mimeType: "image/jpeg", quality: 0.8 });
+      handles?.show();
+      const blob = await (await fetch(dataUrl)).blob();
+      const ticket = await requestThumbnailUpload(id);
+      if (!ticket.ok) return;
+      const { error } = await createClient().storage.from("poster-assets").uploadToSignedUrl(ticket.path, ticket.token, blob, { contentType: "image/jpeg" });
+      if (error) throw error;
+      await setPosterThumbnail(id, ticket.path);
+    } catch (error) {
+      console.error("[posters] preview image failed:", error);
+    }
+  }
+
+  makeThumbnail.current = updateThumbnail;
 
   async function download(type: "png" | "jpeg") {
     setSelectedId(null);
@@ -340,6 +423,35 @@ export function Editor({
         </div>
       </div>
 
+      {recoverable && (
+        <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-info-line bg-info-tint px-4 py-2.5 text-sm text-info">
+          <span>
+            You have unsaved changes to this poster from {new Date(recoverable.savedAt).toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" })}.
+          </span>
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            onClick={() => {
+              change(() => recoverable.design);
+              setTitle(recoverable.title);
+              setRecoverable(null);
+            }}
+          >
+            Restore them
+          </button>
+          <button
+            type="button"
+            className="btn-ghost btn-sm"
+            onClick={() => {
+              clearDraft(initialPosterId);
+              setRecoverable(null);
+            }}
+          >
+            Discard
+          </button>
+        </div>
+      )}
+
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         {/* Desktop left rail */}
         <aside className="hidden w-72 shrink-0 overflow-y-auto border-r border-line bg-surface p-4 lg:block" aria-label="Poster tools">
@@ -369,6 +481,7 @@ export function Editor({
               onAddPhotoSlot={() => addAndSelect(photoSlot(design))}
               onAddSpeaker={() => addAndSelect(createSpeaker(design, DEFAULT_FONT))}
               onOpenPhotos={() => setRailTab("photos")}
+              onAddIcon={(key) => addAndSelect(createIcon(design, key))}
             />
           )}
           {railTab === "photos" && <PhotosPanel targetLabel={photoTarget} onUse={usePhoto} onBackground={setBackgroundPhoto} onUrls={addUrls} />}
@@ -453,6 +566,7 @@ export function Editor({
                 onAddPhotoSlot={() => addAndSelect(photoSlot(design))}
                 onAddSpeaker={() => addAndSelect(createSpeaker(design, DEFAULT_FONT))}
                 onOpenPhotos={() => setPanel("photos")}
+                onAddIcon={(key) => addAndSelect(createIcon(design, key))}
               />
             )}
             {panel === "photos" && <PhotosPanel targetLabel={photoTarget} onUse={usePhoto} onBackground={setBackgroundPhoto} onUrls={addUrls} />}

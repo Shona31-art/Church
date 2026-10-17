@@ -1,11 +1,16 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { checkModuleAccess } from "@/lib/paywall";
-import { can } from "@/lib/permissions";
+import { can, isShepherd } from "@/lib/permissions";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { flash } from "@/lib/flash";
+import { POSTER_BUCKET } from "@/lib/posters/assets";
 import { DESIGN_VERSION, PosterDesignSchema, assetPaths, type PosterDesign } from "@/lib/posters/design";
 
 // Saving editable posters (Poster Studio v2). Re-checks session, plan
@@ -88,4 +93,100 @@ export async function savePosterDesign(input: { id?: string; title: string; expe
   revalidatePath("/dashboard/posters");
   revalidatePath(`/dashboard/posters/${id}`);
   return { ok: true, id: data.id, updatedAt: data.updated_at };
+}
+
+// ---------------------------------------------------------------------------
+// List previews (thumbnails) and duplicating
+// ---------------------------------------------------------------------------
+
+/** Loads a poster the signed-in person may edit (creator, or pastor/admin), or null. */
+async function editablePoster(id: string) {
+  const me = await getCurrentAppUser();
+  if (!me || !can(me.role, "makePosters") || !z.string().uuid().safeParse(id).success) return null;
+  const { data } = await createClient().from("posters").select("id, church_id, created_by, thumbnail_path").eq("id", id).eq("church_id", me.church_id).maybeSingle();
+  if (!data || (data.created_by !== me.id && !isShepherd(me.role))) return null;
+  return { me, poster: data };
+}
+
+/** Input: poster id. Returns a one-time signed upload URL for a new preview image of that poster. */
+export async function requestThumbnailUpload(posterId: string): Promise<{ ok: true; path: string; token: string } | { ok: false }> {
+  const found = await editablePoster(posterId);
+  if (!found) return { ok: false };
+  const path = `${found.poster.church_id}/thumbs/${posterId}-${randomUUID()}.jpg`;
+  const { data, error } = await createAdminClient().storage.from(POSTER_BUCKET).createSignedUploadUrl(path);
+  if (error || !data) {
+    console.error("[posters] thumbnail upload URL failed:", error?.message);
+    return { ok: false };
+  }
+  return { ok: true, path, token: data.token };
+}
+
+/** Input: poster id + the uploaded preview's path. Points the poster at it and deletes the previous preview. */
+export async function setPosterThumbnail(posterId: string, path: string): Promise<{ ok: boolean }> {
+  const found = await editablePoster(posterId);
+  if (!found || !path.startsWith(`${found.poster.church_id}/thumbs/${posterId}-`) || !/^[0-9a-f/-]+\.jpg$/.test(path)) return { ok: false };
+  const admin = createAdminClient();
+  const folder = `${found.poster.church_id}/thumbs`;
+  const name = path.slice(folder.length + 1);
+  const { data: exists } = await admin.storage.from(POSTER_BUCKET).list(folder, { search: name, limit: 1 });
+  if (!exists?.some((f) => f.name === name)) return { ok: false };
+
+  // RLS: only the creator or a pastor/admin can update the poster row.
+  const { error } = await createClient().from("posters").update({ thumbnail_path: path }).eq("id", posterId);
+  if (error) {
+    console.error("[posters] set thumbnail failed:", error.message);
+    return { ok: false };
+  }
+  if (found.poster.thumbnail_path && found.poster.thumbnail_path !== path) {
+    await admin.storage.from(POSTER_BUCKET).remove([found.poster.thumbnail_path]);
+  }
+  revalidatePath("/dashboard/posters");
+  return { ok: true };
+}
+
+/** Form action (poster page): copy a poster as a new one owned by the person copying it, then open it. */
+export async function duplicatePosterAction(formData: FormData): Promise<void> {
+  const me = await getCurrentAppUser();
+  if (!me) redirect("/login");
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  if (!id.success || !can(me.role, "makePosters") || !(await checkModuleAccess("ai_poster")).allowed) {
+    flash("You can't copy this poster.", "error");
+    redirect("/dashboard/posters");
+  }
+  const supabase = createClient();
+  const { data: original } = await supabase.from("posters").select("*").eq("id", id.data).eq("church_id", me.church_id).maybeSingle();
+  if (!original) {
+    flash("That poster no longer exists.", "error");
+    redirect("/dashboard/posters");
+  }
+  const title = `${original.title ?? original.event_title} (copy)`.slice(0, 120);
+  const { data: copy, error } = await supabase
+    .from("posters")
+    .insert({
+      church_id: me.church_id,
+      created_by: me.id,
+      title: original.design ? title : null,
+      event_title: title,
+      tagline: original.tagline,
+      speaker: original.speaker,
+      event_date: original.event_date,
+      location: original.location,
+      template_key: original.template_key,
+      theme_color: original.theme_color,
+      format: original.format,
+      design: original.design,
+      design_version: original.design_version,
+      width: original.width,
+      height: original.height,
+    })
+    .select("id, design_version")
+    .single();
+  if (error || !copy) {
+    console.error("[posters] duplicate failed:", error?.message);
+    flash("Couldn't copy the poster. Try again.", "error");
+    redirect(`/dashboard/posters/${id.data}`);
+  }
+  revalidatePath("/dashboard/posters");
+  flash("Copy made. You're editing the copy.");
+  redirect(copy.design_version ? `/dashboard/posters/editor/${copy.id}` : `/dashboard/posters/${copy.id}/edit`);
 }

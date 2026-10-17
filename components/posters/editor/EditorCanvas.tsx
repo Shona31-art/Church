@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Ellipse, Group, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from "react-konva";
+import { Ellipse, Group, Image as KonvaImage, Layer, Line, Path, Rect, Stage, Text, Transformer } from "react-konva";
 import type Konva from "konva";
 import type { ImageSource, PosterDesign, PosterElement } from "@/lib/posters/design";
 import { applyResize } from "@/lib/posters/elements";
 import { cssFontFamily } from "@/lib/posters/fonts";
+import { posterIcon } from "@/lib/posters/icons";
+import { snapBox } from "@/lib/posters/snapping";
 
 /**
  * Draws a poster design with Konva and handles direct manipulation: click to
@@ -44,6 +46,19 @@ export function EditorCanvas({
   const transformerRef = useRef<Konva.Transformer>(null);
   const nodes = useRef(new Map<string, Konva.Group>());
   const selected = design.elements.find((e) => e.id === selectedId);
+  const [guides, setGuides] = useState<{ vertical: number[]; horizontal: number[] }>({ vertical: [], horizontal: [] });
+
+  /** While dragging: pull the element into line with the poster and other elements, and show guides. */
+  function snapWhileDragging(id: string, node: Konva.Group) {
+    const layer = node.getLayer();
+    if (!layer) return;
+    const box = node.getClientRect({ relativeTo: layer });
+    const others = [...nodes.current.entries()].filter(([otherId]) => otherId !== id).map(([, n]) => n.getClientRect({ relativeTo: layer }));
+    // About 6 screen pixels, whatever the zoom.
+    const snap = snapBox(box, others, { width: design.width, height: design.height }, 6 / scale);
+    if (snap.dx || snap.dy) node.position({ x: node.x() + snap.dx, y: node.y() + snap.dy });
+    setGuides({ vertical: snap.vertical, horizontal: snap.horizontal });
+  }
 
   // Attach the resize/rotate handles to the selected element (not while typing, or if locked).
   useEffect(() => {
@@ -85,9 +100,19 @@ export function EditorCanvas({
             imageUrls={imageUrls}
             register={(node) => (node ? nodes.current.set(element.id, node) : nodes.current.delete(element.id))}
             onSelect={() => onSelect(element.id)}
-            onChange={(changes) => onChange(element.id, changes)}
+            onChange={(changes) => {
+              setGuides({ vertical: [], horizontal: [] });
+              onChange(element.id, changes);
+            }}
+            onDragMove={(node) => snapWhileDragging(element.id, node)}
             onStartEditText={() => onStartEditText(element.id)}
           />
+        ))}
+        {guides.vertical.map((x) => (
+          <Line key={`v${x}`} points={[x, 0, x, design.height]} stroke="#ff3d9a" strokeWidth={1 / scale} listening={false} />
+        ))}
+        {guides.horizontal.map((y) => (
+          <Line key={`h${y}`} points={[0, y, design.width, y]} stroke="#ff3d9a" strokeWidth={1 / scale} listening={false} />
         ))}
         {!readOnly && (
           <Transformer
@@ -145,6 +170,7 @@ function ElementNode({
   register,
   onSelect,
   onChange,
+  onDragMove,
   onStartEditText,
 }: {
   element: PosterElement;
@@ -154,6 +180,7 @@ function ElementNode({
   register: (node: Konva.Group | null) => void;
   onSelect: () => void;
   onChange: (changes: Partial<PosterElement>) => void;
+  onDragMove: (node: Konva.Group) => void;
   onStartEditText: () => void;
 }) {
   return (
@@ -170,6 +197,7 @@ function ElementNode({
       onTap={onSelect}
       onDblClick={element.type === "text" ? onStartEditText : undefined}
       onDblTap={element.type === "text" ? onStartEditText : undefined}
+      onDragMove={(e) => onDragMove(e.currentTarget as unknown as Konva.Group)}
       onDragEnd={(e) => onChange({ x: Math.round(e.target.x()), y: Math.round(e.target.y()) })}
       onTransformEnd={(e) => {
         const node = e.target;
@@ -223,9 +251,17 @@ function ElementShape({ element, imageUrls }: { element: PosterElement; imageUrl
     }
     case "image":
       return <ImageShape element={element} imageUrls={imageUrls} />;
-    case "icon":
-      // Decorative icons arrive in step 5; until then, a neutral marker keeps the layout visible.
-      return <Rect width={element.width} height={element.height} fill={withAlpha(element.fill, 0.25)} cornerRadius={8} />;
+    case "icon": {
+      // Icons are drawn on a 100 × 100 grid (lib/posters/icons.ts) and scaled to the element.
+      const icon = posterIcon(element.icon);
+      if (!icon) return <Rect width={element.width} height={element.height} fill={withAlpha(element.fill, 0.25)} cornerRadius={8} />;
+      return (
+        <>
+          <Rect width={element.width} height={element.height} fill="transparent" />
+          <Path data={icon.path} fill={element.fill} scaleX={element.width / 100} scaleY={element.height / 100} />
+        </>
+      );
+    }
     case "group":
       return (
         <>

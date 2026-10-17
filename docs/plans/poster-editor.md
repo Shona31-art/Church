@@ -1,6 +1,6 @@
 # Plan: Poster editor (Poster Studio v2)
 
-Status: **approved 2026-10-17**, in progress. Decision record:
+Status: **built 2026-10-17** (steps 1–5 on `dev`; awaiting real-device testing). Decision record:
 [`docs/adr/0003-poster-editor.md`](../adr/0003-poster-editor.md).
 
 ## Agreed scope

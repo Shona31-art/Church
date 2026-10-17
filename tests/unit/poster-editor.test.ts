@@ -230,3 +230,40 @@ describe("speaker blocks", () => {
     expect(PosterDesignSchema.safeParse(d).success).toBe(true);
   });
 });
+
+describe("snapping", () => {
+  test("centres snap to the poster's centre lines; nothing snaps when far away", async () => {
+    const { snapBox } = await import("@/lib/posters/snapping");
+    const poster = { width: 1080, height: 1080 };
+    const snap = snapBox({ x: 437, y: 100, width: 200, height: 50 }, [], poster, 8); // centre at 537, 3px from 540
+    expect(snap).toEqual({ dx: 3, dy: 0, vertical: [540], horizontal: [] });
+    expect(snapBox({ x: 300, y: 300, width: 100, height: 100 }, [], poster, 8)).toEqual({ dx: 0, dy: 0, vertical: [], horizontal: [] });
+  });
+
+  test("edges line up with other elements, choosing the nearest line", async () => {
+    const { snapBox } = await import("@/lib/posters/snapping");
+    const other = { x: 100, y: 700, width: 300, height: 80 };
+    const snap = snapBox({ x: 104, y: 795, width: 200, height: 40 }, [other], { width: 1080, height: 1080 }, 8);
+    expect(snap.dx).toBe(-4); // left edge to the other's left edge (100)
+    expect(snap.vertical).toEqual([100]);
+    expect(snap.dy).toBe(0); // 795 is 15 from 780 (too far), so no vertical snap
+    expect(snap.horizontal).toEqual([]);
+  });
+});
+
+describe("icons", () => {
+  test("13 original icons with unique keys and valid path data; a new icon is a valid element", async () => {
+    const { POSTER_ICONS } = await import("@/lib/posters/icons");
+    const { createIcon } = await import("@/lib/posters/elements");
+    expect(POSTER_ICONS).toHaveLength(13);
+    expect(new Set(POSTER_ICONS.map((i) => i.key)).size).toBe(13);
+    for (const icon of POSTER_ICONS) {
+      expect(icon.key).toMatch(/^[a-z0-9-]{1,40}$/); // the design schema's rule for icon keys
+      expect(icon.path).toMatch(/^M[\d .,a-zA-Z-]+$/);
+      expect(icon.path).not.toMatch(/NaN|Infinity/);
+    }
+    const d = addElement(blankDesign("square"), createIcon(blankDesign("square"), "dove"));
+    expect(PosterDesignSchema.safeParse(d).success).toBe(true);
+    expect(d.elements[0]).toMatchObject({ type: "icon", icon: "dove", fill: "#1b2a4a" });
+  });
+});

@@ -328,6 +328,7 @@ the Aperture default). Conventions every screen follows:
   Preview URL, not `pnpm dev`. Highlights and notes need a connection.
   The web app manifest has **no icons yet** (brand placeholder): add
   192×192 and 512×512 PNGs of the logo before launch.
+- **Poster editor**: built and type-checked, but not yet used on real phones or against real Supabase Storage/Pexels. No PDF export (PNG/JPG only) or landscape/projector size yet. A canvas can't be fully screen-reader friendly; the Layers list and properties panel give keyboard access to every element. Unsaved work is kept on the device that was editing (not synced). Stock photo search needs `PEXELS_API_KEY`; its per-person limit is per server instance.
 - **Error tracking:** only server `console.error` logs. Add a Vercel log drain
   (or a free Sentry tier) before launch.
 - **Stripe** is unverified against a real test account.

@@ -1,4 +1,5 @@
-import type { PosterDesign, PosterElement, ShapeElement, TextElement } from "./design";
+import type { IconElement, PosterDesign, PosterElement, ShapeElement, TextElement } from "./design";
+import { posterIcon } from "./icons";
 
 // Operations on a design's elements, used by the editor. Pure functions that
 // return a new design, so every change can go into undo history.
@@ -62,6 +63,24 @@ export function createShape(design: PosterDesign, shape: ShapeElement["shape"]):
     stroke: isLine ? "#c9aa6a" : null,
     strokeWidth: isLine ? Math.max(4, Math.round(side / 40)) : 0,
     cornerRadius: 0,
+  };
+}
+
+/** A decorative icon, gold on dark posters and navy on light ones. */
+export function createIcon(design: PosterDesign, key: string): IconElement {
+  const side = Math.round(Math.min(design.width, design.height) * 0.18);
+  return {
+    id: newId("icon"),
+    type: "icon",
+    name: posterIcon(key)?.label ?? "Icon",
+    icon: key,
+    x: Math.round((design.width - side) / 2),
+    y: Math.round((design.height - side) / 2),
+    width: side,
+    height: side,
+    rotation: 0,
+    opacity: 1,
+    fill: luminance(design.background.color) > 0.5 ? "#1b2a4a" : "#c9aa6a",
   };
 }
 

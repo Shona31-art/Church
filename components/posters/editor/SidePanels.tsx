@@ -4,6 +4,7 @@ import { Circle, ImageIcon, Lock, Minus, Square, Triangle, Type, UserRound } fro
 import type { PosterDesign, ShapeElement } from "@/lib/posters/design";
 import { TEXT_PRESETS } from "@/lib/posters/elements";
 import { labelFor } from "./PropertiesPanel";
+import { POSTER_ICONS } from "@/lib/posters/icons";
 
 /** "Add" tools: text presets, shapes and an empty photo slot. */
 export function InsertPanel({
@@ -12,12 +13,14 @@ export function InsertPanel({
   onAddPhotoSlot,
   onAddSpeaker,
   onOpenPhotos,
+  onAddIcon,
 }: {
   onAddText: (preset: keyof typeof TEXT_PRESETS) => void;
   onAddShape: (shape: ShapeElement["shape"]) => void;
   onAddPhotoSlot: () => void;
   onAddSpeaker: () => void;
   onOpenPhotos: () => void;
+  onAddIcon: (key: string) => void;
 }) {
   return (
     <div className="space-y-5">
@@ -63,6 +66,29 @@ export function InsertPanel({
             </button>
           ))}
         </div>
+      </section>
+
+      <section aria-labelledby="insert-icons">
+        <h2 id="insert-icons" className="eyebrow mb-2">
+          Icons
+        </h2>
+        <ul className="grid grid-cols-5 gap-1.5">
+          {POSTER_ICONS.map((icon) => (
+            <li key={icon.key}>
+              <button
+                type="button"
+                onClick={() => onAddIcon(icon.key)}
+                aria-label={`Add ${icon.label.toLowerCase()} icon`}
+                title={icon.label}
+                className="flex aspect-square w-full items-center justify-center rounded-xl border border-line bg-surface p-1.5 hover:border-line-strong hover:bg-surface-raised"
+              >
+                <svg viewBox="0 0 100 100" aria-hidden className="h-full w-full fill-ink/70">
+                  <path d={icon.path} />
+                </svg>
+              </button>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section aria-labelledby="insert-photo">

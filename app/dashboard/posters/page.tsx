@@ -13,6 +13,8 @@ import { Alert } from "@/components/ui/Alert";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { PosterPreview } from "./PosterCanvas";
 import { NAV_ICONS } from "@/components/ui/NavIcon";
+import Image from "next/image";
+import { signPosterAssets } from "@/lib/posters/assets";
 
 export default async function PostersPage({ searchParams }: { searchParams: { page?: string } }) {
   const gate = await moduleGate("ai_poster");
@@ -26,7 +28,7 @@ export default async function PostersPage({ searchParams }: { searchParams: { pa
   const [{ data, error }, { data: church }] = await Promise.all([
     supabase
       .from("posters")
-      .select("id, title, event_title, tagline, speaker, event_date, location, template_key, theme_color, format, design_version, width, height, created_at")
+      .select("id, title, event_title, tagline, speaker, event_date, location, template_key, theme_color, format, design_version, width, height, thumbnail_path, created_at")
       .eq("church_id", me.church_id)
       .order("created_at", { ascending: false })
       .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE),
@@ -35,6 +37,8 @@ export default async function PostersPage({ searchParams }: { searchParams: { pa
   if (error) console.error("[posters] list failed:", error.message);
 
   const posters = (data ?? []).slice(0, PAGE_SIZE);
+  // Preview images live in the private bucket: short-lived links, this church only.
+  const thumbs = await signPosterAssets(posters.flatMap((p) => (p.thumbnail_path ? [p.thumbnail_path] : [])), me.church_id!);
   // "New design" opens the template gallery; "Quick poster" is the original fixed-layout maker.
   const newButton = (
     <>
@@ -64,8 +68,17 @@ export default async function PostersPage({ searchParams }: { searchParams: { pa
           {posters.map((p) => (
             <li key={p.id}>
               <Link href={`/dashboard/posters/${p.id}`} className="block card-interactive rounded-xl p-2">
-                {p.design_version ? (
-                  // Editor designs: a real preview image arrives with list thumbnails (plan step 5).
+                {p.design_version && p.thumbnail_path && thumbs[p.thumbnail_path] ? (
+                  <Image
+                    src={thumbs[p.thumbnail_path]}
+                    alt=""
+                    width={480}
+                    height={Math.round((480 * (p.height ?? 1)) / (p.width ?? 1))}
+                    unoptimized
+                    className="w-full rounded-lg border border-line bg-surface-raised"
+                  />
+                ) : p.design_version ? (
+                  // No preview yet (saved before previews existed, or the preview failed): show the name.
                   <div
                     className="flex items-center justify-center rounded-lg border border-line bg-surface-raised px-3 text-center"
                     style={{ aspectRatio: `${p.width ?? 1} / ${p.height ?? 1}` }}

@@ -12,6 +12,7 @@ import { DeletePosterButton } from "../DeletePosterButton";
 import { PosterDesignSchema, assetPaths } from "@/lib/posters/design";
 import { signPosterAssets } from "@/lib/posters/assets";
 import { PosterViewer } from "@/components/posters/editor/PosterViewer";
+import { duplicatePosterAction } from "../editor-actions";
 
 export default async function PosterDetailPage({ params }: { params: { id: string } }) {
   const gate = await moduleGate("ai_poster");
@@ -34,12 +35,22 @@ export default async function PosterDetailPage({ params }: { params: { id: strin
         back={{ href: "/dashboard/posters", label: "Poster Studio" }}
         title={title}
         actions={
-          canManage ? (
+          can(me.role, "makePosters") ? (
             <>
+              <form action={duplicatePosterAction}>
+                <input type="hidden" name="id" value={poster.id} />
+                <button type="submit" className="btn-secondary">
+                  Duplicate
+                </button>
+              </form>
+              {canManage && (
+              <>
               <Link href={design ? `/dashboard/posters/editor/${poster.id}` : `/dashboard/posters/${poster.id}/edit`} className="btn-secondary">
                 Edit
               </Link>
               <DeletePosterButton id={poster.id} title={title} />
+              </>
+              )}
             </>
           ) : null
         }

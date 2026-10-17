@@ -8,6 +8,7 @@ import { Plus, Search } from "lucide-react";
 import { POSTER_SIZES, POSTER_SIZE_KEYS, type PosterSize } from "@/lib/posters/design";
 import { OCCASIONS, POSTER_TEMPLATES, templateDesign, type Occasion } from "@/lib/posters/templates";
 import { fontsInDesign, loadFonts } from "@/lib/posters/fonts";
+import { POSTER_STYLES, applyStyle, type PosterStyleKey } from "@/lib/posters/styles";
 
 const EditorCanvas = dynamic(() => import("./editor/EditorCanvas").then((m) => m.EditorCanvas), { ssr: false });
 
@@ -21,10 +22,14 @@ export function TemplateGallery() {
   const [occasion, setOccasion] = useState<Occasion | "All">("All");
   const [fontVersion, setFontVersion] = useState(0);
   const [query, setQuery] = useState("");
+  const [style, setStyle] = useState<PosterStyleKey | "original">("original");
 
   // Load every font the templates use once, then redraw the previews.
   useEffect(() => {
-    const names = POSTER_TEMPLATES.flatMap((t) => fontsInDesign(templateDesign(t.key, "square").elements));
+    const names = [
+      ...POSTER_TEMPLATES.flatMap((t) => fontsInDesign(templateDesign(t.key, "square").elements)),
+      ...POSTER_STYLES.flatMap((s) => [s.titleFont, s.bodyFont]),
+    ];
     loadFonts(names).then(() => setFontVersion((n) => n + 1));
   }, []);
 
@@ -74,6 +79,24 @@ export function TemplateGallery() {
         </fieldset>
       </div>
 
+      <fieldset>
+        <legend className="label">Style</legend>
+        <div className="flex flex-wrap gap-1.5">
+          {([{ key: "original", name: "Original", description: "As designed" }, ...POSTER_STYLES] as const).map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              aria-pressed={style === s.key}
+              onClick={() => setStyle(s.key)}
+              title={s.description}
+              className={`rounded-full border px-3 py-1 text-sm [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:px-4 ${style === s.key ? "border-ember bg-ember text-on-ember" : "border-line bg-surface text-ink/70 hover:border-line-strong"}`}
+            >
+              {s.name}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
       <div className="relative max-w-md">
         <label htmlFor="template-search" className="sr-only">
           Search templates
@@ -108,8 +131,8 @@ export function TemplateGallery() {
         </li>
         {shown.map((t) => (
           <li key={t.key}>
-            <Link href={`/dashboard/posters/editor/new?size=${size}&template=${t.key}`} className="card-interactive flex h-full flex-col rounded-xl p-2">
-              <TemplatePreview templateKey={t.key} size={size} fontVersion={fontVersion} />
+            <Link href={`/dashboard/posters/editor/new?size=${size}&template=${t.key}${style !== "original" ? `&style=${style}` : ""}`} className="card-interactive flex h-full flex-col rounded-xl p-2">
+              <TemplatePreview templateKey={t.key} size={size} style={style} fontVersion={fontVersion} />
               <span className="mt-2 px-1 text-sm font-semibold">{t.name}</span>
               <span className="px-1 text-xs text-ink/55">{t.description}</span>
             </Link>
@@ -120,12 +143,15 @@ export function TemplateGallery() {
   );
 }
 
-function TemplatePreview({ templateKey, size, fontVersion }: { templateKey: string; size: PosterSize; fontVersion: number }) {
+function TemplatePreview({ templateKey, size, style, fontVersion }: { templateKey: string; size: PosterSize; style: PosterStyleKey | "original"; fontVersion: number }) {
   const box = useRef<HTMLSpanElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const [visible, setVisible] = useState(false);
   const [boxWidth, setBoxWidth] = useState(0);
-  const design = useMemo(() => templateDesign(templateKey, size), [templateKey, size]);
+  const design = useMemo(() => {
+    const base = templateDesign(templateKey, size);
+    return style === "original" ? base : applyStyle(base, style);
+  }, [templateKey, size, style]);
 
   useEffect(() => {
     const el = box.current;

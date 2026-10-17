@@ -11,6 +11,7 @@ import { POSTER_SIZES, POSTER_SIZE_KEYS, PosterDesignSchema, type PosterDesign, 
 import { addElement, createIcon, createShape, createSpeaker, createText, duplicateElement, findElement, newId, removeElement, reorderElement, updateChild, updateElement } from "@/lib/posters/elements";
 import { createHistory, recordCoalesced, redo, undo } from "@/lib/posters/history";
 import { resizeDesign } from "@/lib/posters/layout";
+import { applyStyle, posterStyle } from "@/lib/posters/styles";
 import { DEFAULT_FONT, fontsInDesign, loadFonts } from "@/lib/posters/fonts";
 import { EditorCanvas } from "./EditorCanvas";
 import { PropertiesPanel } from "./PropertiesPanel";
@@ -531,6 +532,10 @@ export function Editor({
             onDuplicate={duplicateSelected}
             onDelete={deleteSelected}
             onReorder={(where) => selectedId && change((d) => reorderElement(d, selectedId, where))}
+            onApplyStyle={(key) => {
+              change((d) => applyStyle(d, key));
+              showToast(`${posterStyle(key)?.name} style applied. Undo (Ctrl+Z) to go back.`, "info");
+            }}
           />
         </aside>
 
@@ -581,6 +586,10 @@ export function Editor({
                 onDuplicate={duplicateSelected}
                 onDelete={deleteSelected}
                 onReorder={(where) => selectedId && change((d) => reorderElement(d, selectedId, where))}
+                onApplyStyle={(key) => {
+                  change((d) => applyStyle(d, key));
+                  showToast(`${posterStyle(key)?.name} style applied. Undo (Ctrl+Z) to go back.`, "info");
+                }}
               />
             )}
           </div>

@@ -292,3 +292,68 @@ describe("landscape", () => {
     expect([title.x, title.width]).toEqual([90, 900]);
   });
 });
+
+describe("style variations", () => {
+  const DECORATIVE = new Set(["Series number", "Quote mark"]);
+  const ratio = (a: string, b: string) => {
+    const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+  };
+  const mix = (fg: string, bg: string, a: number) => {
+    const p = (h: string, i: number) => parseInt(h.slice(i, i + 2), 16);
+    return "#" + [1, 3, 5].map((i) => Math.round(p(fg, i) * a + p(bg, i) * (1 - a)).toString(16).padStart(2, "0")).join("");
+  };
+
+  test("every template in every style and size is valid, fits, and meets WCAG AA (independent check)", async () => {
+    const { POSTER_TEMPLATES, templateDesign } = await import("@/lib/posters/templates");
+    const { POSTER_STYLES, applyStyle } = await import("@/lib/posters/styles");
+    const problems: string[] = [];
+    for (const t of POSTER_TEMPLATES) {
+      for (const size of ["square", "story", "landscape"] as const) {
+        const original = templateDesign(t.key, size);
+        for (const style of POSTER_STYLES) {
+          const d = applyStyle(original, style.key);
+          const tag = `${t.key}/${style.key}/${size}`;
+          if (!PosterDesignSchema.safeParse(d).success) problems.push(`${tag}: invalid design`);
+          if (d.elements.length !== original.elements.length) problems.push(`${tag}: elements changed`);
+          for (const e of d.elements) {
+            if (e.type !== "text" || DECORATIVE.has(e.name ?? "")) continue;
+            if (e.x < 0 || e.x + e.width > d.width + 1) problems.push(`${tag} "${e.name}": off the side`);
+            const cx = e.x + e.width / 2;
+            const cy = e.y + e.height / 2;
+            const bg = d.background;
+            let behind = [bg.gradient ? mix(bg.gradient.to, bg.gradient.from, cy / d.height) : bg.color];
+            for (const s of d.elements) {
+              if (s === e) break;
+              if (cx < s.x || cx > s.x + s.width || cy < s.y || cy > s.y + s.height) continue;
+              if (s.type === "shape" && s.fill && s.shape !== "line") behind = behind.map((b) => mix(s.fill!, b, s.opacity * s.fillOpacity));
+              if (s.type === "image" && s.overlay) behind = ["#9aa0aa", "#ffffff"].map((photo) => mix(s.overlay!.color, photo, s.overlay!.opacity));
+            }
+            const worst = Math.min(...behind.map((b) => ratio(e.fill, b)));
+            const unit = Math.min(d.width, d.height) / 1080;
+            const large = e.fontSize >= 48 * unit || (e.fontSize >= 37 * unit && e.fontWeight >= 700);
+            if (worst < (large ? 3 : 4.5)) problems.push(`${tag} "${e.name}": contrast ${worst.toFixed(2)}`);
+          }
+        }
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
+  test("a style keeps the text, photos and layout, and never enlarges text", async () => {
+    const { templateDesign } = await import("@/lib/posters/templates");
+    const { applyStyle } = await import("@/lib/posters/styles");
+    const original = templateDesign("guest-speaker", "square");
+    const neon = applyStyle(original, "neon");
+    neon.elements.forEach((e, i) => {
+      const o = original.elements[i];
+      expect([e.id, e.x, e.y, e.width]).toEqual([o.id, o.x, o.y, o.width]);
+      if (e.type === "text" && o.type === "text") {
+        expect(e.text).toBe(o.text);
+        expect(e.fontSize).toBeLessThanOrEqual(o.fontSize);
+      }
+      if (e.type === "image" && o.type === "image") expect(e.src).toEqual(o.src);
+    });
+    expect(neon.background.color).toBe("#07070d");
+  });
+});

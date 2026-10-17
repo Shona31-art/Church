@@ -3,6 +3,7 @@
 import { AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowUp, Copy, Lock, LockOpen, Trash2, type LucideIcon } from "lucide-react";
 import type { GroupElement, ImageElement, ImageSource, PosterDesign, PosterElement, ShapeElement, TextElement } from "@/lib/posters/design";
 import { POSTER_FONTS } from "@/lib/posters/fonts";
+import { POSTER_STYLES, type PosterStyleKey } from "@/lib/posters/styles";
 
 type Change = (changes: Partial<PosterElement>, key: string) => void;
 
@@ -21,6 +22,7 @@ export function PropertiesPanel({
   onDuplicate,
   onDelete,
   onReorder,
+  onApplyStyle,
 }: {
   design: PosterDesign;
   element: PosterElement | undefined;
@@ -31,8 +33,10 @@ export function PropertiesPanel({
   onDuplicate: () => void;
   onDelete: () => void;
   onReorder: (where: "forward" | "backward") => void;
+  /** Re-themes the whole poster (undoable). */
+  onApplyStyle: (key: PosterStyleKey) => void;
 }) {
-  if (!element) return <BackgroundSettings design={design} onChange={onBackgroundChange} />;
+  if (!element) return <BackgroundSettings design={design} onChange={onBackgroundChange} onApplyStyle={onApplyStyle} />;
 
   return (
     <div className="space-y-5">
@@ -299,11 +303,22 @@ function ShapeSettings({ element, onChange }: { element: ShapeElement; onChange:
   );
 }
 
-function BackgroundSettings({ design, onChange }: { design: PosterDesign; onChange: (bg: PosterDesign["background"], key: string) => void }) {
+function BackgroundSettings({ design, onChange, onApplyStyle }: { design: PosterDesign; onChange: (bg: PosterDesign["background"], key: string) => void; onApplyStyle: (key: PosterStyleKey) => void }) {
   const bg = design.background;
   return (
     <div className="space-y-4">
-      <h2 className="font-sans text-sm font-semibold">Background</h2>
+      <fieldset>
+        <legend className="font-sans text-sm font-semibold">Apply a style</legend>
+        <p className="hint mb-2 mt-0.5">Re-colours and re-fonts the whole poster. Your text and photos stay. Undo to go back.</p>
+        <div className="flex flex-wrap gap-1.5">
+          {POSTER_STYLES.map((s) => (
+            <button key={s.key} type="button" title={s.description} onClick={() => onApplyStyle(s.key)} className="btn-secondary btn-sm">
+              {s.name}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+      <h2 className="border-t border-line pt-4 font-sans text-sm font-semibold">Background</h2>
       <p className="text-sm text-ink/55">Select something on the poster to edit it, or change the background here.</p>
       <ColorField label="Colour" id="prop-bg" value={bg.color} onChange={(color) => onChange({ ...bg, color }, "bg:color")} />
       <label className="flex items-center gap-2 text-sm">

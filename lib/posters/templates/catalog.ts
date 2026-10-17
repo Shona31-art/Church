@@ -7,7 +7,7 @@ import { fullPhoto, photo, shape, text, type Frame } from "./kit";
 // (WEB, or KJV where noted). Each template is a function of the poster's
 // size (see kit.ts), so one definition serves square, portrait, story and A4.
 
-export type Occasion = "Services" | "Events" | "Seasons" | "Groups" | "General";
+export type Occasion = "Services" | "Events" | "Seasons" | "Celebrations" | "Groups" | "Outreach" | "Social posts" | "General";
 
 export interface TemplateDefinition {
   key: string;

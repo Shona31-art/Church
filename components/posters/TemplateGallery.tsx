@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type Konva from "konva";
-import { Plus } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { POSTER_SIZES, POSTER_SIZE_KEYS, type PosterSize } from "@/lib/posters/design";
 import { OCCASIONS, POSTER_TEMPLATES, templateDesign, type Occasion } from "@/lib/posters/templates";
 import { fontsInDesign, loadFonts } from "@/lib/posters/fonts";
@@ -20,6 +20,7 @@ export function TemplateGallery() {
   const [size, setSize] = useState<PosterSize>("square");
   const [occasion, setOccasion] = useState<Occasion | "All">("All");
   const [fontVersion, setFontVersion] = useState(0);
+  const [query, setQuery] = useState("");
 
   // Load every font the templates use once, then redraw the previews.
   useEffect(() => {
@@ -27,7 +28,12 @@ export function TemplateGallery() {
     loadFonts(names).then(() => setFontVersion((n) => n + 1));
   }, []);
 
-  const shown = POSTER_TEMPLATES.filter((t) => occasion === "All" || t.occasion === occasion);
+  const words = query.trim().toLowerCase().split(/s+/).filter(Boolean);
+  const shown = POSTER_TEMPLATES.filter(
+    (t) =>
+      (occasion === "All" || t.occasion === occasion) &&
+      words.every((w) => `${t.name} ${t.description} ${t.occasion}`.toLowerCase().includes(w)),
+  );
   const { width, height } = POSTER_SIZES[size];
 
   return (
@@ -67,6 +73,25 @@ export function TemplateGallery() {
           </div>
         </fieldset>
       </div>
+
+      <div className="relative max-w-md">
+        <label htmlFor="template-search" className="sr-only">
+          Search templates
+        </label>
+        <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" />
+        <input
+          id="template-search"
+          type="search"
+          className="input pl-9"
+          placeholder="Search templates, e.g. Easter, youth, concert"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
+      <p className="text-sm text-ink/55" role="status">
+        {shown.length} {shown.length === 1 ? "template" : "templates"}
+        {occasion !== "All" || words.length ? " match" : ""}
+      </p>
 
       <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         <li>

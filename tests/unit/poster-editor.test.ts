@@ -132,13 +132,13 @@ describe("templates and resizing", () => {
 });
 
 describe("template quality", () => {
-  test("16 templates, each using only bundled fonts, with every text box on the poster at every size", async () => {
+  test("42 templates, each using only bundled fonts, with every text box on the poster at every size", async () => {
     const { POSTER_TEMPLATES, templateDesign } = await import("@/lib/posters/templates");
     const { POSTER_FONTS } = await import("@/lib/posters/fonts");
     const { POSTER_SIZE_KEYS } = await import("@/lib/posters/design");
     const fonts = new Set(POSTER_FONTS.map((f) => f.name));
-    expect(POSTER_TEMPLATES).toHaveLength(16);
-    expect(new Set(POSTER_TEMPLATES.map((t) => t.key)).size).toBe(16);
+    expect(POSTER_TEMPLATES).toHaveLength(42);
+    expect(new Set(POSTER_TEMPLATES.map((t) => t.key)).size).toBe(42);
     const problems: string[] = [];
     for (const t of POSTER_TEMPLATES) {
       for (const size of POSTER_SIZE_KEYS) {
@@ -168,7 +168,7 @@ describe("template quality", () => {
 
 describe("template text contrast", () => {
   // Decorative watermark text (deliberately faint, never the only place information appears).
-  const DECORATIVE = new Set(["Series number"]);
+  const DECORATIVE = new Set(["Series number", "Quote mark"]);
   const ratio = (a: string, b: string) => {
     const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
     return (x + 0.05) / (y + 0.05);

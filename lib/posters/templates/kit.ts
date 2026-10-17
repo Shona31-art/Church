@@ -1,4 +1,4 @@
-import { POSTER_SIZES, type ImageElement, type PosterSize, type ShapeElement, type TextElement } from "../design";
+import { POSTER_SIZES, type IconElement, type ImageElement, type PosterSize, type ShapeElement, type TextElement } from "../design";
 
 // A small toolkit for writing templates that work at every poster size.
 //
@@ -140,4 +140,9 @@ export function photo(
 /** A full-bleed background photo slot with a darkening overlay so text stays readable. */
 export function fullPhoto(f: Frame, label: string, overlay: { color: string; opacity: number }): ImageElement {
   return photo(f, "background-photo", "Background photo", label, { x: 0, y: 0, w: 1080, hf: 1, overlay });
+}
+
+/** One of the original icons from lib/posters/icons.ts (key), e.g. "cross" or "flame". */
+export function icon(f: Frame, id: string, name: string, key: string, o: BoxOptions & { fill: string }): IconElement {
+  return { id, type: "icon", name, icon: key, ...box(f, o), fill: o.fill };
 }

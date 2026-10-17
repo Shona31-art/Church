@@ -9,6 +9,8 @@ import { normalizePosterStyle } from "@/lib/posters";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PosterPreview } from "../PosterCanvas";
 import { DeletePosterButton } from "../DeletePosterButton";
+import { PosterDesignSchema } from "@/lib/posters/design";
+import { PosterViewer } from "@/components/posters/editor/PosterViewer";
 
 export default async function PosterDetailPage({ params }: { params: { id: string } }) {
   const gate = await moduleGate("ai_poster");
@@ -20,23 +22,33 @@ export default async function PosterDetailPage({ params }: { params: { id: strin
   if (!poster) notFound();
 
   const canManage = can(me.role, "makePosters") && (poster.created_by === me.id || isShepherd(me.role));
+  // Editor posters (Poster Studio v2) carry a design; older ones use the fixed layouts.
+  const design = poster.design ? PosterDesignSchema.safeParse(poster.design) : null;
+  const title = poster.title ?? poster.event_title;
 
   return (
-    <div className="max-w-xl">
+    <div className={design ? "max-w-3xl" : "max-w-xl"}>
       <PageHeader
         back={{ href: "/dashboard/posters", label: "Poster Studio" }}
-        title={poster.event_title}
+        title={title}
         actions={
           canManage ? (
             <>
-              <Link href={`/dashboard/posters/${poster.id}/edit`} className="btn-secondary">
+              <Link href={design ? `/dashboard/posters/editor/${poster.id}` : `/dashboard/posters/${poster.id}/edit`} className="btn-secondary">
                 Edit
               </Link>
-              <DeletePosterButton id={poster.id} title={poster.event_title} />
+              <DeletePosterButton id={poster.id} title={title} />
             </>
           ) : null
         }
       />
+      {design ? (
+        design.success ? (
+          <PosterViewer design={design.data} title={title} />
+        ) : (
+          <p className="text-sm text-danger">This poster&apos;s design couldn&apos;t be read. Contact support and mention poster {poster.id}.</p>
+        )
+      ) : (
       <PosterPreview
         data={{
           churchName: poster.churches?.name ?? "",
@@ -48,6 +60,7 @@ export default async function PosterDetailPage({ params }: { params: { id: strin
           ...normalizePosterStyle(poster),
         }}
       />
+      )}
     </div>
   );
 }

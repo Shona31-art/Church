@@ -26,7 +26,7 @@ export default async function PostersPage({ searchParams }: { searchParams: { pa
   const [{ data, error }, { data: church }] = await Promise.all([
     supabase
       .from("posters")
-      .select("id, event_title, tagline, speaker, event_date, location, template_key, theme_color, format, created_at")
+      .select("id, title, event_title, tagline, speaker, event_date, location, template_key, theme_color, format, design_version, width, height, created_at")
       .eq("church_id", me.church_id)
       .order("created_at", { ascending: false })
       .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE),
@@ -35,10 +35,16 @@ export default async function PostersPage({ searchParams }: { searchParams: { pa
   if (error) console.error("[posters] list failed:", error.message);
 
   const posters = (data ?? []).slice(0, PAGE_SIZE);
+  // Until the template gallery (plan step 3), "New design" opens the sample template.
   const newButton = (
-    <Link href="/dashboard/posters/new" className="btn-primary">
-      New poster
-    </Link>
+    <>
+      <Link href="/dashboard/posters/new" className="btn-ghost">
+        Quick poster
+      </Link>
+      <Link href="/dashboard/posters/editor/new?template=worship-night" className="btn-primary">
+        New design
+      </Link>
+    </>
   );
 
   return (
@@ -58,6 +64,15 @@ export default async function PostersPage({ searchParams }: { searchParams: { pa
           {posters.map((p) => (
             <li key={p.id}>
               <Link href={`/dashboard/posters/${p.id}`} className="block card-interactive rounded-xl p-2">
+                {p.design_version ? (
+                  // Editor designs: a real preview image arrives with list thumbnails (plan step 5).
+                  <div
+                    className="flex items-center justify-center rounded-lg border border-line bg-surface-raised px-3 text-center"
+                    style={{ aspectRatio: `${p.width ?? 1} / ${p.height ?? 1}` }}
+                  >
+                    <span className="font-display text-base font-semibold text-ink/70">{p.title ?? p.event_title}</span>
+                  </div>
+                ) : (
                 <PosterPreview
                   showDownload={false}
                   data={{
@@ -70,7 +85,8 @@ export default async function PostersPage({ searchParams }: { searchParams: { pa
                     ...normalizePosterStyle(p),
                   }}
                 />
-                <p className="mt-2 px-1 text-sm font-medium truncate">{p.event_title}</p>
+                )}
+                <p className="mt-2 px-1 text-sm font-medium truncate">{p.title ?? p.event_title}</p>
                 <p className="px-1 text-xs text-ink/60">Made {formatDate(p.created_at, { weekday: undefined })}</p>
               </Link>
             </li>

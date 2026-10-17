@@ -1,0 +1,432 @@
+"use client";
+
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import Link from "next/link";
+import type Konva from "konva";
+import { ChevronLeft, Download, Layers, Plus, Redo2, SlidersHorizontal, Undo2, ZoomIn, ZoomOut } from "lucide-react";
+import { showToast } from "@/components/ui/Toaster";
+import { savePosterDesign } from "@/app/dashboard/posters/editor-actions";
+import { POSTER_SIZES, POSTER_SIZE_KEYS, type PosterDesign, type PosterElement, type PosterSize, type TextElement } from "@/lib/posters/design";
+import { addElement, createShape, createText, duplicateElement, findElement, newId, removeElement, reorderElement, updateElement } from "@/lib/posters/elements";
+import { createHistory, recordCoalesced, redo, undo } from "@/lib/posters/history";
+import { resizeDesign } from "@/lib/posters/layout";
+import { DEFAULT_FONT, fontsReady } from "@/lib/posters/fonts";
+import { EditorCanvas } from "./EditorCanvas";
+import { PropertiesPanel } from "./PropertiesPanel";
+import { InsertPanel, LayersPanel } from "./SidePanels";
+import { TextEditOverlay } from "./TextEditOverlay";
+
+type Panel = "add" | "layers" | "edit";
+const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
+
+/**
+ * The poster editor. Holds the design (with undo history), the selection,
+ * zoom, saving and downloading. Desktop: tools left, canvas centre,
+ * properties right. Phones: canvas on top, the same tools in tabs below.
+ *
+ * Keyboard: Delete removes, ⌘/Ctrl+Z undo, ⌘/Ctrl+Shift+Z or Ctrl+Y redo,
+ * ⌘/Ctrl+D duplicate, ⌘/Ctrl+S save, arrows nudge (Shift = 10px), Esc deselect.
+ */
+export function Editor({
+  initialDesign,
+  initialTitle,
+  posterId: initialPosterId,
+  initialUpdatedAt,
+  imageUrls,
+}: {
+  initialDesign: PosterDesign;
+  initialTitle: string;
+  posterId: string | null;
+  initialUpdatedAt: string | null;
+  imageUrls?: Record<string, string>;
+}) {
+  const [history, setHistory] = useState(() => createHistory(initialDesign));
+  const design = history.present;
+  const [title, setTitle] = useState(initialTitle);
+  const [posterId, setPosterId] = useState(initialPosterId);
+  const [updatedAt, setUpdatedAt] = useState(initialUpdatedAt);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [fit, setFit] = useState(0.4);
+  const [panel, setPanel] = useState<Panel>("add");
+  const [saving, setSaving] = useState(false);
+  const [conflict, setConflict] = useState(false);
+  const [, setFontsLoaded] = useState(0);
+  const saved = useRef({ design: initialDesign, title: initialTitle });
+  const lastChange = useRef({ key: "", at: 0 });
+  const stageRef = useRef<Konva.Stage>(null);
+  const canvasArea = useRef<HTMLDivElement>(null);
+
+  const scale = fit * zoom;
+  const selected = findElement(design, selectedId);
+  const dirty = design !== saved.current.design || title !== saved.current.title;
+
+  /** Apply a change. Same `key` within a second merges into one undo step (typing, sliders). */
+  const change = useCallback((fn: (d: PosterDesign) => PosterDesign, key = "") => {
+    const now = Date.now();
+    const last = lastChange.current;
+    lastChange.current = { key, at: now };
+    setHistory((h) => recordCoalesced(h, fn(h.present), key, last, now));
+  }, []);
+
+  // Fit the poster to the space available, and keep it fitted when the window changes.
+  useLayoutEffect(() => {
+    const el = canvasArea.current;
+    if (!el) return;
+    const measure = () => {
+      const pad = 32;
+      setFit(Math.max(0.05, Math.min((el.clientWidth - pad) / design.width, (el.clientHeight - pad) / design.height)));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [design.width, design.height]);
+
+  // Redraw once web fonts have loaded, so text is measured with the right font.
+  useEffect(() => {
+    fontsReady().then(() => setFontsLoaded((n) => n + 1));
+  }, []);
+
+  // Don't lose work by closing the tab.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  const select = useCallback((id: string | null) => {
+    setSelectedId(id);
+    if (id) setPanel("edit");
+  }, []);
+
+  function updateSelected(changes: Partial<PosterElement>, key: string) {
+    if (selectedId) change((d) => updateElement(d, selectedId, changes), key);
+  }
+
+  function deleteSelected() {
+    if (!selectedId) return;
+    change((d) => removeElement(d, selectedId));
+    setSelectedId(null);
+  }
+
+  function duplicateSelected() {
+    if (!selectedId) return;
+    const result = duplicateElement(design, selectedId);
+    change(() => result.design);
+    setSelectedId(result.newId);
+  }
+
+  function addAndSelect(element: PosterElement) {
+    change((d) => addElement(d, element));
+    select(element.id);
+  }
+
+  function changeSize(size: PosterSize) {
+    change((d) => resizeDesign(d, size));
+    setZoom(1);
+  }
+
+  const save = useCallback(
+    async (asCopy = false) => {
+      if (saving) return;
+      setSaving(true);
+      const snapshot = design;
+      const res = await savePosterDesign({
+        id: asCopy ? undefined : posterId ?? undefined,
+        title: asCopy ? `${title} (copy)`.slice(0, 120) : title,
+        expectedUpdatedAt: asCopy ? undefined : updatedAt ?? undefined,
+        design: snapshot,
+      }).catch(() => null);
+      setSaving(false);
+      if (!res) return showToast("Couldn't save. Check your connection and try again; your work is still here.", "error");
+      if (!res.ok) {
+        setConflict(Boolean(res.conflict));
+        return showToast(res.error, "error");
+      }
+      const newTitle = asCopy ? `${title} (copy)`.slice(0, 120) : title;
+      saved.current = { design: snapshot, title: newTitle };
+      setTitle(newTitle);
+      setPosterId(res.id);
+      setUpdatedAt(res.updatedAt);
+      setConflict(false);
+      // Give a new poster its own address without reloading the editor.
+      if (res.id !== posterId) window.history.replaceState(null, "", `/dashboard/posters/editor/${res.id}`);
+      showToast(asCopy ? "Saved as a copy." : "Poster saved.");
+    },
+    [saving, design, posterId, title, updatedAt],
+  );
+
+  async function download(type: "png" | "jpeg") {
+    setSelectedId(null);
+    setEditingId(null);
+    // Wait two frames so the selection handles are gone from the canvas.
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const stage = stageRef.current;
+    if (!stage) return;
+    const name = (title.trim() || "poster").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "poster";
+    const render = (ratio: number) => stage.toDataURL({ pixelRatio: ratio, mimeType: `image/${type}`, quality: 0.92 });
+    let url: string;
+    try {
+      url = render(1 / scale);
+    } catch (error) {
+      try {
+        // Very large posters (A4 at 300 dpi) can exceed a phone's memory: fall back to half resolution.
+        url = render(1 / scale / 2);
+        showToast("Your device couldn't make the full-size file, so this one is half size (fine for screens).", "info");
+      } catch {
+        console.error("[posters] export failed:", error);
+        return showToast("Couldn't create the image. If the poster uses a photo from another site, remove it and try again.", "error");
+      }
+    }
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${name}.${type === "png" ? "png" : "jpg"}`;
+    a.click();
+  }
+
+  // Keyboard shortcuts (not while typing in a field).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      const typing = target.closest("input, textarea, select, [contenteditable]");
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        save();
+        return;
+      }
+      if (typing || editingId) return;
+      if (mod && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        setHistory((h) => (e.shiftKey ? redo(h) : undo(h)));
+      } else if (mod && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        setHistory(redo);
+      } else if (mod && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        duplicateSelected();
+      } else if ((e.key === "Delete" || e.key === "Backspace") && selected && !selected.locked) {
+        e.preventDefault();
+        deleteSelected();
+      } else if (e.key === "Escape") {
+        setSelectedId(null);
+      } else if (selected && !selected.locked && e.key.startsWith("Arrow")) {
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 1;
+        const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+        const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+        change((d) => updateElement(d, selected.id, { x: selected.x + dx, y: selected.y + dy }), `${selected.id}:nudge`);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  const editing = editingId ? (findElement(design, editingId) as TextElement | undefined) : undefined;
+
+  return (
+    <div className="-mx-4 -my-6 flex flex-col sm:-mx-8 sm:-my-8 lg:-mx-12 lg:-my-10 lg:h-[calc(100dvh-0px)]">
+      {/* Top bar */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-surface px-3 py-2">
+        <Link href="/dashboard/posters" className="btn-ghost btn-sm" aria-label="Back to Poster Studio">
+          <ChevronLeft aria-hidden className="h-4 w-4" />
+          <span className="hidden sm:inline">Posters</span>
+        </Link>
+        <label htmlFor="poster-title" className="sr-only">
+          Poster name
+        </label>
+        <input
+          id="poster-title"
+          className="input w-40 py-1.5 font-semibold sm:w-56"
+          value={title}
+          maxLength={120}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <label htmlFor="poster-size" className="sr-only">
+          Size
+        </label>
+        <select id="poster-size" className="input w-auto py-1.5 text-sm" value={design.size} onChange={(e) => changeSize(e.target.value as PosterSize)}>
+          {POSTER_SIZE_KEYS.map((s) => (
+            <option key={s} value={s}>
+              {POSTER_SIZES[s].label} ({POSTER_SIZES[s].hint})
+            </option>
+          ))}
+        </select>
+
+        <div className="flex items-center gap-0.5">
+          <ToolbarButton label="Undo (Ctrl+Z)" icon={Undo2} disabled={!history.past.length} onClick={() => setHistory(undo)} />
+          <ToolbarButton label="Redo (Ctrl+Shift+Z)" icon={Redo2} disabled={!history.future.length} onClick={() => setHistory(redo)} />
+        </div>
+        <div className="hidden items-center gap-0.5 sm:flex">
+          <ToolbarButton label="Zoom out" icon={ZoomOut} disabled={zoom <= ZOOM_STEPS[0]} onClick={() => setZoom((z) => [...ZOOM_STEPS].reverse().find((s) => s < z) ?? z)} />
+          <button type="button" className="btn-ghost btn-sm tabular w-14" onClick={() => setZoom(1)} title="Fit to screen">
+            {Math.round(zoom * 100)}%
+          </button>
+          <ToolbarButton label="Zoom in" icon={ZoomIn} disabled={zoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]} onClick={() => setZoom((z) => ZOOM_STEPS.find((s) => s > z) ?? z)} />
+        </div>
+
+        <div className="ml-auto flex items-center gap-2">
+          <span className="hidden text-xs text-ink/50 md:inline" role="status">
+            {saving ? "Saving…" : dirty ? "Unsaved changes" : posterId ? "All changes saved" : ""}
+          </span>
+          {conflict && (
+            <button type="button" className="btn-secondary btn-sm" onClick={() => save(true)}>
+              Save as a copy
+            </button>
+          )}
+          <details className="relative">
+            <summary className="btn-secondary btn-sm list-none">
+              <Download aria-hidden className="h-4 w-4" />
+              Download
+            </summary>
+            <div className="absolute right-0 z-20 mt-1 w-56 rounded-xl border border-line bg-surface p-1 shadow-pop">
+              <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-raised" onClick={(e) => { (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; download("png"); }}>
+                <span className="block font-semibold">PNG</span>
+                <span className="block text-xs text-ink/55">Best quality, for print and sharing</span>
+              </button>
+              <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-raised" onClick={(e) => { (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; download("jpeg"); }}>
+                <span className="block font-semibold">JPG</span>
+                <span className="block text-xs text-ink/55">Smaller file, for WhatsApp</span>
+              </button>
+            </div>
+          </details>
+          <button type="button" className="btn-primary btn-sm" onClick={() => save()} disabled={saving || !title.trim()}>
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        {/* Desktop left rail */}
+        <aside className="hidden w-64 shrink-0 space-y-6 overflow-y-auto border-r border-line bg-surface p-4 lg:block" aria-label="Add to poster">
+          <InsertPanel
+            onAddText={(preset) => addAndSelect(createText(design, preset, DEFAULT_FONT))}
+            onAddShape={(shape) => addAndSelect(createShape(design, shape))}
+            onAddPhotoSlot={() => addAndSelect(photoSlot(design))}
+          />
+          <LayersPanel design={design} selectedId={selectedId} onSelect={select} />
+        </aside>
+
+        {/* Canvas */}
+        <div
+          ref={canvasArea}
+          className="relative flex min-h-[55vh] flex-1 items-center justify-center overflow-auto bg-surface-raised p-4 lg:min-h-0"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setSelectedId(null);
+          }}
+        >
+          <div className="relative shadow-card" role="img" aria-label={`Poster preview: ${title}. Use the Layers and properties panels to edit with a keyboard.`}>
+            <EditorCanvas
+              design={design}
+              scale={scale}
+              selectedId={selectedId}
+              editingId={editingId}
+              imageUrls={imageUrls}
+              stageRef={stageRef}
+              onSelect={select}
+              onChange={(id, changes) => change((d) => updateElement(d, id, changes))}
+              onStartEditText={(id) => setEditingId(id)}
+            />
+            {editing && (
+              <TextEditOverlay
+                element={editing}
+                scale={scale}
+                onChange={(text) => change((d) => updateElement(d, editing.id, { text }), `${editing.id}:text`)}
+                onDone={() => setEditingId(null)}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Desktop properties */}
+        <aside className="hidden w-80 shrink-0 overflow-y-auto border-l border-line bg-surface p-4 lg:block" aria-label="Properties">
+          <PropertiesPanel
+            design={design}
+            element={selected}
+            onChange={updateSelected}
+            onBackgroundChange={(background, key) => change((d) => ({ ...d, background }), key)}
+            onDuplicate={duplicateSelected}
+            onDelete={deleteSelected}
+            onReorder={(where) => selectedId && change((d) => reorderElement(d, selectedId, where))}
+          />
+        </aside>
+
+        {/* Phones: tabs under the canvas */}
+        <div className="border-t border-line bg-surface lg:hidden">
+          <div role="tablist" aria-label="Editor tools" className="flex border-b border-line">
+            {(
+              [
+                ["add", Plus, "Add"],
+                ["layers", Layers, "Layers"],
+                ["edit", SlidersHorizontal, selected ? "Edit" : "Background"],
+              ] as const
+            ).map(([key, Icon, label]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={panel === key}
+                onClick={() => setPanel(key)}
+                className={`flex flex-1 items-center justify-center gap-1.5 py-3 text-sm font-medium ${panel === key ? "border-b-2 border-ember text-ink" : "text-ink/55"}`}
+              >
+                <Icon aria-hidden className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+          <div role="tabpanel" className="max-h-[45vh] overflow-y-auto p-4">
+            {panel === "add" && (
+              <InsertPanel
+                onAddText={(preset) => addAndSelect(createText(design, preset, DEFAULT_FONT))}
+                onAddShape={(shape) => addAndSelect(createShape(design, shape))}
+                onAddPhotoSlot={() => addAndSelect(photoSlot(design))}
+              />
+            )}
+            {panel === "layers" && <LayersPanel design={design} selectedId={selectedId} onSelect={select} />}
+            {panel === "edit" && (
+              <PropertiesPanel
+                design={design}
+                element={selected}
+                onChange={updateSelected}
+                onBackgroundChange={(background, key) => change((d) => ({ ...d, background }), key)}
+                onDuplicate={duplicateSelected}
+                onDelete={deleteSelected}
+                onReorder={(where) => selectedId && change((d) => reorderElement(d, selectedId, where))}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function photoSlot(design: PosterDesign): PosterElement {
+  const side = Math.round(Math.min(design.width, design.height) * 0.4);
+  return {
+    id: newId("photo"),
+    type: "image",
+    name: "Photo",
+    x: Math.round((design.width - side) / 2),
+    y: Math.round((design.height - side) / 2),
+    width: side,
+    height: side,
+    rotation: 0,
+    opacity: 1,
+    src: { kind: "placeholder", label: "Add a photo" },
+    fit: "cover",
+    shape: "rect",
+    cornerRadius: 0,
+  };
+}
+
+function ToolbarButton({ label, icon: Icon, onClick, disabled }: { label: string; icon: typeof Undo2; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button type="button" title={label} aria-label={label} onClick={onClick} disabled={disabled} className="btn-ghost btn-icon h-9 w-9 disabled:opacity-30">
+      <Icon aria-hidden className="h-4 w-4" />
+    </button>
+  );
+}

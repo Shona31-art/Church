@@ -6,17 +6,32 @@ import { POSTER_SIZES, type IconElement, type ImageElement, type PosterSize, typ
 // poster and scaled by the real width (u). Vertical positions (y) are a
 // fraction of the poster's height (0 = top, 1 = bottom), so a template
 // spreads out naturally on a tall story or A4 page instead of stretching.
+//
+// Landscape (wider than tall): the 1080-unit design becomes a centred column
+// at the poster's height. Anything spanning the full width (backgrounds,
+// bands, full-photo slots) stretches edge to edge; anything touching only
+// the left or right edge stays anchored to that edge. A template can also
+// supply its own landscape layout, which is built with ox = 0, so its x and
+// widths are plain pixels across the 1920-px poster.
 
 export interface Frame {
   W: number;
   H: number;
-  /** Real pixels per template unit (poster width ÷ 1080). */
+  /** Real pixels per template unit (the poster's shorter side ÷ 1080). */
   u: number;
+  /** Left offset of the centred design column (0 unless the poster is landscape). */
+  ox: number;
 }
 
 export function frame(size: PosterSize): Frame {
   const { width, height } = POSTER_SIZES[size];
-  return { W: width, H: height, u: width / 1080 };
+  const u = Math.min(width, height) / 1080;
+  return { W: width, H: height, u, ox: (width - 1080 * u) / 2 };
+}
+
+/** The frame for a template's own landscape layout: no column offset, so x is in poster pixels. */
+export function absoluteFrame(f: Frame): Frame {
+  return { ...f, ox: 0 };
 }
 
 const r = (n: number) => Math.round(n);
@@ -46,7 +61,7 @@ export function text(f: Frame, id: string, name: string, content: string, o: Tex
     id,
     type: "text",
     name,
-    x: r((o.x ?? 90) * f.u),
+    x: r((o.x ?? 90) * f.u + f.ox),
     y: r(o.y * f.H),
     width: r((o.w ?? 900) * f.u),
     height: r(o.size * f.u * lh * lines),
@@ -82,10 +97,17 @@ interface BoxOptions {
 }
 
 function box(f: Frame, o: BoxOptions) {
+  // Horizontal placement: full-width items stretch, edge-touching items stay on
+  // their edge, everything else sits in the (centred) design column. For every
+  // size except landscape this is simply x × u.
+  const touchesLeft = f.ox > 0 && o.x <= 0;
+  const touchesRight = f.ox > 0 && o.x + o.w >= 1080;
+  const x = touchesLeft && touchesRight ? 0 : touchesLeft ? o.x * f.u : touchesRight ? f.W - (1080 - o.x) * f.u : o.x * f.u + f.ox;
+  const width = touchesLeft && touchesRight ? f.W : o.w * f.u;
   return {
-    x: r(o.x * f.u),
+    x: r(x),
     y: r(o.y * f.H),
-    width: r(o.w * f.u),
+    width: r(width),
     height: r(o.hf !== undefined ? o.hf * f.H : (o.h ?? o.w) * f.u),
     rotation: o.rotation ?? 0,
     opacity: o.opacity ?? 1,

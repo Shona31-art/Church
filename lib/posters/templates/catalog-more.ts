@@ -375,6 +375,8 @@ export const MORE_TEMPLATES: readonly TemplateDefinition[] = [
         shape(f, "sun", "Sun", "ellipse", { x: 760, y: 0.12, w: 180, fill: "#f59e0b", locked: true }),
         // Heights as a share of the poster so the mountains always reach the bottom edge (white text sits on them).
         shape(f, "mountain-back", "Mountain", "triangle", { x: -120, y: 0.52, w: 760, hf: 0.48, fill: "#166534", locked: true }),
+        // Middle peak: on wide (landscape) posters the outer mountains sit at the edges, so this keeps the white text on green.
+        shape(f, "mountain-middle", "Mountain", "triangle", { x: 140, y: 0.5, w: 800, hf: 0.5, fill: "#15803d", locked: true }),
         shape(f, "mountain-front", "Mountain", "triangle", { x: 360, y: 0.46, w: 860, hf: 0.54, fill: "#14532d", locked: true }),
         text(f, "title", "Title", "Youth Camp", { y: 0.17, size: 140, font: "League Spartan", weight: 900, color: "#14532d", upper: true }),
         text(f, "subtitle", "Subtitle", "Faith · Friends · Adventure", { y: 0.33, size: 38, font: "Manrope", weight: 800, color: "#166534" }),

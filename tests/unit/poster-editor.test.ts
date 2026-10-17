@@ -181,7 +181,7 @@ describe("template text contrast", () => {
   test("every text meets WCAG AA against what's behind it (photo slots tested with a bright photo)", async () => {
     const { POSTER_TEMPLATES, templateDesign } = await import("@/lib/posters/templates");
     const failures: string[] = [];
-    for (const size of ["square", "story"] as const) {
+    for (const size of ["square", "story", "landscape"] as const) {
       for (const t of POSTER_TEMPLATES) {
         const d = templateDesign(t.key, size);
         for (const e of d.elements) {
@@ -265,5 +265,30 @@ describe("icons", () => {
     const d = addElement(blankDesign("square"), createIcon(blankDesign("square"), "dove"));
     expect(PosterDesignSchema.safeParse(d).success).toBe(true);
     expect(d.elements[0]).toMatchObject({ type: "icon", icon: "dove", fill: "#1b2a4a" });
+  });
+});
+
+describe("landscape", () => {
+  test("hand-made layouts exist for real templates, and the automatic layout centres the design column", async () => {
+    const { LANDSCAPE_LAYOUTS } = await import("@/lib/posters/templates/catalog-landscape");
+    const { POSTER_TEMPLATES, templateDesign } = await import("@/lib/posters/templates");
+    const keys = new Set(POSTER_TEMPLATES.map((t) => t.key));
+    expect(Object.keys(LANDSCAPE_LAYOUTS)).toHaveLength(10);
+    for (const key of Object.keys(LANDSCAPE_LAYOUTS)) expect(keys.has(key), key).toBe(true);
+
+    // Automatic layout (a template without a hand-made one): centred title, full-width background band.
+    const auto = templateDesign("revival", "landscape");
+    expect(auto.width).toBe(1920);
+    const title = auto.elements.find((e) => e.id === "title")!;
+    expect(title.x + title.width / 2).toBe(960);
+    const band = templateDesign("mens-breakfast", "landscape").elements.find((e) => e.id === "band")!;
+    expect([band.x, band.width]).toEqual([0, 1920]);
+  });
+
+  test("other sizes are unchanged by landscape support", async () => {
+    const { templateDesign } = await import("@/lib/posters/templates");
+    const square = templateDesign("worship-night", "square");
+    const title = square.elements.find((e) => e.id === "title")!;
+    expect([title.x, title.width]).toEqual([90, 900]);
   });
 });

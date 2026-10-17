@@ -16,6 +16,7 @@ export const POSTER_SIZES = {
   portrait: { width: 1080, height: 1350, label: "Portrait", hint: "Instagram portrait posts" },
   story: { width: 1080, height: 1920, label: "Story", hint: "WhatsApp status & stories" },
   a4: { width: 2480, height: 3508, label: "A4 print", hint: "Printing at 300 dpi" },
+  landscape: { width: 1920, height: 1080, label: "Landscape", hint: "Screens, YouTube & Facebook covers" },
 } as const;
 export type PosterSize = keyof typeof POSTER_SIZES;
 export const POSTER_SIZE_KEYS = Object.keys(POSTER_SIZES) as PosterSize[];

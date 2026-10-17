@@ -63,6 +63,7 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 26 | `chat_v3.sql` | Create/edit extra chat channels (open or members-only), church admins can delete department/extra channels (never General), delete a DM for both or hide it for yourself |
 | 27 | `bible_reader_v2.sql` | Bible verse highlights (five colours, private to the member — no admin access), `updated_at` on bookmarks, 2,000-character limit on new Bible notes. Plain-language notes at the top of the file |
 | 28 | `notifications.sql` | Notification bell: `notifications` (created only by database triggers for announcements, events, chat messages, prayers, bookings, support replies, counseling escalations and new members — exactly the people who can see each thing), device pop-up registrations and pop-up preferences, all private to each person. Plain-language notes at the top of the file |
+| 29 | `poster_editor.sql` | Poster editor: editable designs on `posters` (size-limited), the church poster photo library `poster_assets` (poster makers only; delete own, pastors/admins any), and a private `poster-assets` bucket with no browser access (the server signs every upload/download). Plain-language notes at the top of the file |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so

@@ -38,6 +38,7 @@ const SOURCES: [string, string][] = [
   // push_subscriptions deliberately left out: only device endpoints and encryption
   // keys (technical secrets, not personal content). Deleted with the member.
   ["notification_preferences", "user_id"],
+  ["poster_assets", "uploaded_by"],
   ["bible_quiz_attempts", "user_id"],
   ["pastor_bookings", "requested_by"],
   ["support_tickets", "created_by"],

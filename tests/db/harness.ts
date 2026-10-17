@@ -41,6 +41,7 @@ export const MIGRATION_ORDER = [
   "chat_v3.sql",
   "bible_reader_v2.sql",
   "notifications.sql",
+  "poster_editor.sql",
 ];
 
 const SUPABASE_STUBS = `

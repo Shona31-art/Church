@@ -1,0 +1,42 @@
+[
+  {
+    "id": "web",
+    "abbreviation": "WEB",
+    "name": "World English Bible",
+    "year": 2000,
+    "licence": "Public domain",
+    "verses": 31098,
+    "bytes": 4093490,
+    "downloadBytes": 1261297
+  },
+  {
+    "id": "kjv",
+    "abbreviation": "KJV",
+    "name": "King James Version",
+    "year": 1769,
+    "licence": "Public domain",
+    "verses": 31102,
+    "bytes": 4217446,
+    "downloadBytes": 1273562
+  },
+  {
+    "id": "asv",
+    "abbreviation": "ASV",
+    "name": "American Standard Version",
+    "year": 1901,
+    "licence": "Public domain",
+    "verses": 31086,
+    "bytes": 4218506,
+    "downloadBytes": 1271086
+  },
+  {
+    "id": "ylt",
+    "abbreviation": "YLT",
+    "name": "Young's Literal Translation",
+    "year": 1898,
+    "licence": "Public domain",
+    "verses": 31102,
+    "bytes": 4199640,
+    "downloadBytes": 1264496
+  }
+]

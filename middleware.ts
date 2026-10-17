@@ -62,6 +62,7 @@ export const config = {
   // Everything except static files, images, the Stripe webhook (which has
   // no user session and verifies its own signature) and the public-domain
   // Bible text in /bibles/ — no personal data, and a session check on each of
-  // the 66 files would slow reading and break offline downloads.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/stripe/webhook|bibles/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // the 66 files would slow reading and break offline downloads. Likewise the
+  // offline service worker and web app manifest.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/stripe/webhook|bibles/|sw\\.js|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };

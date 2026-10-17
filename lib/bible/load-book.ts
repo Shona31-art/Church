@@ -1,8 +1,19 @@
 import { bookFileUrl, type BookText } from "./books";
+import { TEXT_CACHE, offlineSupported } from "./offline";
+
+/** A downloaded copy (lib/bible/offline.ts), if there is one. */
+async function fromOfflineCopy(url: string): Promise<Response | undefined> {
+  if (!offlineSupported()) return undefined;
+  try {
+    return await (await caches.open(TEXT_CACHE)).match(url);
+  } catch {
+    return undefined;
+  }
+}
 
 // Browser-side loader for the static text files in public/bibles/.
 // Keeps each book in memory for the visit, so moving between chapters of the
-// same book never refetches. (Offline copies are the service worker's job.)
+// same book never refetches. Reads a downloaded copy first when there is one.
 
 const loaded = new Map<string, Promise<BookText>>();
 
@@ -16,7 +27,8 @@ export function loadBook(versionId: string, bookIndex: number): Promise<BookText
   const url = bookFileUrl(versionId, bookIndex);
   let book = loaded.get(url);
   if (!book) {
-    book = fetch(url, { signal: AbortSignal.timeout(20_000) })
+    book = fromOfflineCopy(url)
+      .then((saved) => saved ?? fetch(url, { signal: AbortSignal.timeout(20_000) }))
       .then((res) => {
         if (!res.ok) throw new BookLoadError(false);
         return res.json() as Promise<BookText>;

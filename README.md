@@ -221,6 +221,7 @@ every server action, and is enforced again by Postgres RLS. Menus only hide link
 | Chat (rules, edit window, reactions, voice limits) | `lib/chat.ts` (tested); screen in `app/dashboard/chat/[id]/`; edit/delete in `app/dashboard/chat/actions.ts` |
 | Nightly voice-note expiry | `app/api/cron/expire-chat-media/route.ts`, schedule in `vercel.json` |
 | Bible game content (clues, emoji stories, quotes, books; quiz questions are in SQL) | `lib/games/content/*.ts` — every item has a Bible reference for checking; quiz questions in `supabase/bible_games_content.sql` |
+| Bible reader | Text files: `public/bibles/` (built by `scripts/build-bibles.mjs`; book list `lib/bible/canon.json`). Reader: `components/bible/BibleReader.tsx` (verses `ChapterText.tsx`, picker `PassagePicker.tsx`, action bar, notes, settings). "Go to" parsing: `lib/bible/reference.ts`. Highlights/bookmarks/notes: `app/dashboard/bible/read/actions.ts`. Search: `lib/bible/search.ts` + `components/bible/BibleSearch.tsx`. Offline: `lib/bible/offline.ts` + `public/sw.js`. Why it's built this way: `docs/adr/0001-bible-text-hosting-and-offline.md` |
 | Bible games | Rules, levels, points and puzzle generators: `lib/games/` (tested). Starting/finishing/marking: `app/dashboard/games/actions.ts` + `engine.ts`. Shared intro/timer/results frame: `app/dashboard/games/GameShell.tsx`; which board each game uses: `GameScreen.tsx`. Daily challenge, streaks, badges: `lib/games/progression.ts` |
 | Any AI behaviour, model, timeout | `lib/ai.ts`; rate limit `lib/ai-quota.ts` |
 | Billing / Stripe webhook | `app/dashboard/billing/`, `app/api/stripe/webhook/route.ts`, `lib/billing.ts` |
@@ -283,11 +284,19 @@ the Aperture default). Conventions every screen follows:
   a church admin or super admin would change it in Supabase Auth).
 - **Moving someone to another church** (Super Admin) leaves their old prayers,
   messages and gifts with the old church.
-- **Crossword** from the Android app isn't built.
 - **Crisis detection** is keyword matching — a tripwire, not a safety system.
   Review with a mental-health professional; helplines are South African.
-- **Bible text** comes live from bible-api.com (WEB, public domain); if it's
-  down, the reader shows a fallback message.
+- **Bible text**: the reader and search use public-domain KJV, WEB, ASV and
+  YLT files shipped in `public/bibles/` (rebuild with
+  `node scripts/build-bibles.mjs`). The dashboard's daily verse and the AI
+  study tool still fetch from bible-api.com until Bible step 7 switches them.
+  Licensed versions (NIV, ESV, Afrikaans…) would need a publisher licence and
+  a licensed API, online-only.
+- **Offline Bible** needs the service worker (`public/sw.js`), which is
+  registered in **production builds only**. Test offline reading on a Vercel
+  Preview URL, not `pnpm dev`. Highlights and notes need a connection.
+  The web app manifest has **no icons yet** (brand placeholder): add
+  192×192 and 512×512 PNGs of the logo before launch.
 - **Error tracking:** only server `console.error` logs. Add a Vercel log drain
   (or a free Sentry tier) before launch.
 - **Stripe** is unverified against a real test account.

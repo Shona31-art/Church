@@ -8,6 +8,7 @@ import { can, roleLabel } from "@/lib/permissions";
 import { DashboardChrome, type AccountBanner } from "./DashboardChrome";
 import { getAvatarUrls } from "@/lib/avatars";
 import { getMemberLimitStatus } from "@/lib/member-limit";
+import { ServiceWorker } from "@/components/ServiceWorker";
 
 // `modal` is the @modal parallel route: form pages opened as popups over the
 // current page (components/ui/RouteModal.tsx).
@@ -103,6 +104,7 @@ export default async function DashboardLayout({ children, modal }: { children: R
     >
       {children}
       {modal}
+      <ServiceWorker />
     </DashboardChrome>
   );
 }

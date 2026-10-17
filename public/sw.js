@@ -1,0 +1,103 @@
+// Service worker: offline Bible reading. Plain JS (no build step) because the
+// browser loads this file directly. Registered by components/ServiceWorker.tsx
+// in production only. Decision record: docs/adr/0001-bible-text-hosting-and-offline.md
+//
+// Deliberately narrow — it only ever touches:
+//   1. /bibles/*  public-domain text files. Cache-first; kept until the member
+//                 removes a download (lib/bible/offline.ts writes the same cache).
+//   2. The Bible reader and search pages: network-first, falling back to the
+//      last copy when offline. These pages render no personal data beyond the
+//      app's own header, and the copy is deleted on sign-out.
+//   3. /_next/static/*  the immutable, content-hashed scripts/styles/fonts those
+//      pages need. Cache-first, trimmed so it can't grow without limit.
+// Everything else (other pages, server actions, Supabase, POSTs) goes straight
+// to the network, untouched.
+//
+// Turning it off: replace this file's contents with a worker that deletes its
+// caches and unregisters itself, and deploy.
+
+const TEXT_CACHE = "bible-text-v1"; // must match lib/bible/offline.ts
+const SHELL_CACHE = "bible-shell-v1";
+const KEEP = [TEXT_CACHE, SHELL_CACHE];
+const OFFLINE_PAGES = ["/dashboard/bible/read", "/dashboard/bible/search"];
+const MAX_STATIC_ENTRIES = 200;
+const NETWORK_TIMEOUT_MS = 6000;
+
+self.addEventListener("install", () => self.skipWaiting());
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      // Remove caches from older versions of this worker.
+      for (const key of await caches.keys()) {
+        if (key.startsWith("bible-") && !KEEP.includes(key)) await caches.delete(key);
+      }
+      await self.clients.claim();
+    })(),
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  const request = event.request;
+  if (request.method !== "GET") return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  // Signing out: forget the saved reader pages (they show the member's name in
+  // the header). The Bible text itself isn't personal and stays.
+  if (url.pathname.startsWith("/auth/signout")) {
+    event.waitUntil(caches.delete(SHELL_CACHE));
+    return;
+  }
+
+  if (url.pathname.startsWith("/bibles/")) {
+    event.respondWith(cacheFirst(request, TEXT_CACHE));
+    return;
+  }
+
+  if (url.pathname.startsWith("/_next/static/")) {
+    event.respondWith(cacheFirst(request, SHELL_CACHE, true));
+    return;
+  }
+
+  if (request.mode === "navigate" && OFFLINE_PAGES.includes(url.pathname)) {
+    event.respondWith(networkFirstPage(request, url.pathname));
+  }
+});
+
+async function cacheFirst(request, cacheName, trim = false) {
+  const cache = await caches.open(cacheName);
+  const hit = await cache.match(request, { ignoreSearch: true });
+  if (hit) return hit;
+  const response = await fetch(request);
+  if (response.ok) {
+    await cache.put(request, response.clone());
+    if (trim) trimStatic(cache);
+  }
+  return response;
+}
+
+/** The live page when online; the saved copy when offline or the network hangs. */
+async function networkFirstPage(request, pathname) {
+  const cache = await caches.open(SHELL_CACHE);
+  try {
+    const response = await Promise.race([
+      fetch(request),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), NETWORK_TIMEOUT_MS)),
+    ]);
+    // Only keep real pages: not redirects to /login (signed out) or errors.
+    if (response.ok && !response.redirected) await cache.put(pathname, response.clone());
+    return response;
+  } catch (error) {
+    // One saved copy per page, whatever passage it was saved on: the reader
+    // reads the passage from the address bar, not from the saved HTML.
+    const saved = await cache.match(pathname);
+    if (saved) return saved;
+    throw error;
+  }
+}
+
+async function trimStatic(cache) {
+  const keys = (await cache.keys()).filter((r) => new URL(r.url).pathname.startsWith("/_next/static/"));
+  for (const old of keys.slice(0, Math.max(0, keys.length - MAX_STATIC_ENTRIES))) await cache.delete(old);
+}

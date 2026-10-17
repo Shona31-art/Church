@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { BIBLE_BOOKS } from "@/lib/bible";
 import { moduleGate } from "@/lib/gate";
+import { OfflineDownloads } from "@/components/bible/OfflineDownloads";
 import { getChurchAccess } from "@/lib/paywall";
 
 export default async function BibleHomePage() {
@@ -48,6 +49,10 @@ export default async function BibleHomePage() {
           </div>
         </section>
       ) : null}
+
+      <div className="mb-8">
+        <OfflineDownloads />
+      </div>
 
       <h2 className="text-sm uppercase tracking-wide text-ink/50 mb-3">Books</h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">

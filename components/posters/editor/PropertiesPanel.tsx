@@ -97,10 +97,14 @@ function TextSettings({ element, onChange }: { element: TextElement; onChange: C
               set({ fontFamily: next.name, fontWeight: weight as TextElement["fontWeight"] }, "font");
             }}
           >
-            {POSTER_FONTS.map((f) => (
-              <option key={f.name} value={f.name}>
-                {f.name}
-              </option>
+            {(["Modern", "Headline", "Serif", "Script"] as const).map((category) => (
+              <optgroup key={category} label={category}>
+                {POSTER_FONTS.filter((f) => f.category === category).map((f) => (
+                  <option key={f.name} value={f.name}>
+                    {f.name}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </Field>
@@ -299,7 +303,7 @@ function IconButton({ label, icon: Icon, onClick, pressed, danger }: { label: st
       aria-label={label}
       aria-pressed={pressed}
       onClick={onClick}
-      className={`flex h-8 w-8 items-center justify-center rounded-lg ${pressed ? "bg-surface-raised text-ink" : danger ? "text-danger hover:bg-danger-tint" : "text-ink/60 hover:bg-ink/5 hover:text-ink"}`}
+      className={`flex h-8 w-8 items-center justify-center rounded-lg [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 ${pressed ? "bg-surface-raised text-ink" : danger ? "text-danger hover:bg-danger-tint" : "text-ink/60 hover:bg-ink/5 hover:text-ink"}`}
     >
       <Icon aria-hidden className="h-4 w-4" />
     </button>
@@ -314,7 +318,7 @@ function ToggleButton({ label, pressed, onClick, children }: { label: string; pr
       aria-label={label}
       aria-pressed={pressed}
       onClick={onClick}
-      className={`flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-bold ${pressed ? "bg-surface-raised text-ink" : "text-ink/60 hover:bg-ink/5"}`}
+      className={`flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-bold [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:min-w-11 ${pressed ? "bg-surface-raised text-ink" : "text-ink/60 hover:bg-ink/5"}`}
     >
       {children}
     </button>

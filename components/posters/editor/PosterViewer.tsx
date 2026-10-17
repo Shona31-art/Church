@@ -1,11 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type Konva from "konva";
 import { Download } from "lucide-react";
 import { showToast } from "@/components/ui/Toaster";
 import type { PosterDesign } from "@/lib/posters/design";
+import { fontsInDesign, loadFonts } from "@/lib/posters/fonts";
 
 const EditorCanvas = dynamic(() => import("./EditorCanvas").then((m) => m.EditorCanvas), {
   ssr: false,
@@ -17,6 +18,11 @@ export function PosterViewer({ design, title, imageUrls }: { design: PosterDesig
   const box = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const [scale, setScale] = useState(0.3);
+  const [fontVersion, setFontVersion] = useState(0);
+
+  useEffect(() => {
+    loadFonts(fontsInDesign(design.elements)).then(() => setFontVersion((n) => n + 1));
+  }, [design]);
 
   useLayoutEffect(() => {
     const el = box.current;
@@ -51,6 +57,7 @@ export function PosterViewer({ design, title, imageUrls }: { design: PosterDesig
             selectedId={null}
             editingId={null}
             readOnly
+            fontVersion={fontVersion}
             imageUrls={imageUrls}
             stageRef={stageRef}
             onSelect={() => undefined}

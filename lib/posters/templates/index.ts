@@ -1,26 +1,18 @@
-import { blankDesign, type PosterDesign, type PosterSize } from "../design";
-import { resizeDesign } from "../layout";
-import { worshipNightSquare } from "./worship-night";
+import { DESIGN_VERSION, POSTER_SIZES, blankDesign, type PosterDesign, type PosterSize } from "../design";
+import { TEMPLATE_DEFINITIONS, type Occasion, type TemplateDefinition } from "./catalog";
+import { frame } from "./kit";
 
-// The template catalogue. Each template is an original design stored as data
-// (a PosterDesign). Step 3 of the plan adds the other 15 and hand-tuned
-// portrait layouts; until then, other sizes are derived from the square one.
+// The template catalogue (definitions in catalog.ts). Each template builds a
+// fresh design for whichever size is chosen.
 
-export interface PosterTemplate {
-  key: string;
-  name: string;
-  occasion: string;
-  layouts: Partial<Record<PosterSize, PosterDesign>> & { square: PosterDesign };
-}
-
-export const POSTER_TEMPLATES: readonly PosterTemplate[] = [
-  { key: "worship-night", name: "Worship Night", occasion: "Worship", layouts: { square: worshipNightSquare } },
-];
+export type { Occasion, TemplateDefinition };
+export const POSTER_TEMPLATES = TEMPLATE_DEFINITIONS;
+export const OCCASIONS: readonly Occasion[] = ["Services", "Events", "Seasons", "Groups", "General"];
 
 /** A fresh copy of a template at the chosen size (or a blank design if the key is unknown). */
 export function templateDesign(key: string | undefined, size: PosterSize): PosterDesign {
   const template = POSTER_TEMPLATES.find((t) => t.key === key);
   if (!template) return blankDesign(size);
-  const design = template.layouts[size] ?? resizeDesign(template.layouts.square, size);
-  return structuredClone(design);
+  const { width, height } = POSTER_SIZES[size];
+  return { version: DESIGN_VERSION, size, width, height, templateKey: template.key, ...template.build(frame(size)) };
 }

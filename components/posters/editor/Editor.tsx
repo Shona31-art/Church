@@ -10,7 +10,7 @@ import { POSTER_SIZES, POSTER_SIZE_KEYS, type PosterDesign, type PosterElement, 
 import { addElement, createShape, createText, duplicateElement, findElement, newId, removeElement, reorderElement, updateElement } from "@/lib/posters/elements";
 import { createHistory, recordCoalesced, redo, undo } from "@/lib/posters/history";
 import { resizeDesign } from "@/lib/posters/layout";
-import { DEFAULT_FONT, fontsReady } from "@/lib/posters/fonts";
+import { DEFAULT_FONT, fontsInDesign, loadFonts } from "@/lib/posters/fonts";
 import { EditorCanvas } from "./EditorCanvas";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { InsertPanel, LayersPanel } from "./SidePanels";
@@ -52,7 +52,7 @@ export function Editor({
   const [panel, setPanel] = useState<Panel>("add");
   const [saving, setSaving] = useState(false);
   const [conflict, setConflict] = useState(false);
-  const [, setFontsLoaded] = useState(0);
+  const [fontVersion, setFontVersion] = useState(0);
   const saved = useRef({ design: initialDesign, title: initialTitle });
   const lastChange = useRef({ key: "", at: 0 });
   const stageRef = useRef<Konva.Stage>(null);
@@ -84,10 +84,15 @@ export function Editor({
     return () => observer.disconnect();
   }, [design.width, design.height]);
 
-  // Redraw once web fonts have loaded, so text is measured with the right font.
+  // Load the fonts this design uses, then redraw so text is measured with them.
+  const fontKey = fontsInDesign(design.elements).sort().join("|");
   useEffect(() => {
-    fontsReady().then(() => setFontsLoaded((n) => n + 1));
-  }, []);
+    let cancelled = false;
+    loadFonts(fontKey ? fontKey.split("|") : []).then(() => !cancelled && setFontVersion((n) => n + 1));
+    return () => {
+      cancelled = true;
+    };
+  }, [fontKey]);
 
   // Don't lose work by closing the tab.
   useEffect(() => {
@@ -269,7 +274,7 @@ export function Editor({
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <span className="hidden text-xs text-ink/50 md:inline" role="status">
+          <span className="sr-only text-xs text-ink/50 md:not-sr-only md:inline" role="status">
             {saving ? "Saving…" : dirty ? "Unsaved changes" : posterId ? "All changes saved" : ""}
           </span>
           {conflict && (
@@ -324,6 +329,7 @@ export function Editor({
               scale={scale}
               selectedId={selectedId}
               editingId={editingId}
+              fontVersion={fontVersion}
               imageUrls={imageUrls}
               stageRef={stageRef}
               onSelect={select}
@@ -356,7 +362,8 @@ export function Editor({
 
         {/* Phones: tabs under the canvas */}
         <div className="border-t border-line bg-surface lg:hidden">
-          <div role="tablist" aria-label="Editor tools" className="flex border-b border-line">
+          {/* A simple toggle group (not ARIA tabs, which promise arrow-key navigation). */}
+          <div role="group" aria-label="Editor tools" className="flex border-b border-line">
             {(
               [
                 ["add", Plus, "Add"],
@@ -367,8 +374,7 @@ export function Editor({
               <button
                 key={key}
                 type="button"
-                role="tab"
-                aria-selected={panel === key}
+                aria-pressed={panel === key}
                 onClick={() => setPanel(key)}
                 className={`flex flex-1 items-center justify-center gap-1.5 py-3 text-sm font-medium ${panel === key ? "border-b-2 border-ember text-ink" : "text-ink/55"}`}
               >
@@ -377,7 +383,7 @@ export function Editor({
               </button>
             ))}
           </div>
-          <div role="tabpanel" className="max-h-[45vh] overflow-y-auto p-4">
+          <div className="max-h-[45vh] overflow-y-auto p-4">
             {panel === "add" && (
               <InsertPanel
                 onAddText={(preset) => addAndSelect(createText(design, preset, DEFAULT_FONT))}
@@ -425,7 +431,7 @@ function photoSlot(design: PosterDesign): PosterElement {
 
 function ToolbarButton({ label, icon: Icon, onClick, disabled }: { label: string; icon: typeof Undo2; onClick: () => void; disabled?: boolean }) {
   return (
-    <button type="button" title={label} aria-label={label} onClick={onClick} disabled={disabled} className="btn-ghost btn-icon h-9 w-9 disabled:opacity-30">
+    <button type="button" title={label} aria-label={label} onClick={onClick} disabled={disabled} className="btn-ghost btn-icon h-9 w-9 disabled:opacity-30 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11">
       <Icon aria-hidden className="h-4 w-4" />
     </button>
   );

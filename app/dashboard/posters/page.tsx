@@ -35,13 +35,13 @@ export default async function PostersPage({ searchParams }: { searchParams: { pa
   if (error) console.error("[posters] list failed:", error.message);
 
   const posters = (data ?? []).slice(0, PAGE_SIZE);
-  // Until the template gallery (plan step 3), "New design" opens the sample template.
+  // "New design" opens the template gallery; "Quick poster" is the original fixed-layout maker.
   const newButton = (
     <>
       <Link href="/dashboard/posters/new" className="btn-ghost">
         Quick poster
       </Link>
-      <Link href="/dashboard/posters/editor/new?template=worship-night" className="btn-primary">
+      <Link href="/dashboard/posters/new-design" className="btn-primary">
         New design
       </Link>
     </>

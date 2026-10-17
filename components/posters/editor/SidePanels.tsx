@@ -96,7 +96,12 @@ export function LayersPanel({ design, selectedId, onSelect }: { design: PosterDe
               >
                 <span className="min-w-0 flex-1 truncate">{labelFor(e)}</span>
                 <span className="text-xs text-ink/40">{e.type === "shape" ? e.shape : e.type}</span>
-                {e.locked && <Lock aria-label="Locked" className="h-3.5 w-3.5 text-ink/40" />}
+                {e.locked && (
+                  <>
+                    <Lock aria-hidden className="h-3.5 w-3.5 text-ink/40" />
+                    <span className="sr-only">(locked)</span>
+                  </>
+                )}
               </button>
             </li>
           ))}

@@ -130,3 +130,79 @@ describe("templates and resizing", () => {
     expect(templateDesign("nope", "a4")).toEqual(blankDesign("a4"));
   });
 });
+
+describe("template quality", () => {
+  test("16 templates, each using only bundled fonts, with every text box on the poster at every size", async () => {
+    const { POSTER_TEMPLATES, templateDesign } = await import("@/lib/posters/templates");
+    const { POSTER_FONTS } = await import("@/lib/posters/fonts");
+    const { POSTER_SIZE_KEYS } = await import("@/lib/posters/design");
+    const fonts = new Set(POSTER_FONTS.map((f) => f.name));
+    expect(POSTER_TEMPLATES).toHaveLength(16);
+    expect(new Set(POSTER_TEMPLATES.map((t) => t.key)).size).toBe(16);
+    const problems: string[] = [];
+    for (const t of POSTER_TEMPLATES) {
+      for (const size of POSTER_SIZE_KEYS) {
+        const d = templateDesign(t.key, size);
+        for (const e of d.elements) {
+          if (e.type !== "text") continue;
+          if (!fonts.has(e.fontFamily)) problems.push(`${t.key}: unknown font ${e.fontFamily}`);
+          if (e.x < 0 || e.x + e.width > d.width + 1) problems.push(`${t.key}@${size}: "${e.name}" runs off the side`);
+          if (e.y < 0 || e.y + e.height > d.height + 1) problems.push(`${t.key}@${size}: "${e.name}" runs off the bottom`);
+        }
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
+  test("every bundled font file and its licence exist", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const { POSTER_FONTS } = await import("@/lib/posters/fonts");
+    for (const f of POSTER_FONTS) {
+      const dir = path.resolve(__dirname, "../../public/fonts/poster");
+      expect(fs.existsSync(path.join(dir, f.file)), f.file).toBe(true);
+      expect(fs.existsSync(path.join(dir, `OFL-${f.file.replace(".woff2", "")}.txt`)), `licence for ${f.name}`).toBe(true);
+    }
+  });
+});
+
+describe("template text contrast", () => {
+  // Decorative watermark text (deliberately faint, never the only place information appears).
+  const DECORATIVE = new Set(["Series number"]);
+  const ratio = (a: string, b: string) => {
+    const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+  };
+  const mix = (fg: string, bg: string, a: number) => {
+    const p = (h: string, i: number) => parseInt(h.slice(i, i + 2), 16);
+    return "#" + [1, 3, 5].map((i) => Math.round(p(fg, i) * a + p(bg, i) * (1 - a)).toString(16).padStart(2, "0")).join("");
+  };
+
+  test("every text meets WCAG AA against what's behind it (photo slots tested with a bright photo)", async () => {
+    const { POSTER_TEMPLATES, templateDesign } = await import("@/lib/posters/templates");
+    const failures: string[] = [];
+    for (const size of ["square", "story"] as const) {
+      for (const t of POSTER_TEMPLATES) {
+        const d = templateDesign(t.key, size);
+        for (const e of d.elements) {
+          if (e.type !== "text" || DECORATIVE.has(e.name ?? "")) continue;
+          const cx = e.x + e.width / 2;
+          const cy = e.y + e.height / 2;
+          // Background at the text's height (gradients blended), then each shape/photo underneath it.
+          let behind = [d.background.gradient ? mix(d.background.gradient.to, d.background.gradient.from, cy / d.height) : d.background.color];
+          for (const s of d.elements) {
+            if (s === e) break;
+            if (cx < s.x || cx > s.x + s.width || cy < s.y || cy > s.y + s.height) continue;
+            if (s.type === "shape" && s.fill && s.shape !== "line") behind = behind.map((b) => mix(s.fill!, b, s.opacity * s.fillOpacity));
+            if (s.type === "image" && s.overlay) behind = ["#9aa0aa", "#ffffff"].map((photo) => mix(s.overlay!.color, photo, s.overlay!.opacity));
+          }
+          const worst = Math.min(...behind.map((b) => ratio(e.fill, b)));
+          const unit = d.width / 1080;
+          const large = e.fontSize >= 48 * unit || (e.fontSize >= 37 * unit && e.fontWeight >= 700);
+          if (worst < (large ? 3 : 4.5)) failures.push(`${size} ${t.key} "${e.name}": ${worst.toFixed(2)}`);
+        }
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+});

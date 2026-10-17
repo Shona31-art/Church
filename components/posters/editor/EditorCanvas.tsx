@@ -19,6 +19,7 @@ export function EditorCanvas({
   selectedId,
   editingId,
   readOnly = false,
+  fontVersion = 0,
   imageUrls,
   stageRef,
   onSelect,
@@ -30,6 +31,8 @@ export function EditorCanvas({
   selectedId: string | null;
   editingId: string | null;
   readOnly?: boolean;
+  /** Bump after fonts load: the layer is rebuilt so Konva re-measures text with the real font. */
+  fontVersion?: number;
   /** Signed URLs for uploaded photos, by storage path (step 4). */
   imageUrls?: Record<string, string>;
   stageRef: React.RefObject<Konva.Stage>;
@@ -52,6 +55,8 @@ export function EditorCanvas({
   }, [selected, editingId, readOnly, design]);
 
   const isLine = selected?.type === "shape" && selected.shape === "line";
+  // Finger-sized handles on touch screens (the handles are drawn in screen pixels).
+  const touch = useCoarsePointer();
 
   return (
     <Stage
@@ -68,7 +73,7 @@ export function EditorCanvas({
         if (e.target === e.target.getStage() || e.target.name() === "background") onSelect(null);
       }}
     >
-      <Layer>
+      <Layer key={fontVersion}>
         <Background design={design} imageUrls={imageUrls} />
         {design.elements.map((element) => (
           <ElementNode
@@ -90,7 +95,8 @@ export function EditorCanvas({
             rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
             rotationSnapTolerance={4}
             enabledAnchors={isLine ? ["middle-left", "middle-right"] : undefined}
-            anchorSize={10}
+            anchorSize={touch ? 22 : 10}
+            padding={touch ? 6 : 0}
             anchorCornerRadius={5}
             anchorStroke="#a88a4a"
             borderStroke="#a88a4a"
@@ -285,6 +291,18 @@ function imageUrl(src: ImageSource, imageUrls?: Record<string, string>): string 
   if (src.kind === "stock") return src.url;
   if (src.kind === "asset") return imageUrls?.[src.path] ?? null;
   return null;
+}
+
+function useCoarsePointer(): boolean {
+  const [coarse, setCoarse] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(pointer: coarse)");
+    setCoarse(query.matches);
+    const onChange = (e: MediaQueryListEvent) => setCoarse(e.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+  return coarse;
 }
 
 /** Loads an image for the canvas. crossOrigin keeps the canvas exportable (no "tainted canvas"). */

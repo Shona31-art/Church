@@ -9,6 +9,7 @@ import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitBu
 import { Alert } from "@/components/ui/Alert";
 import { FormActions, FormField, RequiredNote } from "@/components/ui/FormField";
 import { ACCOUNT_TYPES, ACCOUNT_TYPE_LABELS, eftReference } from "@/lib/giving";
+import { ZA_BANKS } from "@/lib/banks-za";
 
 interface Details {
   account_name: string;
@@ -20,21 +21,27 @@ interface Details {
   updated_at: string;
 }
 
-// The common South African banks; "Other bank" lets admins type any name.
-// A plain <select> rather than a <datalist>: datalist pop-ups are drawn in the
-// wrong place inside dialogs in some browsers (and barely work on iPhone).
-const BANKS = ["Absa", "African Bank", "Capitec", "Discovery Bank", "FNB", "Investec", "Nedbank", "Standard Bank", "TymeBank"];
+// Paystack's list of South African banks (lib/banks-za.ts); picking one fills
+// in its universal branch code, which card giving also needs. "Other bank"
+// lets admins type any name. A plain <select> rather than a <datalist>:
+// datalist pop-ups are drawn in the wrong place inside dialogs in some
+// browsers (and barely work on iPhone).
 const OTHER = "__other__";
+const BANK_NAMES = ZA_BANKS.map((b) => b.name);
 
-function BankField({ initial, error }: { initial: string; error?: string }) {
-  const [choice, setChoice] = useState(initial === "" ? "" : BANKS.includes(initial) ? initial : OTHER);
+function BankField({ initial, error, onPick }: { initial: string; error?: string; onPick: (branchCode: string) => void }) {
+  const [choice, setChoice] = useState(initial === "" ? "" : BANK_NAMES.includes(initial) ? initial : OTHER);
   return (
     <div className="space-y-2">
       <FormField label="Bank" htmlFor="bank_choice" required error={choice === OTHER ? undefined : error}>
         <select
           id="bank_choice"
           value={choice}
-          onChange={(e) => setChoice(e.target.value)}
+          onChange={(e) => {
+            setChoice(e.target.value);
+            const bank = ZA_BANKS.find((b) => b.name === e.target.value);
+            if (bank) onPick(bank.code);
+          }}
           required
           className="input"
           aria-invalid={Boolean(error) && choice !== OTHER}
@@ -42,7 +49,7 @@ function BankField({ initial, error }: { initial: string; error?: string }) {
           <option value="" disabled>
             Choose your bank
           </option>
-          {BANKS.map((b) => (
+          {BANK_NAMES.map((b) => (
             <option key={b} value={b}>
               {b}
             </option>
@@ -59,7 +66,7 @@ function BankField({ initial, error }: { initial: string; error?: string }) {
             maxLength={60}
             autoComplete="off"
             autoFocus
-            defaultValue={BANKS.includes(initial) ? "" : initial}
+            defaultValue={BANK_NAMES.includes(initial) ? "" : initial}
             className="input"
             aria-invalid={Boolean(error)}
           />
@@ -88,6 +95,7 @@ export function GivingDetailsForm({
   const v = (name: keyof Details, fallback = "") => state?.values?.[name] ?? details?.[name] ?? fallback;
   const [prefix, setPrefix] = useState(v("reference_prefix", suggestedPrefix));
   const cleanPrefix = prefix.trim().toUpperCase();
+  const [branchCode, setBranchCode] = useState(v("branch_code"));
 
   return (
     <form key={JSON.stringify(state?.values ?? {})} action={action} className="card-elevated max-w-xl space-y-5 rounded-2xl p-5 sm:p-6" noValidate>
@@ -106,7 +114,7 @@ export function GivingDetailsForm({
       </FormField>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <BankField initial={v("bank_name")} error={fe.bank_name} />
+        <BankField initial={v("bank_name")} error={fe.bank_name} onPick={setBranchCode} />
         <FormField label="Account type" htmlFor="account_type" required error={fe.account_type}>
           <select id="account_type" name="account_type" required defaultValue={v("account_type", "cheque")} className="input" aria-invalid={Boolean(fe.account_type)}>
             {ACCOUNT_TYPES.map((t) => (
@@ -132,7 +140,7 @@ export function GivingDetailsForm({
             aria-invalid={Boolean(fe.account_number)}
           />
         </FormField>
-        <FormField label="Branch code" htmlFor="branch_code" required error={fe.branch_code} hint="Most banks use one universal code — check your statement.">
+        <FormField label="Branch code" htmlFor="branch_code" required error={fe.branch_code} hint="Filled in from your bank; change it only if your bank told you to use another.">
           <input
             id="branch_code"
             name="branch_code"
@@ -140,7 +148,8 @@ export function GivingDetailsForm({
             autoComplete="off"
             required
             maxLength={7}
-            defaultValue={v("branch_code")}
+            value={branchCode}
+            onChange={(e) => setBranchCode(e.target.value)}
             className="input tabular"
             aria-invalid={Boolean(fe.branch_code)}
           />

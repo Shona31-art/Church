@@ -12,6 +12,9 @@ import { churchNameSchema } from "@/lib/account-schemas";
 import { phoneSchema } from "@/lib/member-schemas";
 import { FormState, SESSION_EXPIRED, formValues, invalid, optionalField } from "@/lib/forms";
 import { givingDetailsSchema } from "@/lib/giving";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { bankForBranchCode } from "@/lib/banks-za";
+import { PaystackError, createSubaccount, paystackConfigured, updateSubaccount } from "@/lib/paystack";
 
 const ProfileSchema = z.object({
   name: churchNameSchema,
@@ -111,4 +114,93 @@ export async function saveGivingDetails(_prev: FormState, formData: FormData): P
   revalidatePath("/dashboard/giving");
   flash("Bank details saved. Every church admin has been notified of the change.");
   redirect("/dashboard/setup");
+}
+
+/**
+ * Church admin: turn card giving on (or back on after the bank details
+ * changed). Creates — or re-points — the church's Paystack subaccount from
+ * the saved bank details, so card gifts settle to that account.
+ * Form field: expected_details_updated_at (the bank details the admin saw;
+ * if they changed since, nothing happens).
+ *
+ * church_card_giving has no browser write access at all (migration #31), so
+ * this writes it with the service role — after the admin check above it.
+ */
+export async function enableCardGiving(_prev: FormState, formData: FormData): Promise<FormState> {
+  const me = await getCurrentAppUser();
+  if (!me || !me.church_id) return { error: SESSION_EXPIRED };
+  if (!can(me.role, "manageChurchProfile")) return { error: "Only church admins can turn on card giving." };
+  if (!paystackConfigured()) return { error: "Card giving isn't available yet: the platform's Paystack account isn't connected." };
+
+  const supabase = createClient();
+  const [{ data: details }, { data: church }] = await Promise.all([
+    supabase.from("church_giving_details").select("account_name, account_number, branch_code, updated_at").eq("church_id", me.church_id).maybeSingle(),
+    supabase.from("churches").select("name, email").eq("id", me.church_id).maybeSingle(),
+  ]);
+  if (!details) return { error: "Save your bank details first." };
+  if (details.updated_at !== String(formData.get("expected_details_updated_at") ?? "")) {
+    return { error: "The bank details changed while this page was open. Check them, then turn on card giving again." };
+  }
+  const bank = bankForBranchCode(details.branch_code);
+  if (!bank) {
+    return { error: "Card giving needs your bank's universal branch code (for example FNB 250655). Choose your bank from the list in the bank details, then try again." };
+  }
+
+  const admin = createAdminClient();
+  const { data: existing } = await admin.from("church_card_giving").select("subaccount_code").eq("church_id", me.church_id).maybeSingle();
+  const input = {
+    businessName: church?.name ?? details.account_name,
+    bankCode: bank.code,
+    accountNumber: details.account_number,
+    contactEmail: church?.email ?? me.email,
+  };
+
+  let subaccountCode: string;
+  try {
+    subaccountCode = existing
+      ? (await updateSubaccount(existing.subaccount_code, input)).subaccountCode
+      : (await createSubaccount(input)).subaccountCode;
+  } catch (error) {
+    const message = error instanceof PaystackError ? error.message : "unknown error";
+    console.error("[card-giving] Paystack subaccount failed:", message);
+    // Paystack's reason (e.g. "Account number is invalid") helps the admin fix it.
+    return { error: `Paystack couldn't set up card giving with these bank details (${message}). Check the bank details, then try again.` };
+  }
+
+  const { error } = await admin.from("church_card_giving").upsert({
+    church_id: me.church_id,
+    subaccount_code: subaccountCode,
+    bank_code: bank.code,
+    account_ending: details.account_number.slice(-4),
+    enabled: true,
+    updated_by: me.id,
+  });
+  if (error) {
+    console.error("[card-giving] saving subaccount failed:", error.message);
+    return { error: "Paystack is set up, but we couldn't save it here. Try again — it's safe to repeat." };
+  }
+
+  await logAudit({ churchId: me.church_id, actorId: me.id, action: "card_giving.enabled", targetTable: "church_card_giving", targetId: me.church_id, metadata: { bank: bank.name, account_ending: details.account_number.slice(-4) } });
+  revalidatePath("/dashboard/setup/giving");
+  revalidatePath("/dashboard/giving");
+  flash("Card giving is on. Card gifts will be paid into your church's bank account.");
+  return { ok: true };
+}
+
+/** Church admin: stop card giving (bank transfers keep working). */
+export async function disableCardGiving(_prev: FormState, _formData: FormData): Promise<FormState> {
+  const me = await getCurrentAppUser();
+  if (!me || !me.church_id) return { error: SESSION_EXPIRED };
+  if (!can(me.role, "manageChurchProfile")) return { error: "Only church admins can turn off card giving." };
+
+  const { error } = await createAdminClient().from("church_card_giving").update({ enabled: false, updated_by: me.id }).eq("church_id", me.church_id);
+  if (error) {
+    console.error("[card-giving] disable failed:", error.message);
+    return { error: "Couldn't turn off card giving — please try again." };
+  }
+  await logAudit({ churchId: me.church_id, actorId: me.id, action: "card_giving.disabled", targetTable: "church_card_giving", targetId: me.church_id });
+  revalidatePath("/dashboard/setup/giving");
+  revalidatePath("/dashboard/giving");
+  flash("Card giving is off. Members can still give by bank transfer.");
+  return { ok: true };
 }

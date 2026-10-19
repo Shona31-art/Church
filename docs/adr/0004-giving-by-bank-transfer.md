@@ -57,3 +57,11 @@ until Paystack replaces it.
     count gifts an admin confirmed, and members can't confirm their own.
 - **Revisit when:** the first church pays a subscription, or members ask to
   give by card.
+
+## Update (2026-10-19): card giving added via Paystack
+
+Brought forward at the product owner's request. Each church becomes a
+Paystack subaccount (0 % platform share, Paystack's fee borne by the church's
+share unless the member adds it), so card gifts settle to the church's own
+bank account. Billing subscriptions stay manual for now. Stripe is removed.
+Details: `docs/plans/paystack-card-giving.md`.

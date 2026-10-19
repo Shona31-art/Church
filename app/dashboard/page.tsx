@@ -5,13 +5,30 @@ import { getCurrentAppUser } from "@/lib/current-user";
 import { getChurchAccess } from "@/lib/paywall";
 import { can, isShepherd } from "@/lib/permissions";
 import { verseRefForDate } from "@/lib/bible";
+import { parseReference } from "@/lib/bible/reference";
+import { readerHref } from "@/lib/bible/books";
 import { fetchVerse } from "@/lib/bible/text";
 import { upcomingBirthdays, describeDaysUntil } from "@/lib/birthdays";
-import { APP_TIMEZONE, formatDate, formatDateTime, formatMoney, todayInAppZone } from "@/lib/format";
+import { APP_TIMEZONE, formatDate, formatMoney, formatTime, todayInAppZone } from "@/lib/format";
 import { PLAN_LABELS, type ModuleKey } from "@/lib/subscription";
 import { Section } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { Pin } from "lucide-react";
+import {
+  ArrowRight,
+  BookOpen,
+  Cake,
+  CalendarPlus,
+  ChevronRight,
+  CircleCheck,
+  Gamepad2,
+  Gift,
+  HandHeart,
+  Megaphone,
+  NotebookPen,
+  Pin,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
 
 // Dashboard home, shaped by role. Every card degrades on its own: a failed
 // query shows that card's empty state rather than breaking the page. Only
@@ -154,23 +171,78 @@ export default async function DashboardHomePage() {
     { label: "Open support tickets", count: openTicketsRes.count ?? 0, href: "/dashboard/support", tone: "info" as const },
   ].filter((a) => a.count > 0);
 
+  const firstName = me.name.split(" ")[0];
+  const verseLink = parseReference(verseRef);
+  const canPost = has("announcements") && can(me.role, "postAnnouncements");
+  const canAddEvent = has("calendar") && can(me.role, "createEvents");
+
+  const verse = (
+    <section aria-labelledby="verse-heading" className="flex flex-col rounded-2xl bg-panel p-6 text-on-panel shadow-card sm:p-8">
+      <h2 id="verse-heading" className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gold">
+        Verse of the day
+      </h2>
+      {verseText ? (
+        <blockquote className="mt-4 max-w-3xl flex-1 font-display text-xl leading-relaxed sm:text-[22px]">“{verseText}”</blockquote>
+      ) : (
+        <p className="mt-4 flex-1 text-on-panel/75">We couldn&apos;t load today&apos;s verse text right now — open it in the Bible reader instead.</p>
+      )}
+      <div className="rule-gold mt-5" />
+      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+        <span className="font-semibold">
+          {verseRef} <span className="font-normal text-on-panel/65">(WEB)</span>
+        </span>
+        {has("bible") && verseLink && (
+          <Link href={readerHref({ ...verseLink })} className="font-medium text-on-panel/85 underline-offset-4 hover:text-on-panel hover:underline">
+            Read in context
+          </Link>
+        )}
+        {has("bible_study_ai") && (
+          <Link
+            href={`/dashboard/bible/study?ref=${encodeURIComponent(verseRef)}`}
+            className="inline-flex items-center gap-1 font-medium text-on-panel/85 underline-offset-4 hover:text-on-panel hover:underline"
+          >
+            Study this verse <ArrowRight aria-hidden className="h-3.5 w-3.5" />
+          </Link>
+        )}
+      </div>
+    </section>
+  );
+
   return (
-    <div className="max-w-6xl space-y-6">
-      <header>
-        <p className="text-sm text-ink/60">{greeting(now)},</p>
-        <h1 className="text-3xl font-semibold">{me.name.split(" ")[0]}</h1>
-        <div className="rule-gold mt-2" />
+    <div className="max-w-6xl space-y-8">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="eyebrow">{formatDate(now, { weekday: "long", month: "long", year: undefined })}</p>
+          <h1 className="mt-2 text-[28px] font-semibold leading-tight sm:text-[32px]">
+            {greeting(now)}, {firstName}
+          </h1>
+          <div className="rule-gold mt-3" />
+        </div>
+        {(canPost || canAddEvent) && (
+          <div className="flex flex-wrap gap-2">
+            {canAddEvent && (
+              <Link href="/dashboard/calendar/new" className="btn-secondary">
+                <CalendarPlus aria-hidden className="h-4 w-4" /> New event
+              </Link>
+            )}
+            {canPost && (
+              <Link href="/dashboard/announcements/new" className="btn-primary">
+                <Megaphone aria-hidden className="h-4 w-4" /> New announcement
+              </Link>
+            )}
+          </div>
+        )}
       </header>
 
       {shepherd && (
         <section aria-labelledby="stats-heading">
           <h2 id="stats-heading" className="sr-only">Church at a glance</h2>
-          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             <Stat label="Active members" value={String(memberCountRes.count ?? 0)} href="/dashboard/members" />
             <Stat label="New in the last 30 days" value={String(newMembersRes.count ?? 0)} href="/dashboard/members" />
             <Stat label="Praying together" value={String(sharedPrayersRes.count ?? 0)} hint="requests on the wall" href="/dashboard/prayer-board/wall" />
             {admin && has("giving") ? (
-              <Stat label={`Giving in ${today.slice(0, 4)}`} value={formatMoney(givingTotal)} href="/dashboard/giving/report" mono />
+              <Stat label={`Giving in ${today.slice(0, 4)}`} value={formatMoney(givingTotal)} href="/dashboard/giving/report" />
             ) : (
               <Stat label="Upcoming events" value={String(events.length)} href="/dashboard/calendar" />
             )}
@@ -178,23 +250,34 @@ export default async function DashboardHomePage() {
         </section>
       )}
 
-      {shepherd && (
-        <Section title="Needs your attention">
-          {attention.length === 0 ? (
-            <p className="text-sm text-ink/60">You&apos;re all caught up. Nothing is waiting on you right now.</p>
-          ) : (
-            <ul className="divide-y divide-line">
-              {attention.map((a) => (
-                <li key={a.label}>
-                  <Link href={a.href} className="flex items-center justify-between gap-3 py-2.5 hover:bg-ink/[0.02] -mx-2 px-2 rounded-lg">
-                    <span className="text-sm">{a.label}</span>
-                    <StatusBadge tone={a.tone}>{a.count}</StatusBadge>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
+      {shepherd ? (
+        <div className="grid gap-6 lg:grid-cols-5">
+          <Section title="Needs your attention" className="lg:col-span-3">
+            {attention.length === 0 ? (
+              <p className="flex items-center gap-2 text-sm text-ink/70">
+                <CircleCheck aria-hidden className="h-4 w-4 shrink-0 text-success" />
+                You&apos;re all caught up. Nothing is waiting on you right now.
+              </p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {attention.map((a) => (
+                  <li key={a.label}>
+                    <Link href={a.href} className="group -mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-3 hover:bg-ink/[0.03]">
+                      <span className="text-sm">{a.label}</span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <StatusBadge tone={a.tone}>{a.count}</StatusBadge>
+                        <ChevronRight aria-hidden className="h-4 w-4 text-ink/40 group-hover:text-ink/70" />
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+          <div className="lg:col-span-2">{verse}</div>
+        </div>
+      ) : (
+        verse
       )}
 
       {me.role === "department_leader" && (
@@ -213,43 +296,28 @@ export default async function DashboardHomePage() {
         </Section>
       )}
 
-      <section className="card-elevated rounded-2xl p-6" aria-labelledby="verse-heading">
-        <p id="verse-heading" className="text-xs uppercase tracking-widest text-gold font-semibold">
-          Verse of the day
-        </p>
-        {verseText ? (
-          <blockquote className="mt-3 text-lg leading-relaxed font-display">“{verseText}”</blockquote>
-        ) : (
-          <p className="mt-3 text-ink/60">We couldn&apos;t load today&apos;s verse text right now — open it in the Bible reader instead.</p>
-        )}
-        <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
-          <span className="font-semibold">
-            {verseRef} <span className="text-ink/50 font-normal">(WEB)</span>
-          </span>
-          {has("bible_study_ai") && (
-            <Link href={`/dashboard/bible/study?ref=${encodeURIComponent(verseRef)}`} className="link">
-              Study this verse →
-            </Link>
-          )}
-        </div>
-      </section>
-
       <div className="grid gap-6 md:grid-cols-2">
         {has("calendar") && (
           <Section title="Coming up" actions={<Link href="/dashboard/calendar" className="btn-ghost btn-sm">Calendar</Link>}>
             {events.length === 0 ? (
-              <p className="text-sm text-ink/60">No upcoming events yet.</p>
+              <EmptyLine
+                text="No upcoming events yet."
+                action={canAddEvent ? <Link href="/dashboard/calendar/new" className="btn-secondary btn-sm">Add an event</Link> : null}
+              />
             ) : (
-              <ul className="space-y-3">
+              <ul className="space-y-1">
                 {events.map((e) => (
                   <li key={e.id}>
-                    <Link href={`/dashboard/calendar/${e.id}`} className="block hover:opacity-80">
-                      <p className="text-sm font-medium">{e.title}</p>
-                      <p className="text-xs text-ink/60">
-                        {formatDateTime(e.start_time)}
-                        {e.location ? ` · ${e.location}` : ""}
-                        {e.departments?.name ? ` · ${e.departments.name}` : ""}
-                      </p>
+                    <Link href={`/dashboard/calendar/${e.id}`} className="-mx-2 flex items-center gap-4 rounded-xl px-2 py-2 hover:bg-ink/[0.03]">
+                      <DateTile value={e.start_time} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{e.title}</p>
+                        <p className="truncate text-xs text-ink/60">
+                          {formatDate(e.start_time, { year: undefined })} · {formatTime(e.start_time)}
+                          {e.location ? ` · ${e.location}` : ""}
+                          {e.departments?.name ? ` · ${e.departments.name}` : ""}
+                        </p>
+                      </div>
                     </Link>
                   </li>
                 ))}
@@ -261,18 +329,21 @@ export default async function DashboardHomePage() {
         {has("announcements") && (
           <Section title="Announcements" actions={<Link href="/dashboard/announcements" className="btn-ghost btn-sm">See all</Link>}>
             {announcements.length === 0 ? (
-              <p className="text-sm text-ink/60">No announcements yet.</p>
+              <EmptyLine
+                text="No announcements yet."
+                action={canPost ? <Link href="/dashboard/announcements/new" className="btn-secondary btn-sm">Post an announcement</Link> : null}
+              />
             ) : (
-              <ul className="space-y-3">
+              <ul className="divide-y divide-line">
                 {announcements.map((a) => (
                   <li key={a.id}>
-                    <Link href={`/dashboard/announcements/${a.id}`} className="block hover:opacity-80">
-                      <p className="text-sm font-medium">
+                    <Link href={`/dashboard/announcements/${a.id}`} className="-mx-2 block rounded-lg px-2 py-3 hover:bg-ink/[0.03]">
+                      <p className="text-sm font-semibold">
                         {a.pinned && <span className="sr-only">Pinned: </span>}
                         {a.pinned && <Pin aria-hidden className="mr-1 inline h-3.5 w-3.5 -translate-y-px text-gold" />}
                         {a.title}
                       </p>
-                      <p className="text-xs text-ink/60 line-clamp-2">{a.body}</p>
+                      <p className="mt-0.5 line-clamp-2 text-xs text-ink/60">{a.body}</p>
                     </Link>
                   </li>
                 ))}
@@ -283,13 +354,15 @@ export default async function DashboardHomePage() {
 
         {!shepherd && has("pastor_booking") && (myBookingsRes.data?.length ?? 0) > 0 && (
           <Section title="My booking requests" actions={<Link href="/dashboard/booking" className="btn-ghost btn-sm">All requests</Link>}>
-            <ul className="space-y-2">
+            <ul className="divide-y divide-line">
               {(myBookingsRes.data as any[]).map((b) => (
-                <li key={b.id} className="flex items-center justify-between gap-3 text-sm">
-                  <Link href={`/dashboard/booking/${b.id}`} className="capitalize hover:underline">
-                    {b.booking_type} · {formatDate(b.preferred_date, { weekday: undefined })}
+                <li key={b.id}>
+                  <Link href={`/dashboard/booking/${b.id}`} className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 text-sm hover:bg-ink/[0.03]">
+                    <span className="capitalize">
+                      {b.booking_type} · {formatDate(b.preferred_date, { weekday: undefined })}
+                    </span>
+                    <StatusBadge tone={b.status === "approved" ? "success" : "warning"}>{b.status === "approved" ? "Approved" : "Pending"}</StatusBadge>
                   </Link>
-                  <StatusBadge tone={b.status === "approved" ? "success" : "warning"}>{b.status === "approved" ? "Approved" : "Pending"}</StatusBadge>
                 </li>
               ))}
             </ul>
@@ -299,16 +372,19 @@ export default async function DashboardHomePage() {
         {shepherd && has("pastoral_care") && (
           <Section title="Birthdays this week" actions={<Link href="/dashboard/pastoral-care" className="btn-ghost btn-sm">Care log</Link>}>
             {birthdays.length === 0 ? (
-              <p className="text-sm text-ink/60">No birthdays in the next 7 days. Add birth dates on member profiles to get reminders here.</p>
+              <EmptyLine text="No birthdays in the next 7 days. Add birth dates on member profiles to get reminders here." />
             ) : (
               <ul className="divide-y divide-line">
                 {birthdays.map((b) => (
-                  <li key={b.userId} className="py-2 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium">{b.name}</p>
-                      <p className="text-xs text-ink/60">
-                        {describeDaysUntil(b.daysUntil)} · turning {b.turningAge}
-                      </p>
+                  <li key={b.userId} className="flex items-center justify-between gap-3 py-2.5">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Cake aria-hidden className="h-4 w-4 shrink-0 text-gold" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{b.name}</p>
+                        <p className="text-xs text-ink/60">
+                          {describeDaysUntil(b.daysUntil)} · turning {b.turningAge}
+                        </p>
+                      </div>
                     </div>
                     <Link href={`/dashboard/pastoral-care/new?member=${b.userId}&type=birthday_reachout`} className="btn-secondary btn-sm shrink-0">
                       Log reach-out
@@ -323,18 +399,18 @@ export default async function DashboardHomePage() {
         {shepherd && has("pastoral_care") && (
           <Section title="Follow-ups due" actions={<Link href="/dashboard/pastoral-care?due=1" className="btn-ghost btn-sm">View all</Link>}>
             {followUps.length === 0 ? (
-              <p className="text-sm text-ink/60">Nothing due this week.</p>
+              <EmptyLine text="Nothing due this week." />
             ) : (
               <ul className="divide-y divide-line">
                 {followUps.map((f) => {
                   const overdue = f.follow_up_date < today;
                   return (
-                    <li key={f.id} className="py-2 flex items-center justify-between gap-3">
+                    <li key={f.id} className="flex items-center justify-between gap-3 py-2.5">
                       <p className="text-sm">{f.member_name}</p>
                       {overdue ? (
                         <StatusBadge tone="danger">Overdue · {formatDate(f.follow_up_date, { weekday: undefined, year: undefined })}</StatusBadge>
                       ) : (
-                        <span className="text-xs text-ink/60">{formatDate(f.follow_up_date, { year: undefined })}</span>
+                        <span className="tabular text-xs text-ink/60">{formatDate(f.follow_up_date, { year: undefined })}</span>
                       )}
                     </li>
                   );
@@ -348,7 +424,7 @@ export default async function DashboardHomePage() {
       <QuickLinks has={has} />
 
       {admin && access?.planKey && (
-        <p className="text-xs text-ink/50">
+        <p className="text-xs text-ink/60">
           Plan: {PLAN_LABELS[access.planKey] ?? access.planKey}.{" "}
           <Link href="/dashboard/billing" className="link">
             Billing
@@ -359,40 +435,65 @@ export default async function DashboardHomePage() {
   );
 }
 
-function Stat({ label, value, hint, href, mono }: { label: string; value: string; hint?: string; href: string; mono?: boolean }) {
+/** One-line empty state inside a home-page card, with the fix when the viewer can make it. */
+function EmptyLine({ text, action }: { text: string; action?: React.ReactNode }) {
   return (
-    <Link href={href} className="card-interactive rounded-xl p-4 block">
-      <p className={`text-2xl font-semibold ${mono ? "tabular-nums" : ""}`}>{value}</p>
-      <p className="text-xs text-ink/60 mt-1">
-        {label}
-        {hint ? <span className="sr-only"> ({hint})</span> : null}
-      </p>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <p className="text-sm text-ink/60">{text}</p>
+      {action}
+    </div>
+  );
+}
+
+/** Calendar-style month/day tile for event rows. */
+function DateTile({ value }: { value: string }) {
+  return (
+    <span aria-hidden className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl border border-line bg-parchment">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink/60">
+        {formatDate(value, { weekday: undefined, day: undefined, year: undefined, month: "short" })}
+      </span>
+      <span className="tabular text-lg font-semibold leading-none">{formatDate(value, { weekday: undefined, month: undefined, year: undefined, day: "numeric" })}</span>
+    </span>
+  );
+}
+
+function Stat({ label, value, hint, href }: { label: string; value: string; hint?: string; href: string }) {
+  return (
+    <Link href={href} className="card-interactive group block rounded-2xl p-4 sm:p-5">
+      <p className="text-xs font-medium text-ink/60">{label}</p>
+      <p className="tabular mt-2 truncate text-[26px] font-semibold leading-none tracking-[-0.01em] sm:text-[28px]">{value}</p>
+      {hint && <p className="mt-1.5 text-xs text-ink/60">{hint}</p>}
     </Link>
   );
 }
 
-const QUICK_LINKS = [
-  { href: "/dashboard/prayer-board/wall", label: "Prayer wall", hint: "Pray for your church family", module: "prayer_board" },
-  { href: "/dashboard/bible", label: "Read the Bible", hint: "World English Bible", module: "bible" },
-  { href: "/dashboard/bible/study", label: "Bible study AI", hint: "Explain, devotional, reading plan", module: "bible_study_ai" },
-  { href: "/dashboard/games", label: "Bible games", hint: "Quiz, word search, verse puzzle", module: "bible_games" },
-  { href: "/dashboard/giving", label: "Give", hint: "Tithes & offerings", module: "giving" },
-  { href: "/dashboard/journal", label: "Journal", hint: "Private & encrypted", module: "journal" },
-] as const;
+const QUICK_LINKS: { href: string; label: string; hint: string; module: ModuleKey; Icon: LucideIcon }[] = [
+  { href: "/dashboard/prayer-board/wall", label: "Prayer wall", hint: "Pray for your church family", module: "prayer_board", Icon: HandHeart },
+  { href: "/dashboard/bible", label: "Read the Bible", hint: "World English Bible", module: "bible", Icon: BookOpen },
+  { href: "/dashboard/bible/study", label: "Bible study AI", hint: "Explain, devotional, reading plan", module: "bible_study_ai", Icon: Sparkles },
+  { href: "/dashboard/games", label: "Bible games", hint: "Quiz, word search, verse puzzle", module: "bible_games", Icon: Gamepad2 },
+  { href: "/dashboard/giving", label: "Give", hint: "Tithes & offerings", module: "giving", Icon: Gift },
+  { href: "/dashboard/journal", label: "Journal", hint: "Private & encrypted", module: "journal", Icon: NotebookPen },
+];
 
 function QuickLinks({ has }: { has: (m: ModuleKey) => boolean }) {
   const links = QUICK_LINKS.filter((q) => has(q.module));
   if (!links.length) return null;
   return (
     <section aria-labelledby="quick-heading">
-      <h2 id="quick-heading" className="text-lg font-semibold mb-3">
+      <h2 id="quick-heading" className="mb-4 text-xl font-semibold">
         Quick access
       </h2>
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
-        {links.map((q) => (
-          <Link key={q.href} href={q.href} className="card-interactive rounded-xl p-4">
-            <p className="text-sm font-semibold">{q.label}</p>
-            <p className="text-xs text-ink/60 mt-1">{q.hint}</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {links.map(({ href, label, hint, Icon }) => (
+          <Link key={href} href={href} className="card-interactive flex items-center gap-4 rounded-2xl p-4">
+            <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-line bg-parchment text-gold">
+              <Icon className="h-5 w-5" strokeWidth={1.75} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold">{label}</span>
+              <span className="block truncate text-xs text-ink/60">{hint}</span>
+            </span>
           </Link>
         ))}
       </div>

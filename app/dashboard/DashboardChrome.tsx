@@ -215,7 +215,7 @@ function Sidebar({
           <Avatar name={userName} src={userPhotoUrl} />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold leading-tight">{userName}</p>
-            <p className="truncate text-xs leading-tight text-ink/55">{userRole}</p>
+            <p className="truncate text-xs leading-tight text-ink/60">{userRole}</p>
           </div>
         </Link>
         <div className="flex items-center justify-between gap-2 px-2">

@@ -20,8 +20,56 @@ interface Details {
   updated_at: string;
 }
 
-// Suggestions only — admins can type any bank.
+// The common South African banks; "Other bank" lets admins type any name.
+// A plain <select> rather than a <datalist>: datalist pop-ups are drawn in the
+// wrong place inside dialogs in some browsers (and barely work on iPhone).
 const BANKS = ["Absa", "African Bank", "Capitec", "Discovery Bank", "FNB", "Investec", "Nedbank", "Standard Bank", "TymeBank"];
+const OTHER = "__other__";
+
+function BankField({ initial, error }: { initial: string; error?: string }) {
+  const [choice, setChoice] = useState(initial === "" ? "" : BANKS.includes(initial) ? initial : OTHER);
+  return (
+    <div className="space-y-2">
+      <FormField label="Bank" htmlFor="bank_choice" required error={choice === OTHER ? undefined : error}>
+        <select
+          id="bank_choice"
+          value={choice}
+          onChange={(e) => setChoice(e.target.value)}
+          required
+          className="input"
+          aria-invalid={Boolean(error) && choice !== OTHER}
+        >
+          <option value="" disabled>
+            Choose your bank
+          </option>
+          {BANKS.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+          <option value={OTHER}>Other bank…</option>
+        </select>
+      </FormField>
+      {choice === OTHER ? (
+        <FormField label="Bank name" htmlFor="bank_name" required error={error}>
+          <input
+            id="bank_name"
+            name="bank_name"
+            required
+            maxLength={60}
+            autoComplete="off"
+            autoFocus
+            defaultValue={BANKS.includes(initial) ? "" : initial}
+            className="input"
+            aria-invalid={Boolean(error)}
+          />
+        </FormField>
+      ) : (
+        <input type="hidden" name="bank_name" value={choice} />
+      )}
+    </div>
+  );
+}
 
 export function GivingDetailsForm({
   details,
@@ -58,14 +106,7 @@ export function GivingDetailsForm({
       </FormField>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <FormField label="Bank" htmlFor="bank_name" required error={fe.bank_name}>
-          <input id="bank_name" name="bank_name" list="sa-banks" required maxLength={60} autoComplete="off" defaultValue={v("bank_name")} className="input" aria-invalid={Boolean(fe.bank_name)} />
-          <datalist id="sa-banks">
-            {BANKS.map((b) => (
-              <option key={b} value={b} />
-            ))}
-          </datalist>
-        </FormField>
+        <BankField initial={v("bank_name")} error={fe.bank_name} />
         <FormField label="Account type" htmlFor="account_type" required error={fe.account_type}>
           <select id="account_type" name="account_type" required defaultValue={v("account_type", "cheque")} className="input" aria-invalid={Boolean(fe.account_type)}>
             {ACCOUNT_TYPES.map((t) => (

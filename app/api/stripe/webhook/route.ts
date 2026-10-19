@@ -25,9 +25,11 @@ export async function POST(req: NextRequest) {
   const body = await req.text();
   const signature = req.headers.get("stripe-signature");
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!signature || !webhookSecret || !process.env.STRIPE_SECRET_KEY) {
+  if (!webhookSecret || !process.env.STRIPE_SECRET_KEY) {
     return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
   }
+  // No signature at all is a bad request, not a server problem.
+  if (!signature) return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
 
   let event: Stripe.Event;
   try {

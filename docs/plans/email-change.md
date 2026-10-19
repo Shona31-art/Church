@@ -1,6 +1,6 @@
 # Members change their own email — plan
 
-Status: **PROPOSED** (2026-10-19), awaiting approval. Closes the README gap
+Status: **BUILT** (2026-10-19), approved. Change from the plan: no "Cancel this change" button — Supabase offers no reliable way for a member to withdraw a pending change, so the page says the links simply expire, and a new request replaces the old one. Closes the README gap
 "Member email changes aren't supported in the app".
 
 ## Why it needs care

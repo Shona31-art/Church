@@ -16,7 +16,7 @@ export function ProfileForm({ name, phone, birthDate, email }: { name: string; p
       <FormField label="Full name" htmlFor="name" required error={fe.name}>
         <input id="name" name="name" required maxLength={120} defaultValue={name} autoComplete="name" className="input" aria-invalid={Boolean(fe.name)} />
       </FormField>
-      <FormField label="Email" htmlFor="email" hint="Your sign-in email. Contact your church admin to change it.">
+      <FormField label="Email" htmlFor="email" hint="Your sign-in email. Change it under Email address below.">
         <input id="email" value={email} disabled className="input" />
       </FormField>
       <div className="grid gap-5 sm:grid-cols-2">

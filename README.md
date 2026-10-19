@@ -67,6 +67,7 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 30 | `eft_giving.sql` | Giving by bank transfer: `church_giving_details` (each church's bank account — readable by that church's members, changed only by its church admins; every change audit-logged and sent to every church admin's bell), new `givings` columns and statuses (`reported` → `succeeded`/`not_received`), members may only record their own transfer and delete it while waiting, admins confirm through `confirm_eft_gift()`. Plain-language notes at the top of the file. Why: `docs/adr/0004-giving-by-bank-transfer.md` |
 | 31 | `paystack_card_giving.sql` | Card giving: `church_card_giving` (each church's Paystack subaccount — readable by its members, written only by the server after an admin check; paused automatically when bank details change), `givings.provider` / `provider_reference` (unique) / `fee_cents`. Plain-language notes at the top of the file |
 | 32 | `church_move.sql` | When the platform admin moves someone to another church: their birthday moves with them, their shared prayers come off the old church's wall (kept privately), upcoming bookings with the old church are cancelled and RSVPs to its upcoming events removed; one audit entry. Gifts, care notes, counselling records and messages stay with the old church. Plan: `docs/plans/church-move-cleanup.md` |
+| 33 | `email_sync.sql` | When a member's sign-in email changes (they confirm it from My account → Email address), copies it to `app_users.email` and audit-logs it with both addresses partly hidden. Plan: `docs/plans/email-change.md` |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so
@@ -330,6 +331,7 @@ every server action, and is enforced again by Postgres RLS. Menus only hide link
 | Billing (plans; manual for now) | `app/dashboard/billing/`, `lib/billing.ts`; plan changes in `app/dashboard/super-admin/` |
 | Giving, giving report & CSV | Bank transfers (EFT, the default): church bank details `app/dashboard/setup/giving/`; member page + "I've made a transfer" + confirm/delete actions `app/dashboard/giving/`; waiting list `app/dashboard/giving/report/WaitingGifts.tsx`; rules + references `lib/giving.ts`; database rules `supabase/eft_giving.sql` (tests `tests/db/eft-giving.test.ts`). CSV `app/api/giving/export/route.ts`. Card giving (Paystack): client `lib/paystack.ts`, settlement rules `lib/card-giving.ts` (tested), bank list `lib/banks-za.ts`, settings `app/dashboard/setup/giving/CardGivingSection.tsx`, return `app/api/giving/paystack/return/route.ts`, webhook `app/api/paystack/webhook/route.ts`, database `supabase/paystack_card_giving.sql`. Why: `docs/adr/0004-giving-by-bank-transfer.md` |
 | Journal encryption | `lib/encryption.ts` (tested) |
+| Changing sign-in email | `app/dashboard/account/EmailChangeForm.tsx`, `requestEmailChange` in `app/dashboard/account/actions.ts`, password check `lib/supabase/verify-password.ts`, link landing `app/auth/confirm-email/route.ts`, sync `supabase/email_sync.sql` |
 | Registration & church creation | `app/register/actions.ts`, `lib/provision.ts` |
 | Super admin | `app/dashboard/super-admin/` (`actions.ts` holds all writes) |
 | Session refresh & sign-in redirects | `middleware.ts`, `app/login/`, `app/auth/signout/` |
@@ -403,8 +405,14 @@ the Aperture default). Conventions every screen follows:
   first limit a growing platform will hit.
 - **One timezone per deployment** (`NEXT_PUBLIC_APP_TIMEZONE`). Per-church
   timezones would need a `churches.timezone` column.
-- **Member email changes** aren't supported in the app (email is the sign-in;
-  a church admin or super admin would change it in Supabase Auth).
+- **Email changes** are self-service (My account → Email address; needs the
+  current password and an emailed confirmation). Check Supabase → Authentication
+  → Providers → Email → **Secure email change** is on, so the old address must
+  confirm too, and add `<your-domain>/auth/confirm-email` (and
+  `http://localhost:3000/auth/confirm-email`) to Authentication → URL
+  Configuration → Redirect URLs. Someone who has lost their old inbox needs the
+  platform admin to change it in Supabase Auth. A pending change can't be
+  withdrawn in the app; its links simply expire.
 - **Moving someone to another church** (Super Admin) keeps the old church's
   own records — gifts, pastoral care notes, counselling records, messages —
   with the old church on purpose. The person's birthday, shared prayers,

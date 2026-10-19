@@ -72,7 +72,7 @@ export function MemberForm({
           <input id="email" name="email" type="email" required maxLength={254} autoComplete="off" defaultValue={value("email", "")} className="input" aria-invalid={Boolean(fe.email)} />
         </FormField>
       ) : (
-        <FormField label="Email" htmlFor="email" hint="Email is their sign-in, so only they can change it.">
+        <FormField label="Email" htmlFor="email" hint="Email is their sign-in, so only they can change it — in My account → Email address.">
           <input id="email" value={member?.email} disabled className="input" />
         </FormField>
       )}

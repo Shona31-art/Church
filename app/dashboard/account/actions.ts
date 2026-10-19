@@ -9,6 +9,8 @@ import { nameSchema, phoneSchema } from "@/lib/member-schemas";
 import { passwordSchema } from "@/lib/account-schemas";
 import { FormState, SESSION_EXPIRED, invalid, optionalField } from "@/lib/forms";
 import { AVATAR_BUCKET, isOwnAvatarPath } from "@/lib/avatar-path";
+import { verifyPassword } from "@/lib/supabase/verify-password";
+import { logAudit } from "@/lib/audit";
 
 // Self-service account changes. RLS lets people update their own name and
 // phone; the security trigger stops anyone changing their own role, status,
@@ -76,6 +78,61 @@ export async function changeMyPassword(_prev: FormState, formData: FormData): Pr
     };
   }
   flash("Password changed.");
+  return { ok: true };
+}
+
+/**
+ * Start changing the sign-in email (docs/plans/email-change.md).
+ * Form fields: new_email, current_password.
+ *
+ * Nothing changes yet: Supabase emails a confirmation link (to both the old
+ * and the new address when "Secure email change" is on) and switches the
+ * sign-in only once it's confirmed; migration #33 then updates app_users.
+ */
+export async function requestEmailChange(_prev: FormState, formData: FormData): Promise<FormState> {
+  const me = await getCurrentAppUser();
+  if (!me) return { error: SESSION_EXPIRED };
+
+  const parsed = z
+    .object({
+      new_email: z.string().trim().toLowerCase().email("Enter a valid email address.").max(254, "That email is too long."),
+      current_password: z.string().min(1, "Enter your current password."),
+    })
+    .safeParse({ new_email: formData.get("new_email") ?? "", current_password: formData.get("current_password") ?? "" });
+  if (!parsed.success) {
+    const result = invalid(parsed.error, formData);
+    if (result?.values) delete result.values.current_password; // never echo a password back
+    return result;
+  }
+  const keep = { new_email: parsed.data.new_email };
+  if (parsed.data.new_email === me.email.toLowerCase()) {
+    return { error: "That's already your email address.", fieldErrors: { new_email: "Enter a different address." }, values: keep };
+  }
+
+  const check = await verifyPassword(me.email, parsed.data.current_password);
+  if (check === "wrong") return { error: "That password isn't right.", fieldErrors: { current_password: "Check your current password." }, values: keep };
+  if (check === "limited") return { error: "Too many attempts. Wait a few minutes, then try again.", values: keep };
+  if (check === "error") return { error: "We couldn't check your password just now — please try again.", values: keep };
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const { error } = await createClient().auth.updateUser({ email: parsed.data.new_email }, { emailRedirectTo: `${appUrl}/auth/confirm-email` });
+  if (error) {
+    console.error("[account] email change request failed:", error.message);
+    const taken = /already|registered|exists/i.test(error.message);
+    return {
+      error: taken
+        ? "That email address is already used by another account."
+        : error.status === 429
+          ? "Too many emails sent just now. Wait a few minutes, then try again."
+          : "We couldn't start the change — please try again. Your email hasn't changed.",
+      fieldErrors: taken ? { new_email: "Use a different address." } : undefined,
+      values: keep,
+    };
+  }
+
+  await logAudit({ churchId: me.church_id, actorId: me.id, action: "account.email_change_requested", targetTable: "app_users", targetId: me.id });
+  revalidatePath("/dashboard/account");
+  flash("Check your email. Confirm the change from the links we sent — your sign-in stays the same until you do.", "info");
   return { ok: true };
 }
 

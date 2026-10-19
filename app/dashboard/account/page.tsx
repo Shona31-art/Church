@@ -9,10 +9,15 @@ import { getAvatarUrls } from "@/lib/avatars";
 import { Alert } from "@/components/ui/Alert";
 import { PushSettings } from "@/components/notifications/PushSettings";
 import { InstallApp } from "@/components/install/InstallApp";
+import { EmailChangeForm } from "./EmailChangeForm";
 
-export default async function MyAccountPage() {
+// searchParams is optional: the popup version of this page renders it without one.
+export default async function MyAccountPage({ searchParams }: { searchParams?: { email?: string } } = {}) {
   const me = (await getCurrentAppUser())!;
   const supabase = createClient();
+  // Supabase keeps a requested-but-unconfirmed email as `new_email` on the auth user.
+  const { data: authData } = await supabase.auth.getUser();
+  const pendingEmail = authData.user?.new_email ?? null;
   const [{ data: profile }, { data: birthday }, { data: church }, { data: department }, chatProfile, avatars] = await Promise.all([
     supabase.from("app_users").select("phone").eq("id", me.id).maybeSingle(),
     supabase.from("member_birthdays").select("birth_date").eq("user_id", me.id).maybeSingle(),
@@ -101,6 +106,22 @@ export default async function MyAccountPage() {
           />
         </Section>
       )}
+
+      <div id="email" className="scroll-mt-24">
+        <Section title="Email address" description="The address you sign in with and receive church emails at.">
+          {searchParams?.email === "confirmed" && (
+            <Alert tone="success" className="mb-4">
+              Thanks — that confirmation was received. If we also emailed your other address, open that link too; your sign-in changes once both are done.
+            </Alert>
+          )}
+          {searchParams?.email === "link_problem" && (
+            <Alert tone="error" className="mb-4">
+              That link didn&apos;t work — it may have expired or already been used. Ask for the change again below.
+            </Alert>
+          )}
+          <EmailChangeForm currentEmail={me.email} pendingEmail={pendingEmail} />
+        </Section>
+      </div>
 
       <Section title="Password">
         <PasswordForm />

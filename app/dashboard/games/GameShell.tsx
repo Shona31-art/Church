@@ -230,7 +230,7 @@ function ResultCard({
             <div key={b.key} className="flex items-center gap-3 rounded-xl border border-gold/50 bg-gold/10 px-4 py-3 text-left motion-safe:animate-modal-in">
               <Award aria-hidden className="h-6 w-6 shrink-0 text-gold" />
               <span>
-                <span className="block text-xs font-semibold uppercase tracking-wide text-gold">New badge</span>
+                <span className="block text-xs font-semibold uppercase tracking-wide text-gold-deep">New badge</span>
                 <span className="block font-semibold">{b.title}</span>
                 <span className="block text-xs text-ink/60">{b.description}</span>
               </span>

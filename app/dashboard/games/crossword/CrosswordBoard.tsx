@@ -124,7 +124,7 @@ export function CrosswordBoard({ view, finish, finishing }: BoardProps<Crossword
     <div className="card-elevated rounded-2xl p-4 sm:p-6">
       {current && (
         <div className="sticky top-14 z-10 mb-4 rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 md:top-2" aria-live="polite">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-gold">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-gold-deep">
             {current.direction === "across" ? <ArrowRight aria-hidden className="h-3.5 w-3.5" /> : <ArrowDown aria-hidden className="h-3.5 w-3.5" />}
             {current.number} {current.direction === "across" ? "Across" : "Down"} · {current.length} letters
           </p>

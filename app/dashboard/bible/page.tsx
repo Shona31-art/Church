@@ -64,7 +64,7 @@ export default async function BibleHomePage() {
       </div>
 
       <section aria-labelledby="votd-title" className="card-elevated mt-4 rounded-2xl p-5 sm:p-6">
-        <h2 id="votd-title" className="eyebrow text-gold">
+        <h2 id="votd-title" className="eyebrow text-gold-deep">
           Verse of the day
         </h2>
         {verseText ? (

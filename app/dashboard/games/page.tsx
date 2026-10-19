@@ -143,7 +143,7 @@ export default async function GamesHubPage({ searchParams }: { searchParams: { k
             <ol className="mt-5 space-y-2 border-t border-line pt-4">
               {daily.slice(0, 5).map((r, i) => (
                 <li key={r.user_id} className={`flex items-center gap-3 text-sm ${r.user_id === me.id ? "font-semibold" : ""}`}>
-                  <span className={`tabular w-5 text-center ${i < 3 ? "font-semibold text-gold" : "text-ink/60"}`}>{i + 1}</span>
+                  <span className={`tabular w-5 text-center ${i < 3 ? "font-semibold text-gold-deep" : "text-ink/60"}`}>{i + 1}</span>
                   <Avatar name={r.app_users?.name ?? "Member"} src={photos.get(r.user_id)} size="xs" />
                   <span className="flex-1 truncate">{r.app_users?.name ?? "Member"}</span>
                   <span className="tabular text-ink/60">
@@ -227,7 +227,7 @@ export default async function GamesHubPage({ searchParams }: { searchParams: { k
             <ol className="space-y-2.5">
               {leaderboard.map((row, i) => (
                 <li key={row.userId} className={`flex items-center gap-3 text-sm ${row.userId === me.id ? "font-semibold" : ""}`}>
-                  <span className={`tabular w-6 text-center ${i < 3 ? "font-semibold text-gold" : "text-ink/60"}`}>{i + 1}</span>
+                  <span className={`tabular w-6 text-center ${i < 3 ? "font-semibold text-gold-deep" : "text-ink/60"}`}>{i + 1}</span>
                   <Avatar name={row.name} src={photos.get(row.userId)} size="xs" />
                   <span className="flex-1 truncate">
                     {row.name}
@@ -255,7 +255,7 @@ export default async function GamesHubPage({ searchParams }: { searchParams: { k
                   <span>
                     {GAMES[a.game_type as GameKey]?.title ?? a.game_type}
                     {a.level && <span className="text-ink/60"> · {LEVEL_LABELS[a.level as Level] ?? a.level}</span>}
-                    {a.mode === "daily" && <span className="text-gold"> · daily</span>}
+                    {a.mode === "daily" && <span className="text-gold-deep"> · daily</span>}
                     {a.mode === "kids" && <span className="text-ink/60"> · kids</span>}
                   </span>
                   <span className="tabular text-ink/60">

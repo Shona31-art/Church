@@ -74,7 +74,7 @@ export function StudyTool({ initialQuery }: { initialQuery: string }) {
 
       {result?.passageText && (
         <section className="card-elevated rounded-2xl p-5">
-          <p className="text-xs uppercase tracking-widest text-gold font-semibold">{query} · World English Bible</p>
+          <p className="eyebrow text-gold-deep">{query} · World English Bible</p>
           <p className="mt-2 leading-relaxed">{result.passageText}</p>
         </section>
       )}

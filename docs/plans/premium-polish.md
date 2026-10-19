@@ -1,6 +1,6 @@
 # Premium polish & button audit — plan
 
-Status: **APPROVED** (2026-10-19).
+Status: **BUILT** (2026-10-19), steps 1–6 on `dev`; awaiting your visual review.
 
 ## Decisions taken (from the 2026-10-19 audit questions)
 

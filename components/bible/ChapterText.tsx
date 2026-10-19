@@ -83,7 +83,7 @@ export function ChapterText({
 
   const inner = (n: number, text: string) => (
     <>
-      <sup className="tabular mr-1 text-[0.68em] font-semibold text-gold">{n}</sup>
+      <sup className="tabular mr-1 text-[0.68em] font-semibold text-gold-deep">{n}</sup>
       {bookmarks.includes(n) && (
         <>
           <Bookmark aria-hidden className="mr-1 inline h-[0.8em] w-[0.8em] -translate-y-px fill-current text-gold" />
@@ -162,7 +162,7 @@ export function ChapterText({
           <span className="eyebrow mr-1.5">{compare.abbreviation}</span>
           {compare.verses.slice(verses.length).map((t, j) => (
             <span key={j}>
-              <sup className="tabular mr-1 text-[0.68em] font-semibold text-gold">{verses.length + j + 1}</sup>
+              <sup className="tabular mr-1 text-[0.68em] font-semibold text-gold-deep">{verses.length + j + 1}</sup>
               <VerseText text={t} />{" "}
             </span>
           ))}

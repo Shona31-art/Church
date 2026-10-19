@@ -234,6 +234,10 @@ every server action, and is enforced again by Postgres RLS. Menus only hide link
 | Light/dark theme switch | `lib/theme.ts`, `components/ui/ThemeSwitcher.tsx`; applied before paint in `app/layout.tsx` |
 | Icons (menu + empty states) | `components/ui/NavIcon.tsx` (lucide-react) |
 | Shared UI (page header, empty/error states, badges, confirm dialog, toasts) | `components/ui/`, `components/ConfirmSubmitButton.tsx` |
+| "Are you sure?" from code (not a form) | `components/ui/ConfirmDialog.tsx` (`useConfirm`) |
+| Calling a server action from a client component | wrap it in `callAction` (`lib/call-action.ts`) so a failed request shows an error instead of a stuck button |
+| Loading skeletons | `components/ui/Skeleton.tsx`; per-section `loading.tsx` (dashboard, members, chat, posters) |
+| Product logo, photo placeholders, sign-in layout | `components/brand/` (`BrandMark`, `PhotoPlaceholder`, `AuthShell`) |
 | Forms opening as popups | `components/ui/RouteModal.tsx`; one wrapper per form in `app/dashboard/@modal/(.)<route>/page.tsx`. A new form page needs a matching wrapper, or it opens as a full page |
 | Dates, times, money formatting; timezone | `lib/format.ts` |
 | Form error handling pattern | `lib/forms.ts` |
@@ -280,6 +284,11 @@ the Aperture default). Conventions every screen follows:
   errors, typed values kept after an error, button disabled while saving,
   a toast on success.
 - **Status** is always a word in a badge, never colour alone.
+- **Contrast**: small grey text uses `text-ink/60` or darker (lighter fails
+  WCAG AA on the light theme). `gold` is for hairlines and icons; gold *text*
+  on a light surface uses `text-gold-deep`. The navy `panel` / `on-panel`
+  tokens are for brand panels that stay dark in both themes.
+- **Icons** come from lucide-react only — no emoji as icons.
 
 ---
 

@@ -65,7 +65,7 @@ export function MessageBubble({
                 : `border border-line bg-surface ${showHeader ? "rounded-tl-md" : ""}`
             } ${message.pending ? "opacity-70" : ""}`}
           >
-            {showHeader && !isMine && !isDm && <p className="mb-0.5 text-xs font-semibold text-gold">{sender.name}</p>}
+            {showHeader && !isMine && !isDm && <p className="mb-0.5 text-xs font-semibold text-gold-deep">{sender.name}</p>}
 
             {quoted && !deleted && (
               <button
@@ -115,7 +115,7 @@ export function MessageBubble({
               {message.edited_at && !deleted && <span>Edited</span>}
               <time dateTime={message.created_at}>{message.pending ? "Sending…" : formatTime(message.created_at)}</time>
               {receipt && receipt !== "sending" && !deleted && (
-                <span className={receipt === "read" ? "text-gold" : ""} title={receipt === "read" ? "Read" : "Sent"}>
+                <span className={receipt === "read" ? "text-gold-deep" : ""} title={receipt === "read" ? "Read" : "Sent"}>
                   {receipt === "read" ? <CheckCheck aria-hidden className="h-3.5 w-3.5" /> : <Check aria-hidden className="h-3.5 w-3.5" />}
                   <span className="sr-only">{receipt === "read" ? "Read" : "Sent"}</span>
                 </span>

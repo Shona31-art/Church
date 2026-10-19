@@ -21,6 +21,8 @@
   --ember: 27 42 74;
   --on-ember: 255 255 255;
   --gold: 168 138 74;
+  /* Gold for small text on light surfaces: --gold is only ~3:1 there. */
+  --gold-deep: 130 102 46;
   --shadow: 20 22 31;
   /* Brand panel (auth screens, landing band): deep navy in both themes. */
   --panel: 22 32 56;
@@ -62,6 +64,7 @@
   --ember: 226 205 160;
   --on-ember: 18 20 28;
   --gold: 201 170 106;
+  --gold-deep: 201 170 106;
   --shadow: 0 0 0;
   --panel: 24 31 48;
   --on-panel: 237 234 227;
@@ -98,6 +101,7 @@
     --ember: 226 205 160;
     --on-ember: 18 20 28;
     --gold: 201 170 106;
+    --gold-deep: 201 170 106;
     --shadow: 0 0 0;
     --panel: 24 31 48;
     --on-panel: 237 234 227;

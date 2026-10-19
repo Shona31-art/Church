@@ -29,7 +29,7 @@ const config: Config = {
         "line-strong": token("line-strong"), // input borders
         ember: token("ember"), // primary actions, links
         "on-ember": token("on-ember"), // text/icons on an ember background
-        gold: token("gold"), // restrained brass — hairlines, small accents only
+        gold: { DEFAULT: token("gold"), deep: token("gold-deep") }, // restrained brass — hairlines, icons, small accents; `gold-deep` for text
         panel: token("panel"), // deep navy brand panel (auth screens, landing band) in both themes
         "on-panel": token("on-panel"), // text on the brand panel
         success: { DEFAULT: token("success"), tint: token("success-tint"), line: token("success-line") },

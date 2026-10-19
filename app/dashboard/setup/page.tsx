@@ -23,11 +23,23 @@ export default async function ChurchSettingsPage() {
     supabase.from("app_users").select("id", { count: "exact", head: true }).eq("church_id", me.church_id),
     supabase.from("counseling_settings").select("enabled").eq("church_id", me.church_id).maybeSingle(),
   ]);
+  // Before migration #30 this table doesn't exist: the step just shows "To do".
+  const { data: givingDetails } = await supabase.from("church_giving_details").select("bank_name, account_number").eq("church_id", me.church_id).maybeSingle();
 
   const steps = [
     { title: "Church profile", description: "Name, contact details and logo", done: Boolean(church?.address || church?.phone), href: "/dashboard/setup/profile" },
     { title: "Create departments", description: `${departments ?? 0} created — e.g. Worship, Youth, Ushers`, done: (departments ?? 0) > 0, href: "/dashboard/departments" },
     { title: "Invite your members", description: `${members ?? 0} people so far`, done: (members ?? 0) > 1, href: "/dashboard/members/new" },
+    ...(access?.modules.has("giving")
+      ? [
+          {
+            title: "Bank details for giving",
+            description: givingDetails ? `${givingDetails.bank_name} · account ending ${givingDetails.account_number.slice(-4)}` : "Where members send tithes and offerings",
+            done: Boolean(givingDetails),
+            href: "/dashboard/setup/giving",
+          },
+        ]
+      : []),
     ...(access?.modules.has("ai_counseling")
       ? [{ title: "Decide on AI counseling", description: counseling?.enabled ? "Turned on" : "Off until you turn it on", done: counseling !== null, href: "/dashboard/counseling/settings" }]
       : []),

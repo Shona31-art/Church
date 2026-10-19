@@ -42,6 +42,7 @@ export const MIGRATION_ORDER = [
   "bible_reader_v2.sql",
   "notifications.sql",
   "poster_editor.sql",
+  "eft_giving.sql",
 ];
 
 const SUPABASE_STUBS = `

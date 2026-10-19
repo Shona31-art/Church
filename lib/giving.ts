@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 // Giving constants shared by the form, the checkout action and the report.
 
 export const GIVING_FUNDS = ["general", "tithe", "missions", "building"] as const;
@@ -32,4 +34,75 @@ export function csvCell(value: unknown): string {
   let s = value === null || value === undefined ? "" : String(value);
   if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+// ---------------------------------------------------------------------------
+// Giving by bank transfer (docs/plans/eft-giving.md, migration #30)
+// ---------------------------------------------------------------------------
+
+export const ACCOUNT_TYPES = ["cheque", "savings", "transmission", "business"] as const;
+export const ACCOUNT_TYPE_LABELS: Record<(typeof ACCOUNT_TYPES)[number], string> = {
+  cheque: "Cheque / current",
+  savings: "Savings",
+  transmission: "Transmission",
+  business: "Business",
+};
+
+/**
+ * A member's payment reference: the church's prefix + the first 6 characters
+ * of their account id, upper-case ("KAMI-3F9A2C"). The database trigger
+ * app_private.set_eft_reference (supabase/eft_giving.sql) builds the same
+ * string when a transfer is recorded — keep the two identical.
+ */
+export function eftReference(prefix: string, userId: string): string {
+  return `${prefix}-${userId.replace(/-/g, "").slice(0, 6).toUpperCase()}`;
+}
+
+/** A starting prefix from the church name: "KAMI Church" → "KAMI", "St Mark's" → "STMARKS". */
+export function defaultReferencePrefix(churchName: string): string {
+  const words = churchName
+    .normalize("NFKD")
+    .replace(/[^A-Za-z0-9 ]/g, "")
+    .toUpperCase()
+    .split(/\s+/)
+    .filter((w) => w && !["CHURCH", "THE", "OF", "AND"].includes(w));
+  const joined = words.join("").slice(0, 8);
+  if (joined.length >= 2) return joined;
+  return "GIVE";
+}
+
+/** Church admin's bank details form (server-validated; the database checks the same rules). */
+export const givingDetailsSchema = z.object({
+  account_name: z.string().trim().min(2, "Enter the account holder's name.").max(100, "Keep it under 100 characters."),
+  bank_name: z.string().trim().min(2, "Enter the bank's name.").max(60, "Keep it under 60 characters."),
+  account_number: z
+    .string()
+    .transform((v) => v.replace(/[\s-]/g, ""))
+    .pipe(z.string().regex(/^\d{6,16}$/, "Enter 6 to 16 digits — numbers only.")),
+  branch_code: z
+    .string()
+    .transform((v) => v.replace(/\s/g, ""))
+    .pipe(z.string().regex(/^\d{6}$/, "Branch codes are 6 digits.")),
+  account_type: z.enum(ACCOUNT_TYPES, { error: "Choose the account type." }),
+  reference_prefix: z
+    .string()
+    .transform((v) => v.trim().toUpperCase())
+    .pipe(z.string().regex(/^[A-Z0-9]{2,8}$/, "Use 2 to 8 letters or numbers, no spaces.")),
+});
+export type GivingDetails = z.infer<typeof givingDetailsSchema>;
+
+/** Member's "I've made a transfer" form. */
+export function transferReportSchema(today: string) {
+  return z.object({
+    amount_cents: z
+      .string()
+      .transform((v) => randToCents(v))
+      .refine((c): c is number => c !== null, "Enter an amount like 250 or 250.50.")
+      .refine((c) => c !== null && c >= 100 && c <= MAX_GIFT_RAND * 100, `Enter an amount between R1 and R${MAX_GIFT_RAND.toLocaleString("en-ZA")}.`),
+    fund: z.enum(GIVING_FUNDS, { error: "Choose a fund." }),
+    paid_on: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Choose the date you paid.")
+      .refine((d) => d <= today, "The date can't be in the future."),
+  });
 }

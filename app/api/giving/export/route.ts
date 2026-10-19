@@ -10,7 +10,8 @@ import { logAudit } from "@/lib/audit";
  * GET /api/giving/export?year=2026&fund=tithe — completed gifts as CSV.
  *
  * Who: church admins, for their own church only (RLS also limits givings).
- * Returns text/csv: date, donor, fund, amount (rand).
+ * Returns text/csv: date (paid date for bank transfers), donor, fund, amount
+ * (rand), method, reference, confirmed by, confirmed at.
  * Errors: 401 not signed in · 403 not an admin / feature off · 500 failure.
  */
 export async function GET(request: NextRequest) {
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
 
   let query = createClient()
     .from("givings")
-    .select("created_at, amount_cents, fund, app_users(name)")
+    .select("created_at, amount_cents, fund, method, reference, paid_on, confirmed_at, app_users!givings_user_id_fkey(name), confirmer:app_users!givings_confirmed_by_fkey(name)")
     .eq("church_id", me.church_id)
     .eq("status", "succeeded")
     .gte("created_at", `${year}-01-01T00:00:00Z`)
@@ -41,9 +42,20 @@ export async function GET(request: NextRequest) {
   }
 
   const lines = [
-    ["Date", "Donor", "Fund", "Amount (ZAR)"].join(","),
+    ["Date", "Donor", "Fund", "Amount (ZAR)", "Method", "Reference", "Confirmed by", "Confirmed at"].join(","),
     ...(data ?? []).map((g: any) =>
-      [g.created_at.slice(0, 10), g.app_users?.name ?? "Former member", fundLabel(g.fund), (g.amount_cents / 100).toFixed(2)].map(csvCell).join(",")
+      [
+        g.method === "eft" && g.paid_on ? g.paid_on : g.created_at.slice(0, 10),
+        g.app_users?.name ?? "Former member",
+        fundLabel(g.fund),
+        (g.amount_cents / 100).toFixed(2),
+        g.method === "eft" ? "Bank transfer" : "Card",
+        g.reference ?? "",
+        g.method === "eft" ? g.confirmer?.name ?? "" : "Card provider",
+        g.confirmed_at ? g.confirmed_at.slice(0, 16).replace("T", " ") : "",
+      ]
+        .map(csvCell)
+        .join(",")
     ),
   ];
 

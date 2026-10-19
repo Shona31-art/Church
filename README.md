@@ -110,7 +110,19 @@ shared prayer and care note. It refuses to run without `SEED_CONFIRM=yes` —
 | `NOTIFICATIONS_WEBHOOK_SECRET` | with pop-ups | Secret the Supabase Database Webhook sends to `/api/notifications/push` |
 | `PEXELS_API_KEY` | no | Free stock photo search in the poster editor (free key from pexels.com/api). Blank = uploads only |
 
-### Stripe (optional)
+### Giving by bank transfer
+
+The default way to give (ADR-0004). After migration #30: a church admin opens
+**Church settings → Bank details for giving** and enters the church's bank
+account and a reference prefix. Members then see those details on **Giving**
+with their own reference (e.g. `KAMI-3F9A2C`), pay in their banking app, and
+tap **I've made this transfer**. Church admins confirm each one under **Giving
+report → Waiting for confirmation** (the dashboard shows how many are
+waiting). Only confirmed gifts count in totals, the report and the CSV. No
+payment provider, no fees, and the money goes straight to the church.
+
+### Stripe (optional — likely unavailable to South African organisations)
+
 
 Stay in Test mode. Create "Basic" and "Premium" products with monthly prices →
 copy the price IDs into `STRIPE_PRICE_*`; copy the secret key; add a webhook to
@@ -301,7 +313,7 @@ every server action, and is enforced again by Postgres RLS. Menus only hide link
 | Bible games | Rules, levels, points and puzzle generators: `lib/games/` (tested). Starting/finishing/marking: `app/dashboard/games/actions.ts` + `engine.ts`. Shared intro/timer/results frame: `app/dashboard/games/GameShell.tsx`; which board each game uses: `GameScreen.tsx`. Daily challenge, streaks, badges: `lib/games/progression.ts` |
 | Any AI behaviour, model, timeout | `lib/ai.ts`; rate limit `lib/ai-quota.ts` |
 | Billing / Stripe webhook | `app/dashboard/billing/`, `app/api/stripe/webhook/route.ts`, `lib/billing.ts` |
-| Giving, giving report & CSV | `app/dashboard/giving/`, `app/api/giving/export/route.ts`, `lib/giving.ts` |
+| Giving, giving report & CSV | Bank transfers (EFT, the default): church bank details `app/dashboard/setup/giving/`; member page + "I've made a transfer" + confirm/delete actions `app/dashboard/giving/`; waiting list `app/dashboard/giving/report/WaitingGifts.tsx`; rules + references `lib/giving.ts`; database rules `supabase/eft_giving.sql` (tests `tests/db/eft-giving.test.ts`). CSV `app/api/giving/export/route.ts`. Card giving (Stripe) only shows when configured. Why: `docs/adr/0004-giving-by-bank-transfer.md` |
 | Journal encryption | `lib/encryption.ts` (tested) |
 | Registration & church creation | `app/register/actions.ts`, `lib/provision.ts` |
 | Super admin | `app/dashboard/super-admin/` (`actions.ts` holds all writes) |
@@ -396,7 +408,8 @@ the Aperture default). Conventions every screen follows:
 - **Poster editor**: built and type-checked, but not yet used on real phones or against real Supabase Storage/Pexels. No PDF export (PNG/JPG only) or landscape/projector size yet. A canvas can't be fully screen-reader friendly; the Layers list and properties panel give keyboard access to every element. Unsaved work is kept on the device that was editing (not synced). Stock photo search needs `PEXELS_API_KEY`; its per-person limit is per server instance.
 - **Error tracking:** only server `console.error` logs. Add a Vercel log drain
   (or a free Sentry tier) before launch.
-- **Stripe** is unverified against a real test account.
+- **Card payments:** Stripe probably won't accept a South African organisation (ADR-0004); giving uses bank transfers and Billing is manual (Super Admin) until a card provider (Paystack planned) is added. Stripe code is kept but switched off.
+- **Bank-transfer gifts are confirmed by hand** — the app can't see the church's bank account. The year in the report follows when a gift was recorded, so a transfer made on 31 December and recorded in January counts in January (the paid date is shown and exported).
 - `support_ticket_messages.attachment_url` is unused but kept so no data is lost.
 
 Running costs and when each service would start costing money: see

@@ -1,6 +1,6 @@
 # Giving by bank transfer (EFT) — plan
 
-Status: **PROPOSED** (2026-10-19), awaiting approval. Decision record:
+Status: **BUILT** (2026-10-19). Approved with: church admins only confirm; dashboard count, no bell per gift. Decision record:
 `docs/adr/0004-giving-by-bank-transfer.md`.
 
 ## Workflow

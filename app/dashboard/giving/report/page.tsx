@@ -11,6 +11,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
 import { PermissionDenied } from "@/components/ui/Gates";
+import { WaitingGifts, type WaitingGift } from "./WaitingGifts";
 
 export default async function GivingReportPage({ searchParams }: { searchParams: { year?: string; fund?: string; page?: string } }) {
   const gate = await moduleGate("giving");
@@ -32,7 +33,7 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
   let totalsQuery = supabase.from("givings").select("fund, amount_cents").eq("church_id", me.church_id).eq("status", "succeeded").gte("created_at", from).lt("created_at", to).limit(20000);
   let listQuery = supabase
     .from("givings")
-    .select("id, amount_cents, fund, created_at, app_users(name)")
+    .select("id, amount_cents, fund, created_at, method, reference, paid_on, app_users!givings_user_id_fkey(name)")
     .eq("church_id", me.church_id)
     .eq("status", "succeeded")
     .gte("created_at", from)
@@ -43,7 +44,28 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
     totalsQuery = totalsQuery.eq("fund", fund);
     listQuery = listQuery.eq("fund", fund);
   }
-  const [{ data: totals, error }, { data: rows }] = await Promise.all([totalsQuery, listQuery]);
+  // Bank transfers members say they made, oldest first (not limited to the
+  // year filter: anything still waiting needs attention).
+  const waitingQuery = supabase
+    .from("givings")
+    .select("id, amount_cents, fund, paid_on, reference, updated_at, app_users!givings_user_id_fkey(name)")
+    .eq("church_id", me.church_id)
+    .eq("status", "reported")
+    .order("paid_on", { ascending: true })
+    .limit(51);
+  const [{ data: totals, error }, { data: rows }, { data: waitingRows, error: waitingError }] = await Promise.all([totalsQuery, listQuery, waitingQuery]);
+  // Before migration #30 there's no "reported" status yet; that's not an error worth showing.
+  if (waitingError && !/status|column/i.test(waitingError.message)) console.error("[giving] waiting list failed:", waitingError.message);
+  const waiting: WaitingGift[] = (waitingRows ?? []).slice(0, 50).map((g: any) => ({
+    id: g.id,
+    donor: g.app_users?.name ?? "Former member",
+    reference: g.reference ?? "—",
+    amountLabel: formatMoney(g.amount_cents),
+    amountRand: (g.amount_cents / 100).toFixed(2),
+    fund: fundLabel(g.fund),
+    paidOn: g.paid_on ? formatDate(g.paid_on, { weekday: undefined }) : "—",
+    updatedAt: g.updated_at,
+  }));
   if (error) console.error("[giving] report failed:", error.message);
 
   const byFund = new Map<string, number>();
@@ -60,7 +82,7 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
       <PageHeader
         back={{ href: "/dashboard/giving", label: "Giving" }}
         title="Giving report"
-        description="Gifts received by card (completed payments only). Donor names are visible to church admins only."
+        description="Gifts your church has received — confirmed bank transfers and completed card payments. Donor names are visible to church admins only."
         actions={
           // Plain link: a CSV download from an API route.
           <a href={`/api/giving/export${buildQuery({ year, fund })}`} className="btn-secondary">
@@ -76,6 +98,16 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
           Apply
         </button>
       </form>
+
+      {waiting.length > 0 && (
+        <Section
+          title={`Waiting for confirmation (${(waitingRows?.length ?? 0) > 50 ? "50+" : waiting.length})`}
+          description="Bank transfers members say they made. Check each reference on your bank statement, then mark it received or not received."
+        >
+          <WaitingGifts gifts={waiting} />
+          {(waitingRows?.length ?? 0) > 50 && <p className="mt-3 text-xs text-ink/60">Showing the 50 oldest. More appear as you work through these.</p>}
+        </Section>
+      )}
 
       {error ? (
         <Alert tone="error" title="Couldn't load the report">Refresh the page to try again.</Alert>
@@ -96,7 +128,7 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
 
           <Section title="Transactions">
             {!list.length ? (
-              <EmptyState title={`No gifts recorded for ${year}`} description="Completed card gifts appear here automatically." />
+              <EmptyState title={`No gifts received in ${year}`} description="Bank transfers appear here once you mark them received; card gifts appear automatically." />
             ) : (
               <>
                 <div className="overflow-x-auto">
@@ -107,15 +139,25 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
                         <th scope="col" className="py-2 pr-4">Date</th>
                         <th scope="col" className="py-2 pr-4">Donor</th>
                         <th scope="col" className="py-2 pr-4">Fund</th>
+                        <th scope="col" className="py-2 pr-4">Method</th>
                         <th scope="col" className="py-2 text-right">Amount</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line">
                       {list.map((g) => (
                         <tr key={g.id}>
-                          <td className="py-2 pr-4 whitespace-nowrap">{formatDate(g.created_at, { weekday: undefined })}</td>
+                          <td className="py-2 pr-4 whitespace-nowrap">{formatDate(g.method === "eft" && g.paid_on ? g.paid_on : g.created_at, { weekday: undefined })}</td>
                           <td className="py-2 pr-4">{g.app_users?.name ?? <span className="text-ink/60">Former member</span>}</td>
                           <td className="py-2 pr-4">{fundLabel(g.fund)}</td>
+                          <td className="py-2 pr-4 whitespace-nowrap">
+                            {g.method === "eft" ? (
+                              <>
+                                Transfer <span className="tabular text-xs text-ink/60">{g.reference}</span>
+                              </>
+                            ) : (
+                              "Card"
+                            )}
+                          </td>
                           <td className="py-2 text-right tabular-nums">{formatMoney(g.amount_cents)}</td>
                         </tr>
                       ))}

@@ -1,6 +1,6 @@
 # ADR-0004: Giving by bank transfer (EFT) first; card payments later via Paystack
 
-**Status:** Proposed (2026-10-19)
+**Status:** Accepted (2026-10-19)
 **Date:** 2026-10-19
 **Deciders:** Product owner (Vishona)
 

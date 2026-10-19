@@ -16,7 +16,7 @@ export function GivingForm({ disabled }: { disabled: boolean }) {
   const fe = state?.fieldErrors ?? {};
 
   return (
-    <form action={formAction} className="card-elevated rounded-2xl p-5 sm:p-6 space-y-5">
+    <form action={formAction} className="space-y-5">
       {state?.error && <Alert tone="error">{state.error}</Alert>}
 
       <fieldset>

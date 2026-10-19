@@ -83,6 +83,7 @@ export default async function DashboardHomePage() {
     deptMembersRes,
     bdayRes,
     followRes,
+    waitingGiftsRes,
   ] = await Promise.all([
     fetchVerse(verseRef),
     has("calendar")
@@ -148,6 +149,10 @@ export default async function DashboardHomePage() {
           .order("follow_up_date")
           .limit(5)
       : none,
+    // Bank transfers members recorded, waiting for an admin to confirm (migration #30).
+    admin && has("giving")
+      ? supabase.from("givings").select("id", { count: "exact", head: true }).eq("church_id", me.church_id).eq("status", "reported")
+      : none,
   ]);
 
   const birthdays = bdayRes.data
@@ -170,6 +175,7 @@ export default async function DashboardHomePage() {
     { label: "Follow-ups due this week", count: followUps.length, href: "/dashboard/pastoral-care?due=1", tone: "warning" as const },
     { label: "Invites not yet accepted", count: invitedRes.count ?? 0, href: "/dashboard/members?status=invited", tone: "info" as const },
     { label: "Open support tickets", count: openTicketsRes.count ?? 0, href: "/dashboard/support", tone: "info" as const },
+    { label: "Gifts waiting for confirmation", count: waitingGiftsRes.count ?? 0, href: "/dashboard/giving/report", tone: "info" as const },
   ].filter((a) => a.count > 0);
 
   const firstName = me.name.split(" ")[0];

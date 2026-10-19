@@ -1,6 +1,6 @@
 # Installable app (PWA) — plan
 
-Status: **BUILDING** (2026-10-19). Icons deferred: waiting for the real logo.
+Status: **BUILT** (2026-10-19) except icons, which wait for the real logo.
 
 ## Starting point
 

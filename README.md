@@ -190,6 +190,49 @@ GitHub Actions (`.github/workflows/ci.yml`) runs all four checks on every push.
    heavily rate-limited), confirm backups (the free plan has none you can
    restore yourself), and set up a log drain / error tracking.
 
+### Installing on a phone (home-screen app)
+
+The app is installable (a PWA): it opens full screen from a home-screen icon,
+keeps people signed in, and shows a branded offline page when there's no
+connection. Installing **only works over HTTPS**, so it needs the deployed
+Vercel URL (Preview or Production) — `localhost` on your PC can't be installed
+from a phone. Vercel serves every deployment over HTTPS automatically.
+
+**Before launch — icons (still missing):** put the logo exports in
+`public/icons/` — `icon-192.png` (192×192), `icon-512.png` (512×512),
+`icon-maskable-512.png` (512×512, logo inside the middle 80% because Android
+crops it to a circle/squircle) and `apple-touch-icon.png` (180×180, no
+transparency). Then list the first three under `icons` in `app/manifest.ts`,
+add `icons: { apple: "/icons/apple-touch-icon.png" }` to the metadata in
+`app/layout.tsx`, and set `icon: "/icons/icon-192.png"` in the push handler in
+`public/sw.js`. Until then Android Chrome won't show its install prompt (it
+requires the icons), and phones use a screenshot or letter as the icon.
+
+**Android (Chrome, Edge, Samsung Internet):**
+1. Open the app's URL and sign in.
+2. Tap **Install** on the banner on the home page, or go to **My account →
+   Install the app**. (Before the icons exist: browser menu ⋮ → **Install app**
+   / **Add to Home screen**.)
+3. Confirm. The icon appears on the home screen and in the app list.
+
+**iPhone / iPad (Safari; also Chrome and Edge on iOS 16.4+):**
+1. Open the app's URL in Safari and sign in.
+2. Tap **Share** (bottom of the screen on iPhone, top on iPad) → **Add to Home
+   Screen** → **Add**. My account → Install the app shows the same steps.
+3. Open it from the home screen. Phone pop-up notifications on iPhone only
+   work from the installed app.
+
+Links opened inside WhatsApp, Facebook or Instagram open a mini-browser that
+can't install; the app tells people to open the page in Safari/Chrome first.
+
+**Updates:** nothing to do — each deploy is picked up the next time the app
+opens (or returns to the foreground), and people see a "has been updated"
+notice. Pages are never cached, only the versioned script/style files, the
+Bible text and the offline page.
+
+**Checking an installed build:** in desktop Chrome/Edge open DevTools →
+Application → Manifest (lists installability problems) and Service workers.
+
 **Environments:** I couldn't check whether your Preview and Production point at
 the same Supabase project. If they do, any test (including `pnpm seed`) touches
 live data — ask the Supabase org owner for a second project for dev/preview.
@@ -238,6 +281,7 @@ every server action, and is enforced again by Postgres RLS. Menus only hide link
 | Calling a server action from a client component | wrap it in `callAction` (`lib/call-action.ts`) so a failed request shows an error instead of a stuck button |
 | Loading skeletons | `components/ui/Skeleton.tsx`; per-section `loading.tsx` (dashboard, members, chat, posters) |
 | Product logo, photo placeholders, sign-in layout | `components/brand/` (`BrandMark`, `PhotoPlaceholder`, `AuthShell`) |
+| Installable app (PWA) | Manifest `app/manifest.ts`; iPhone metadata + viewport `app/layout.tsx`; install button/banner `components/install/` (device rules `lib/install.ts`, tested); service worker `public/sw.js` (registered by `components/ServiceWorker.tsx`); offline page `public/offline.html`. Plan: `docs/plans/installable-app.md` |
 | Forms opening as popups | `components/ui/RouteModal.tsx`; one wrapper per form in `app/dashboard/@modal/(.)<route>/page.tsx`. A new form page needs a matching wrapper, or it opens as a full page |
 | Dates, times, money formatting; timezone | `lib/format.ts` |
 | Form error handling pattern | `lib/forms.ts` |
@@ -306,6 +350,12 @@ the Aperture default). Conventions every screen follows:
 - **Journal storage fix is reasoned, not observed.** The old code stored the
   JSON text of a Buffer in `bytea` columns; new code writes hex and reads both
   formats (unit-tested). Confirm by saving and reading one entry after deploying.
+- **App icons (missing on purpose):** no home-screen/app icons until the real
+  logo arrives — no stand-in icon is shipped. Until they're added (steps under
+  "Installing on a phone"), Android Chrome won't offer its install prompt
+  (people use the browser menu instead) and phones use a screenshot as the
+  icon. The offline page (`public/offline.html`) also draws the gold-square
+  stand-in mark.
 - **Brand assets (placeholders):** the product logo is a gold square drawn in one
   place (`components/brand/BrandMark.tsx`), and labelled "Awaiting church photo"
   boxes (`components/brand/PhotoPlaceholder.tsx`) mark the landing hero and the

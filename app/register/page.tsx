@@ -6,6 +6,7 @@ import { registerChurch } from "./actions";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { Alert } from "@/components/ui/Alert";
 import { FormField, RequiredNote } from "@/components/ui/FormField";
+import { AuthShell, AuthHeading } from "@/components/brand/AuthShell";
 
 export default function RegisterPage() {
   const [state, action] = useFormState(registerChurch, null);
@@ -14,29 +15,25 @@ export default function RegisterPage() {
 
   if (state?.ok) {
     return (
-      <main className="min-h-screen flex items-center justify-center px-4">
-        <div className="card-elevated rounded-2xl p-8 max-w-md text-center" role="status">
-          <h1 className="text-2xl font-semibold">Check your email</h1>
-          <div className="rule-gold mx-auto mt-2" />
-          <p className="text-ink/70 mt-4">
+      <AuthShell>
+        <div className="w-full max-w-[400px]" role="status">
+          <AuthHeading eyebrow="Almost there" title="Check your email">
             Your church is set up. We&apos;ve sent a confirmation link{v.email ? ` to ${v.email}` : ""} — open it, then sign in to get started.
-          </p>
-          <Link href="/login" className="btn-primary mt-6">
+          </AuthHeading>
+          <Link href="/login" className="btn-primary mt-6 w-full">
             Go to sign in
           </Link>
         </div>
-      </main>
+      </AuthShell>
     );
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 py-10">
-      <form key={JSON.stringify(v)} action={action} className="w-full max-w-md card-elevated rounded-2xl p-6 sm:p-8 space-y-5" noValidate>
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold">Start your free trial</h1>
-          <div className="rule-gold mx-auto mt-2" />
-          <p className="text-sm text-ink/60 mt-3">30 days, every core feature, no card required.</p>
-        </div>
+    <AuthShell>
+      <form key={JSON.stringify(v)} action={action} className="w-full max-w-[440px] space-y-5" noValidate>
+        <AuthHeading eyebrow="For church leaders" title="Start your free trial">
+          30 days, every core feature, no card required.
+        </AuthHeading>
 
         {state?.error && <Alert tone="error">{state.error}</Alert>}
         <RequiredNote />
@@ -70,13 +67,13 @@ export default function RegisterPage() {
           Create church account
         </PendingButton>
 
-        <p className="text-center text-sm text-ink/60">
+        <p className="border-t border-line pt-5 text-center text-sm text-ink/60">
           Already have an account?{" "}
           <Link href="/login" className="link">
             Sign in
           </Link>
         </p>
       </form>
-    </main>
+    </AuthShell>
   );
 }

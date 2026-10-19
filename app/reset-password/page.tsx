@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { passwordSchema } from "@/lib/account-schemas";
 import { Alert } from "@/components/ui/Alert";
 import { FormField } from "@/components/ui/FormField";
+import { AuthShell, AuthHeading } from "@/components/brand/AuthShell";
+import { Loader2 } from "lucide-react";
 
 // Landing page for invite and password-reset emails. The link signs the
 // person in (Supabase puts the session in the URL), then they choose a password.
@@ -64,16 +66,22 @@ export default function ResetPasswordPage() {
     }, 1200);
   }
 
-  const shell = (children: React.ReactNode) => <main className="min-h-screen flex items-center justify-center px-4 py-10">{children}</main>;
+  const shell = (children: React.ReactNode) => <AuthShell>{children}</AuthShell>;
 
-  if (done) return shell(<Alert tone="success">Password saved — taking you to your dashboard…</Alert>);
-  if (checkingSession) return shell(<p className="text-ink/70" role="status">Checking your secure link…</p>);
+  if (done) return shell(<Alert tone="success" className="w-full max-w-[400px]">Password saved — taking you to your dashboard…</Alert>);
+  if (checkingSession)
+    return shell(
+      <p className="flex items-center gap-2 text-ink/70" role="status">
+        <Loader2 aria-hidden className="h-4 w-4 motion-safe:animate-spin" /> Checking your secure link…
+      </p>
+    );
   if (!hasSession) {
     return shell(
-      <div className="card-elevated rounded-2xl p-8 max-w-sm text-center">
-        <h1 className="text-xl font-semibold">This link has expired or was already used</h1>
-        <p className="text-sm text-ink/70 mt-3">Links work once and expire after a while. Request a new one and open the latest email.</p>
-        <Link href="/forgot-password" className="btn-primary mt-6">
+      <div className="w-full max-w-[400px]">
+        <AuthHeading title="This link has expired or was already used">
+          Links work once and expire after a while. Request a new one and open the latest email.
+        </AuthHeading>
+        <Link href="/forgot-password" className="btn-primary mt-6 w-full">
           Request a new link
         </Link>
       </div>
@@ -81,11 +89,8 @@ export default function ResetPasswordPage() {
   }
 
   return shell(
-    <form onSubmit={handleSubmit} className="w-full max-w-sm card-elevated rounded-2xl p-6 sm:p-8 space-y-4">
-      <div className="text-center">
-        <h1 className="text-2xl font-semibold">Choose your password</h1>
-        <div className="rule-gold mx-auto mt-2" />
-      </div>
+    <form onSubmit={handleSubmit} className="w-full max-w-[400px] space-y-5">
+      <AuthHeading eyebrow="Welcome" title="Choose your password" />
       <FormField label="New password" htmlFor="password" required hint="At least 8 characters, with letters and numbers.">
         <input id="password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="input" />
       </FormField>

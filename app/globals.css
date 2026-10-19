@@ -22,6 +22,9 @@
   --on-ember: 255 255 255;
   --gold: 168 138 74;
   --shadow: 20 22 31;
+  /* Brand panel (auth screens, landing band): deep navy in both themes. */
+  --panel: 22 32 56;
+  --on-panel: 244 240 230;
 
   --success: 23 113 79;
   --success-tint: 231 244 238;
@@ -60,6 +63,8 @@
   --on-ember: 18 20 28;
   --gold: 201 170 106;
   --shadow: 0 0 0;
+  --panel: 24 31 48;
+  --on-panel: 237 234 227;
 
   --success: 94 201 152;
   --success-tint: 17 44 34;
@@ -94,6 +99,8 @@
     --on-ember: 18 20 28;
     --gold: 201 170 106;
     --shadow: 0 0 0;
+    --panel: 24 31 48;
+    --on-panel: 237 234 227;
 
     --success: 94 201 152;
     --success-tint: 17 44 34;
@@ -201,6 +208,8 @@ dialog {
   .btn-danger-outline { @apply btn border border-danger-line text-danger bg-surface hover:bg-danger-tint; }
   .btn-ghost { @apply btn font-medium text-ink/70 hover:bg-ink/5 hover:text-ink; }
   .btn-sm { @apply px-3 min-h-[32px] rounded-lg text-xs; }
+  /* Hero / landing calls to action only. */
+  .btn-lg { @apply px-6 min-h-[48px] text-[15px]; }
   .btn-icon { @apply btn h-10 w-10 p-0; }
 
   /* Form controls: the ring replaces the global outline so focus reads as part
@@ -213,12 +222,12 @@ dialog {
       disabled:bg-ink/5 disabled:text-ink/50 aria-[invalid=true]:border-danger;
   }
   .label { @apply block text-sm font-semibold text-ink/90 mb-1.5; }
-  .hint { @apply text-xs text-ink/55 mt-1.5; }
+  .hint { @apply text-xs text-ink/60 mt-1.5; }
 
   .link { @apply text-ember font-medium underline-offset-4 hover:underline; }
 
   /* Small uppercase label above a group or a figure ("THIS MONTH"). */
-  .eyebrow { @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-ink/45; }
+  .eyebrow { @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-ink/60; }
 
   /* Figures that change (counts, money, times) keep their width. */
   .tabular { font-variant-numeric: tabular-nums; }

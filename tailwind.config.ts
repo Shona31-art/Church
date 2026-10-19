@@ -30,6 +30,8 @@ const config: Config = {
         ember: token("ember"), // primary actions, links
         "on-ember": token("on-ember"), // text/icons on an ember background
         gold: token("gold"), // restrained brass — hairlines, small accents only
+        panel: token("panel"), // deep navy brand panel (auth screens, landing band) in both themes
+        "on-panel": token("on-panel"), // text on the brand panel
         success: { DEFAULT: token("success"), tint: token("success-tint"), line: token("success-line") },
         warning: { DEFAULT: token("warning"), tint: token("warning-tint"), line: token("warning-line") },
         danger: { DEFAULT: token("danger"), tint: token("danger-tint"), line: token("danger-line") },

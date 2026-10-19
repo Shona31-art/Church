@@ -293,10 +293,11 @@ the Aperture default). Conventions every screen follows:
 - **Journal storage fix is reasoned, not observed.** The old code stored the
   JSON text of a Buffer in `bytea` columns; new code writes hex and reads both
   formats (unit-tested). Confirm by saving and reading one entry after deploying.
-- **Brand assets (placeholders):** the landing page uses a plain square as a stand-in
-  logo and no photography, and the dashboard sidebar shows the church's initials
-  as a monogram in place of a church logo. Supply a real logo (SVG) and images
-  before launch.
+- **Brand assets (placeholders):** the product logo is a gold square drawn in one
+  place (`components/brand/BrandMark.tsx`), and labelled "Awaiting church photo"
+  boxes (`components/brand/PhotoPlaceholder.tsx`) mark the landing hero and the
+  sign-in brand panel. The dashboard sidebar shows the church's initials in place
+  of a church logo. Supply a real logo (SVG) and photos before launch.
 - **Chat "typing…" uses an open Realtime broadcast** keyed by the chat's random ID.
   It carries only a user ID (never message text), but isn't permission-checked the
   way messages are. Supabase "private channels" (Realtime Authorization) would close

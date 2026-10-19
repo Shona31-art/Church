@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/Alert";
 import { FormField } from "@/components/ui/FormField";
+import { AuthShell, AuthHeading } from "@/components/brand/AuthShell";
 
 // Only ever redirect back into the app — never to an arbitrary URL from the
 // query string (open-redirect protection).
@@ -61,12 +62,9 @@ export function LoginForm({ expired, nextPath, reason }: { expired: boolean; nex
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 py-10">
-      <form onSubmit={handleLogin} className="w-full max-w-sm card-elevated rounded-2xl p-6 sm:p-8 space-y-4" noValidate={false}>
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold">Sign in</h1>
-          <div className="rule-gold mx-auto mt-2" />
-        </div>
+    <AuthShell>
+      <form onSubmit={handleLogin} className="w-full max-w-[400px] space-y-5">
+        <AuthHeading eyebrow="Welcome back" title="Sign in to your church" />
 
         {expired && (
           <Alert tone="warning">Your session expired, so you were signed out. Sign in again to pick up where you left off.</Alert>
@@ -95,8 +93,8 @@ export function LoginForm({ expired, nextPath, reason }: { expired: boolean; nex
             className="input"
           />
         </FormField>
-        <div className="text-right -mt-2">
-          <Link href="/forgot-password" className="text-xs link">
+        <div className="-mt-2 text-right">
+          <Link href="/forgot-password" className="link text-sm">
             Forgot password?
           </Link>
         </div>
@@ -107,13 +105,13 @@ export function LoginForm({ expired, nextPath, reason }: { expired: boolean; nex
           {loading ? "Signing in…" : "Sign in"}
         </button>
 
-        <p className="text-center text-sm text-ink/60">
+        <p className="border-t border-line pt-5 text-center text-sm text-ink/60">
           New church?{" "}
           <Link href="/register" className="link">
             Start a free trial
           </Link>
         </p>
       </form>
-    </main>
+    </AuthShell>
   );
 }

@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { ManualQuestionForm } from "./ManualQuestionForm";
 import { generateQuestionsWithAI, saveGeneratedQuestions, GeneratedQuestion } from "../ai-actions";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 /** Add quiz questions by hand, or (plans with AI writing help) generate them. */
 export function NewQuestionsForm({ aiAvailable }: { aiAvailable: boolean }) {
@@ -31,6 +32,17 @@ export function NewQuestionsForm({ aiAvailable }: { aiAvailable: boolean }) {
     setGenerated(result.questions);
   }
 
+  const [confirm, confirmDialog] = useConfirm();
+
+  async function discardGenerated() {
+    const ok = await confirm({
+      title: `Discard ${generated.length} generated question${generated.length === 1 ? "" : "s"}?`,
+      message: "They haven't been saved, so you'd need to generate them again.",
+      confirmLabel: "Discard",
+    });
+    if (ok) setGenerated([]);
+  }
+
   function removeGenerated(index: number) {
     setGenerated((qs) => qs.filter((_, i) => i !== index));
   }
@@ -48,9 +60,7 @@ export function NewQuestionsForm({ aiAvailable }: { aiAvailable: boolean }) {
 
   return (
     <div className="max-w-lg">
-      <Link href="/dashboard/games/questions" className="inline-flex items-center gap-1 text-sm text-ink/60 hover:text-ink mb-2"><span aria-hidden>←</span> Quiz questions</Link>
-      <h1 className="text-2xl font-semibold">Add questions</h1>
-      <div className="rule-gold mt-2 mb-6" />
+      <PageHeader title="Add questions" back={{ href: "/dashboard/games/questions", label: "Quiz questions" }} />
 
       {aiAvailable && (
       <div className="flex gap-2 mb-6" role="group" aria-label="How to add questions">
@@ -139,16 +149,14 @@ export function NewQuestionsForm({ aiAvailable }: { aiAvailable: boolean }) {
               </div>
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={handleSaveGenerated}
                   disabled={saving || !generated.length}
                   className="btn-primary"
                 >
                   {saving ? "Saving..." : `Save ${generated.length} question(s)`}
                 </button>
-                <button
-                  onClick={() => setGenerated([])}
-                  className="border border-ink/20 px-6 py-3 rounded-lg font-medium"
-                >
+                <button type="button" onClick={discardGenerated} disabled={saving} className="btn-secondary">
                   Discard
                 </button>
               </div>
@@ -156,6 +164,7 @@ export function NewQuestionsForm({ aiAvailable }: { aiAvailable: boolean }) {
           )}
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

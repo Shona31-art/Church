@@ -71,13 +71,13 @@ export function PosterEditor({ churchName, poster }: { churchName: string; poste
           {state?.error && <Alert tone="error">{state.error}</Alert>}
 
           <div>
-            <label htmlFor="event_title" className="block text-sm font-medium mb-1">Event title</label>
+            <label htmlFor="event_title" className="label">Event title</label>
             <input id="event_title" name="event_title" required maxLength={120} value={form.eventTitle} onChange={(e) => update("eventTitle", e.target.value)} className={field} />
           </div>
 
           <div>
-            <label htmlFor="tagline" className="block text-sm font-medium mb-1">
-              Tagline <span className="font-normal text-ink/40">(optional)</span>
+            <label htmlFor="tagline" className="label">
+              Tagline <span className="font-normal text-ink/60">(optional)</span>
             </label>
             <div className="flex gap-2">
               <input id="tagline" name="tagline" maxLength={120} value={form.tagline} onChange={(e) => update("tagline", e.target.value)} className={`${field} flex-1`} />
@@ -100,22 +100,22 @@ export function PosterEditor({ churchName, poster }: { churchName: string; poste
           </div>
 
           <div>
-            <label htmlFor="speaker" className="block text-sm font-medium mb-1">
-              Speaker <span className="font-normal text-ink/40">(optional)</span>
+            <label htmlFor="speaker" className="label">
+              Speaker <span className="font-normal text-ink/60">(optional)</span>
             </label>
             <input id="speaker" name="speaker" maxLength={80} value={form.speaker} onChange={(e) => update("speaker", e.target.value)} className={field} />
           </div>
 
           <div>
-            <label htmlFor="event_date" className="block text-sm font-medium mb-1">
-              Date and time <span className="font-normal text-ink/40">(as it should appear)</span>
+            <label htmlFor="event_date" className="label">
+              Date and time <span className="font-normal text-ink/60">(as it should appear)</span>
             </label>
             <input id="event_date" name="event_date" maxLength={80} placeholder="e.g. Sunday 10 Aug · 9AM" value={form.eventDate} onChange={(e) => update("eventDate", e.target.value)} className={field} />
           </div>
 
           <div>
-            <label htmlFor="location" className="block text-sm font-medium mb-1">
-              Location <span className="font-normal text-ink/40">(optional)</span>
+            <label htmlFor="location" className="label">
+              Location <span className="font-normal text-ink/60">(optional)</span>
             </label>
             <input id="location" name="location" maxLength={120} value={form.location} onChange={(e) => update("location", e.target.value)} className={field} />
           </div>
@@ -157,7 +157,7 @@ export function PosterEditor({ churchName, poster }: { churchName: string; poste
           </fieldset>
 
           <div>
-            <label htmlFor="format" className="block text-sm font-medium mb-1">Size</label>
+            <label htmlFor="format" className="label">Size</label>
             <select id="format" name="format" value={form.format} onChange={(e) => update("format", e.target.value as PosterData["format"])} className={field}>
               <option value="square">Square (Instagram/Facebook)</option>
               <option value="story">Story (WhatsApp/Instagram Story)</option>

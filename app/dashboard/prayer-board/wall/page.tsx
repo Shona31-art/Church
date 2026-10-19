@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BackLink } from "@/components/ui/PageHeader";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { togglePrayed, deletePrayerComment, removeFromWall } from "../actions";
@@ -7,7 +7,7 @@ import { CommentForm } from "./CommentForm";
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
 import { moduleGate } from "@/lib/gate";
 import { Alert } from "@/components/ui/Alert";
-import { HandHeart } from "lucide-react";
+import { HandHeart, Plus } from "lucide-react";
 
 // Church prayer wall (ported from the Android Prayer Board): requests members
 // chose to share, plus answered-prayer testimonies. Private prayers never
@@ -57,16 +57,16 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
 
   return (
     <div className="max-w-2xl">
-      <BackLink href="/dashboard/prayer-board" label="Prayer board" />
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-        <h1 className="text-2xl font-semibold">Church prayer wall</h1>
-        <Link href="/dashboard/prayer-board/new" className="btn-primary">
-          + Share a request
-        </Link>
-      </div>
-      <p className="text-sm text-ink/50 mb-6">
-        Requests and testimonies your church family chose to share. Your own board stays private unless you share.
-      </p>
+      <PageHeader
+        title="Church prayer wall"
+        back={{ href: "/dashboard/prayer-board", label: "Prayer board" }}
+        description="Requests and testimonies your church family chose to share. Your own board stays private unless you share."
+        actions={
+          <Link href="/dashboard/prayer-board/new" className="btn-primary">
+            <Plus aria-hidden className="h-4 w-4" /> Share a request
+          </Link>
+        }
+      />
 
       {error && (
         <Alert tone="error" className="mb-6">

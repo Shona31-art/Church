@@ -35,7 +35,7 @@ export function StudyTool({ initialQuery }: { initialQuery: string }) {
     <div className="space-y-6">
       <form onSubmit={handleSubmit} className="card-elevated rounded-2xl p-5 space-y-4">
         <div>
-          <label htmlFor="query" className="block text-sm font-medium mb-1">Passage or topic</label>
+          <label htmlFor="query" className="label">Passage or topic</label>
           <input
             id="query"
             value={query}
@@ -43,21 +43,23 @@ export function StudyTool({ initialQuery }: { initialQuery: string }) {
             placeholder="e.g. Romans 8:28, Psalm 23, or 'forgiveness'"
             maxLength={200}
             required
-            className="w-full border border-ink/20 rounded-lg px-4 py-3"
+            className="input"
           />
         </div>
 
         <fieldset>
-          <legend className="block text-sm font-medium mb-2">What would you like?</legend>
+          <legend className="label">What would you like?</legend>
           <div className="grid gap-2 grid-cols-2">
             {MODE_OPTIONS.map((m) => (
               <label
                 key={m.value}
-                className={`cursor-pointer rounded-lg border px-3 py-2 text-sm ${mode === m.value ? "border-ember bg-ink/[0.03]" : "border-ink/15 hover:bg-ink/5"}`}
+                className={`cursor-pointer rounded-xl border px-3 py-2.5 text-sm has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-gold ${
+                  mode === m.value ? "border-ember bg-surface-raised" : "border-line-strong hover:bg-ink/5"
+                }`}
               >
                 <input type="radio" name="mode" value={m.value} checked={mode === m.value} onChange={() => setMode(m.value)} className="sr-only" />
                 <span className="font-medium">{m.label}</span>
-                <span className="block text-xs text-ink/50">{m.hint}</span>
+                <span className="block text-xs text-ink/60">{m.hint}</span>
               </label>
             ))}
           </div>

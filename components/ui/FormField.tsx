@@ -32,7 +32,7 @@ export function FormField({
             *
           </span>
         )}
-        {optional && <span className="font-normal text-ink/50"> (optional)</span>}
+        {optional && <span className="font-normal text-ink/60"> (optional)</span>}
       </label>
       {children}
       {hint && !error && (
@@ -48,7 +48,7 @@ export function FormField({
 /** Explains the red asterisk once per form. */
 export function RequiredNote() {
   return (
-    <p className="text-xs text-ink/50">
+    <p className="text-xs text-ink/60">
       Fields marked <span className="text-danger">*</span> are required.
     </p>
   );

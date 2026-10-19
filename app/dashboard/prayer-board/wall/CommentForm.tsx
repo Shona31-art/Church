@@ -28,7 +28,7 @@ export function CommentForm({ prayerId }: { prayerId: string }) {
           maxLength={1000}
           required
           placeholder="Leave a word of encouragement…"
-          className="flex-1 min-w-0 border border-ink/20 rounded-lg px-3 py-2 text-sm"
+          className="input min-w-0 flex-1 py-2"
         />
         <PendingButton className="btn-primary btn-sm" pendingLabel="…">
           Post

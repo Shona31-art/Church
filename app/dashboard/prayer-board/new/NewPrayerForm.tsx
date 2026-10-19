@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
 import { createPrayer } from "./actions";
 import { draftPrayerWithAi } from "../actions";
 import { Alert, FieldError } from "@/components/ui/Alert";
 import { Sparkles } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 /** Add-a-prayer form. `aiAvailable` is false on plans without AI writing help (Basic). */
 export function NewPrayerForm({ aiAvailable }: { aiAvailable: boolean }) {
@@ -27,15 +27,19 @@ export function NewPrayerForm({ aiAvailable }: { aiAvailable: boolean }) {
 
   return (
     <form action={formAction} className="max-w-lg space-y-4">
-      <Link href="/dashboard/prayer-board" className="text-sm text-ink/50 hover:text-ink">← My prayer board</Link>
-      <h1 className="text-2xl font-semibold">Add a prayer</h1>
+      <PageHeader title="Add a prayer" back={{ href: "/dashboard/prayer-board", label: "My prayer board" }} />
 
       {state?.error && (
         <Alert tone="error">{state.error}</Alert>
       )}
 
       <div>
-        <label htmlFor="prayer_text" className="block text-sm font-medium mb-1">Your prayer</label>
+        <label htmlFor="prayer_text" className="label">
+          Your prayer
+          <span className="ml-0.5 text-danger" aria-hidden>
+            *
+          </span>
+        </label>
         <textarea
           id="prayer_text"
           name="prayer_text"
@@ -45,11 +49,11 @@ export function NewPrayerForm({ aiAvailable }: { aiAvailable: boolean }) {
           required
           rows={6}
           maxLength={4000}
-          className="w-full border border-ink/20 rounded-lg px-4 py-3"
+          className="input"
         />
         {aiAvailable && (
         <div className="flex items-center justify-between mt-2 gap-3">
-          <p className="text-xs text-ink/40">
+          <p className="text-xs text-ink/60">
             Not sure how to put it? Jot a few words, then let AI draft a prayer you can edit.
           </p>
           <button
@@ -72,13 +76,15 @@ export function NewPrayerForm({ aiAvailable }: { aiAvailable: boolean }) {
       </div>
 
       <div>
-        <label htmlFor="category" className="block text-sm font-medium mb-1">Category</label>
+        <label htmlFor="category" className="label">
+          Category <span className="font-normal text-ink/60">(optional)</span>
+        </label>
         <select
           id="category"
           name="category"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="w-full border border-ink/20 rounded-lg px-4 py-3"
+          className="input"
         >
           <option value="">None</option>
           <option value="family">Family</option>
@@ -90,16 +96,16 @@ export function NewPrayerForm({ aiAvailable }: { aiAvailable: boolean }) {
       </div>
 
       <label className="flex items-start gap-3 text-sm">
-        <input type="checkbox" name="share" className="mt-1" />
+        <input type="checkbox" name="share" className="mt-0.5 h-4 w-4 accent-ember" />
         <span>
           Share this request on the church prayer wall
-          <span className="block text-xs text-ink/40">
+          <span className="mt-0.5 block text-xs text-ink/60">
             Members of your church will see it and can pray or leave encouragement. You can un-share any time.
           </span>
         </span>
       </label>
 
-      <p className="text-xs text-ink/40">We'll suggest a few relevant Bible verses automatically when you save.</p>
+      <p className="text-xs text-ink/60">We'll suggest a few relevant Bible verses automatically when you save.</p>
 
       <SubmitButton />
     </form>
@@ -109,8 +115,8 @@ export function NewPrayerForm({ aiAvailable }: { aiAvailable: boolean }) {
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending} className="btn-primary">
-      {pending ? "Saving..." : "Save prayer"}
+    <button type="submit" disabled={pending} aria-busy={pending} className="btn-primary">
+      {pending ? "Saving…" : "Save prayer"}
     </button>
   );
 }

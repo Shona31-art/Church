@@ -1,24 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { planForStripeStatus } from "@/lib/billing";
 import { csvCell, randToCents } from "@/lib/giving";
 import { isDirectMediaFile, isSafeHttpUrl, youtubeEmbedUrl } from "@/lib/media";
-
-describe("Stripe subscription status → church access", () => {
-  test("paying churches stay active", () => {
-    expect(planForStripeStatus("active")).toBe("active");
-    expect(planForStripeStatus("trialing")).toBe("active");
-  });
-  test("failed payments give a grace period, not an instant lock-out", () => {
-    expect(planForStripeStatus("past_due")).toBe("grace");
-    expect(planForStripeStatus("unpaid")).toBe("grace");
-  });
-  test("cancelled subscriptions suspend access", () => {
-    expect(planForStripeStatus("canceled")).toBe("suspended");
-  });
-  test("an unknown future status changes nothing", () => {
-    expect(planForStripeStatus("something_new")).toBeNull();
-  });
-});
 
 describe("gift amounts", () => {
   test("accepts rand with optional cents, in either decimal style", () => {

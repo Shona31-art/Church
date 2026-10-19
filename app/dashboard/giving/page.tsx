@@ -4,7 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
 import { can } from "@/lib/permissions";
-import { ACCOUNT_TYPE_LABELS, eftReference, fundLabel } from "@/lib/giving";
+import { ACCOUNT_TYPE_LABELS, cardFeeRateFromEnv, eftReference, fundLabel } from "@/lib/giving";
+import { paystackConfigured } from "@/lib/paystack";
 import { formatDate, formatMoney, todayInAppZone } from "@/lib/format";
 import { PageHeader, Section } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
@@ -17,7 +18,8 @@ import { DeleteTransferButton } from "./DeleteTransferButton";
 
 // Giving: by bank transfer (ADR-0004) — the church's own account, a personal
 // reference, and "I've made a transfer" for the church admin to confirm.
-// Card giving (Stripe) only appears if a card provider is configured.
+// Card giving (Paystack) appears when the platform has Paystack connected and
+// this church has turned it on (Church settings → Bank details for giving).
 
 const STATUS: Record<string, { tone: "success" | "warning" | "danger" | "info"; label: string }> = {
   succeeded: { tone: "success", label: "Received" },
@@ -30,14 +32,14 @@ const STATUS: Record<string, { tone: "success" | "warning" | "danger" | "info"; 
 // PostgREST says this when migration #30 hasn't been run yet.
 const missingTable = (code?: string) => code === "42P01" || code === "PGRST205";
 
-export default async function GivingPage({ searchParams }: { searchParams: { given?: string } }) {
+export default async function GivingPage({ searchParams }: { searchParams: { card?: string } }) {
   const gate = await moduleGate("giving");
   if (gate) return gate;
 
   const me = (await getCurrentAppUser())!;
   const year = todayInAppZone().slice(0, 4);
   const supabase = createClient();
-  const [{ data: recent, error }, { data: yearRows }, { data: details, error: detailsError }] = await Promise.all([
+  const [{ data: recent, error }, { data: yearRows }, { data: details, error: detailsError }, { data: card }] = await Promise.all([
     supabase
       .from("givings")
       .select("id, amount_cents, fund, status, method, paid_on, created_at")
@@ -50,10 +52,11 @@ export default async function GivingPage({ searchParams }: { searchParams: { giv
       .select("account_name, bank_name, account_number, branch_code, account_type, reference_prefix, updated_at")
       .eq("church_id", me.church_id)
       .maybeSingle(),
+    supabase.from("church_card_giving").select("enabled").eq("church_id", me.church_id).maybeSingle(),
   ]);
   if (detailsError && !missingTable(detailsError.code)) console.error("[giving] bank details load failed:", detailsError.message);
 
-  const cardConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
+  const cardAvailable = paystackConfigured() && Boolean(card?.enabled);
   const totalThisYear = (yearRows ?? []).reduce((sum, g) => sum + g.amount_cents, 0);
   const isAdmin = can(me.role, "manageChurchProfile");
 
@@ -71,14 +74,20 @@ export default async function GivingPage({ searchParams }: { searchParams: { giv
         }
       />
 
-      {searchParams.given === "success" && (
+      {/* Set by /api/giving/paystack/return after asking Paystack what happened. */}
+      {searchParams.card === "received" && (
         <Alert tone="success" title="Thank you for your gift" className="mb-4">
-          Your card payment is being confirmed and will show as received below within a minute.
+          Your card gift was received. It&apos;s in your history below.
         </Alert>
       )}
-      {searchParams.given === "cancelled" && (
+      {searchParams.card === "failed" && (
+        <Alert tone="error" title="The card payment didn't go through" className="mb-4">
+          You haven&apos;t been charged. You can try again, or give by bank transfer.
+        </Alert>
+      )}
+      {(searchParams.card === "pending" || searchParams.card === "unconfirmed") && (
         <Alert tone="info" className="mb-4">
-          Checkout was cancelled — you haven&apos;t been charged.
+          Paystack is still confirming your payment. It will show as received below once it&apos;s done — there&apos;s no need to pay again.
         </Alert>
       )}
 
@@ -126,9 +135,9 @@ export default async function GivingPage({ searchParams }: { searchParams: { giv
             </>
           )}
 
-          {cardConfigured && (
-            <Section title="Give by card" description="One-off card gift through a secure checkout.">
-              <GivingForm disabled={false} />
+          {cardAvailable && (
+            <Section title="Give by card" description="A one-off gift by card, paid into your church's bank account.">
+              <GivingForm feeRate={cardFeeRateFromEnv()} />
             </Section>
           )}
         </div>

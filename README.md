@@ -65,6 +65,7 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 28 | `notifications.sql` | Notification bell: `notifications` (created only by database triggers for announcements, events, chat messages, prayers, bookings, support replies, counseling escalations and new members — exactly the people who can see each thing), device pop-up registrations and pop-up preferences, all private to each person. Plain-language notes at the top of the file |
 | 29 | `poster_editor.sql` | Poster editor: editable designs on `posters` (size-limited), the church poster photo library `poster_assets` (poster makers only; delete own, pastors/admins any), and a private `poster-assets` bucket with no browser access (the server signs every upload/download). Plain-language notes at the top of the file |
 | 30 | `eft_giving.sql` | Giving by bank transfer: `church_giving_details` (each church's bank account — readable by that church's members, changed only by its church admins; every change audit-logged and sent to every church admin's bell), new `givings` columns and statuses (`reported` → `succeeded`/`not_received`), members may only record their own transfer and delete it while waiting, admins confirm through `confirm_eft_gift()`. Plain-language notes at the top of the file. Why: `docs/adr/0004-giving-by-bank-transfer.md` |
+| 31 | `paystack_card_giving.sql` | Card giving: `church_card_giving` (each church's Paystack subaccount — readable by its members, written only by the server after an admin check; paused automatically when bank details change), `givings.provider` / `provider_reference` (unique) / `fee_cents`. Plain-language notes at the top of the file |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so
@@ -97,13 +98,14 @@ shared prayer and care note. It refuses to run without `SEED_CONFIRM=yes` —
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | Public key; RLS limits what it can do |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | **Server only.** Registration, invites, deletion, audit log, exports, webhooks |
-| `NEXT_PUBLIC_APP_URL` | yes in prod | Base URL for invite/reset emails and Stripe redirects |
+| `NEXT_PUBLIC_APP_URL` | yes in prod | Base URL for invite/reset emails and returning from Paystack |
 | `JOURNAL_ENCRYPTION_KEY` | for Journal | 64 hex chars (`openssl rand -hex 32`). Losing it = journals unreadable |
 | `NEXT_PUBLIC_APP_TIMEZONE` | no | Timezone for showing/entering times (default `Africa/Johannesburg`) |
 | `ANTHROPIC_API_KEY` | no | Enables AI features; each has a non-AI fallback |
 | `ANTHROPIC_MODEL` | no | Model override (default `claude-opus-5-5`) — a smaller model costs less |
 | `AI_CALLS_PER_USER_PER_HOUR` | no | Per-person AI cap (default 30) — protects the API bill |
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_BASIC`, `STRIPE_PRICE_PREMIUM` | no | Billing and giving (Stripe test mode is free) |
+| `PAYSTACK_SECRET_KEY` | for card giving | **Server only.** Paystack secret key (`sk_test_…` while testing). Also verifies Paystack's webhook signatures. Blank = card giving hidden |
+| `PAYSTACK_FEE_PERCENT`, `PAYSTACK_FEE_FLAT_CENTS` | no | Paystack's card fee (from their pricing page) so members can choose to add it. Blank = option hidden |
 | `NOTIFY_WEBHOOK_URL`, `NOTIFY_WEBHOOK_SECRET` | no | Send alerts via a Make.com/n8n webhook; blank = in-app only |
 | `CRON_SECRET` | yes in production | Lets Vercel Cron call `/api/cron/expire-chat-media` (deletes voice notes after 90 days). Blank = the job refuses to run |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | no | Phone/computer pop-ups for the notification bell (Web Push). Blank = bell only. See below |
@@ -121,20 +123,32 @@ report → Waiting for confirmation** (the dashboard shows how many are
 waiting). Only confirmed gifts count in totals, the report and the CSV. No
 payment provider, no fees, and the money goes straight to the church.
 
-### Stripe (optional — likely unavailable to South African organisations)
+### Card giving (Paystack)
 
+Optional, alongside bank transfers. Each church becomes a Paystack
+*subaccount*, so card gifts are paid into that church's own bank account
+(about two working days later). Grace-bound's share is 0 %; Paystack's fee
+comes out of each gift unless the member ticks "add the card fee".
+Plan: `docs/plans/paystack-card-giving.md`.
 
-Stay in Test mode. Create "Basic" and "Premium" products with monthly prices →
-copy the price IDs into `STRIPE_PRICE_*`; copy the secret key; add a webhook to
-`https://<your-domain>/api/stripe/webhook` (locally:
-`stripe listen --forward-to localhost:3000/api/stripe/webhook`) for these
-events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
-`checkout.session.async_payment_failed`, `checkout.session.expired`,
-`invoice.payment_succeeded`, `invoice.payment_failed`,
-`customer.subscription.updated`, `customer.subscription.deleted`. Without
-Stripe, Billing shows "not set up" and plan changes go through Super Admin.
-Plan prices shown in the app come from the `plans` table — keep them equal to
-the Stripe prices.
+1. **Platform (once):** create a Paystack business account at paystack.com
+   (country: South Africa). Test mode works immediately; live payments need
+   Paystack to verify the business. Put the **secret key** in
+   `PAYSTACK_SECRET_KEY` (`.env.local` locally, Vercel env vars when
+   deployed). Optionally set `PAYSTACK_FEE_PERCENT` / `PAYSTACK_FEE_FLAT_CENTS`.
+2. **Webhook (deployed app only):** Paystack dashboard → Settings → API Keys
+   & Webhooks → Webhook URL `https://<your-domain>/api/paystack/webhook`.
+   Locally there's no webhook: the app confirms each payment with Paystack
+   when the member returns, which is enough for testing.
+3. **Each church admin:** Church settings → Bank details for giving → choose
+   the bank from the list → **Turn on card giving**. Changing the bank
+   details later pauses card giving until it's turned on again.
+4. **Test:** with the test key, give by card using one of Paystack's test
+   cards (listed in their docs, "Test Payments"). The gift shows as received
+   in the member's history and the giving report.
+
+Billing (church subscriptions) is manual for now: plan changes go through
+Super Admin. Stripe was removed (ADR-0004).
 
 ### Notification pop-ups (optional)
 
@@ -183,7 +197,7 @@ deactivated accounts, plan-catalogue tampering, counseling escalation, RSVP
 scope, draft visibility, booking cancellation, pastoral-note confidentiality,
 journal privacy, audit-log integrity and member erasure. Unit tests cover
 permissions, feature gating, navigation, timezone conversion, journal
-encryption storage, money parsing, CSV safety and Stripe status mapping.
+encryption storage, money parsing, CSV safety, card-gift settlement and Paystack webhook signatures.
 GitHub Actions (`.github/workflows/ci.yml`) runs all four checks on every push.
 
 ---
@@ -312,8 +326,8 @@ every server action, and is enforced again by Postgres RLS. Menus only hide link
 | Poster editor | Design format + validation: `lib/posters/design.ts`. Editor: `components/posters/editor/Editor.tsx` (canvas `EditorCanvas.tsx`, properties `PropertiesPanel.tsx`, add/layers `SidePanels.tsx`). Undo, element operations, resizing between sizes: `lib/posters/{history,elements,layout}.ts` (tested). Templates: the 42 designs in `lib/posters/templates/catalog.ts` and `catalog-more.ts`, written with the size-independent helpers in `kit.ts` (tests check validity, fit and contrast at every size); gallery `components/posters/TemplateGallery.tsx`. Fonts: list in `lib/posters/fonts.ts`, files + OFL licences in `public/fonts/poster/` (refresh with `node scripts/fetch-poster-fonts.mjs`). Save: `app/dashboard/posters/editor-actions.ts`. Pages: `app/dashboard/posters/editor/`. Why: `docs/adr/0003-poster-editor.md` |
 | Bible games | Rules, levels, points and puzzle generators: `lib/games/` (tested). Starting/finishing/marking: `app/dashboard/games/actions.ts` + `engine.ts`. Shared intro/timer/results frame: `app/dashboard/games/GameShell.tsx`; which board each game uses: `GameScreen.tsx`. Daily challenge, streaks, badges: `lib/games/progression.ts` |
 | Any AI behaviour, model, timeout | `lib/ai.ts`; rate limit `lib/ai-quota.ts` |
-| Billing / Stripe webhook | `app/dashboard/billing/`, `app/api/stripe/webhook/route.ts`, `lib/billing.ts` |
-| Giving, giving report & CSV | Bank transfers (EFT, the default): church bank details `app/dashboard/setup/giving/`; member page + "I've made a transfer" + confirm/delete actions `app/dashboard/giving/`; waiting list `app/dashboard/giving/report/WaitingGifts.tsx`; rules + references `lib/giving.ts`; database rules `supabase/eft_giving.sql` (tests `tests/db/eft-giving.test.ts`). CSV `app/api/giving/export/route.ts`. Card giving (Stripe) only shows when configured. Why: `docs/adr/0004-giving-by-bank-transfer.md` |
+| Billing (plans; manual for now) | `app/dashboard/billing/`, `lib/billing.ts`; plan changes in `app/dashboard/super-admin/` |
+| Giving, giving report & CSV | Bank transfers (EFT, the default): church bank details `app/dashboard/setup/giving/`; member page + "I've made a transfer" + confirm/delete actions `app/dashboard/giving/`; waiting list `app/dashboard/giving/report/WaitingGifts.tsx`; rules + references `lib/giving.ts`; database rules `supabase/eft_giving.sql` (tests `tests/db/eft-giving.test.ts`). CSV `app/api/giving/export/route.ts`. Card giving (Paystack): client `lib/paystack.ts`, settlement rules `lib/card-giving.ts` (tested), bank list `lib/banks-za.ts`, settings `app/dashboard/setup/giving/CardGivingSection.tsx`, return `app/api/giving/paystack/return/route.ts`, webhook `app/api/paystack/webhook/route.ts`, database `supabase/paystack_card_giving.sql`. Why: `docs/adr/0004-giving-by-bank-transfer.md` |
 | Journal encryption | `lib/encryption.ts` (tested) |
 | Registration & church creation | `app/register/actions.ts`, `lib/provision.ts` |
 | Super admin | `app/dashboard/super-admin/` (`actions.ts` holds all writes) |
@@ -408,7 +422,7 @@ the Aperture default). Conventions every screen follows:
 - **Poster editor**: built and type-checked, but not yet used on real phones or against real Supabase Storage/Pexels. No PDF export (PNG/JPG only) or landscape/projector size yet. A canvas can't be fully screen-reader friendly; the Layers list and properties panel give keyboard access to every element. Unsaved work is kept on the device that was editing (not synced). Stock photo search needs `PEXELS_API_KEY`; its per-person limit is per server instance.
 - **Error tracking:** only server `console.error` logs. Add a Vercel log drain
   (or a free Sentry tier) before launch.
-- **Card payments:** Stripe probably won't accept a South African organisation (ADR-0004); giving uses bank transfers and Billing is manual (Super Admin) until a card provider (Paystack planned) is added. Stripe code is kept but switched off.
+- **Card giving (Paystack) is untested against a real Paystack account** — built from Paystack's official API spec and unit-tested with mocked responses. Test it with a test key before going live; the webhook needs the deployed HTTPS URL. Billing (church subscriptions) is manual until it's needed; Stripe was removed (ADR-0004).
 - **Bank-transfer gifts are confirmed by hand** — the app can't see the church's bank account. The year in the report follows when a gift was recorded, so a transfer made on 31 December and recorded in January counts in January (the paid date is shown and exported).
 - `support_ticket_messages.attachment_url` is unused but kept so no data is lost.
 

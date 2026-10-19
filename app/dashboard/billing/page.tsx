@@ -10,7 +10,6 @@ import { PageHeader, Section, DetailList } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { StatusBadge, type BadgeTone } from "@/components/ui/StatusBadge";
 import { PermissionDenied } from "@/components/ui/Gates";
-import { PlanButton, PortalButton } from "./BillingButtons";
 import { Check } from "lucide-react";
 
 const STATUS: Record<string, { tone: BadgeTone; label: string }> = {
@@ -23,7 +22,7 @@ const STATUS: Record<string, { tone: BadgeTone; label: string }> = {
   error: { tone: "danger", label: "Couldn't verify access" },
 };
 
-export default async function BillingPage({ searchParams }: { searchParams: { checkout?: string } }) {
+export default async function BillingPage() {
   const me = await getCurrentAppUser();
   if (!me || !can(me.role, "manageBilling")) {
     return <PermissionDenied message="Only church admins can manage billing." />;
@@ -38,23 +37,21 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
     supabase.from("app_users").select("id", { count: "exact", head: true }).eq("church_id", me.church_id).neq("status", "disabled"),
   ]);
 
-  const stripeReady = Boolean(process.env.STRIPE_SECRET_KEY);
   const status = access?.status ?? "none";
   const sorted = [...(plans ?? [])].sort((a, b) => Number(a.monthly_price) - Number(b.monthly_price));
 
   return (
     <div className="max-w-4xl space-y-6">
-      <PageHeader title="Billing" description="Your church's plan, payment details and invoices." />
+      <PageHeader title="Billing" description="Your church's plan and what it includes." />
 
-      {searchParams.checkout === "success" && <Alert tone="success" title="Payment received">Your plan updates as soon as Stripe confirms it — usually within a few seconds. Refresh if it hasn&apos;t changed.</Alert>}
-      {searchParams.checkout === "cancelled" && <Alert tone="info">Checkout cancelled — nothing was charged.</Alert>}
-      {!stripeReady && (
-        <Alert tone="warning" title="Online payments aren't set up yet">
-          Plan changes are handled by the platform team for now. <Link href="/dashboard/support/new" className="underline">Open a support ticket</Link> to change plans.
-        </Alert>
-      )}
+      {/* Plan payments are arranged with the Grace-bound team for now; online
+          subscriptions (Paystack) come when they're needed — ADR-0004. */}
+      <Alert tone="info" title="Changing your plan">
+        The Grace-bound team sets up plan changes and invoices for you. <Link href="/dashboard/support/new" className="underline">Open a support ticket</Link> or use
+        &ldquo;Ask to switch&rdquo; below.
+      </Alert>
 
-      <Section title="Current plan" actions={sub?.stripe_customer_id && stripeReady ? <PortalButton /> : null}>
+      <Section title="Current plan">
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <p className="text-xl font-semibold">{sub ? PLAN_LABELS[sub.plan_key] ?? sub.plan_key : "No plan"}</p>
           <StatusBadge tone={STATUS[status]?.tone ?? "neutral"}>{STATUS[status]?.label ?? status}</StatusBadge>
@@ -67,8 +64,8 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
             ...(status === "grace" && sub?.grace_period_end ? [{ label: "Access until", value: formatDate(sub.grace_period_end) }] : []),
           ]}
         />
-        {status === "grace" && <Alert tone="warning" className="mt-4">Your last payment didn&apos;t go through. Update your card under “Payment method & invoices” to avoid interruption.</Alert>}
-        {status === "suspended" && <Alert tone="error" className="mt-4">Your subscription has ended, so most features are paused. Your data is kept safe. Choose a plan below to restore access.</Alert>}
+        {status === "grace" && <Alert tone="warning" className="mt-4">Your last payment hasn&apos;t been received. Access continues for now — open a support ticket to settle it and avoid interruption.</Alert>}
+        {status === "suspended" && <Alert tone="error" className="mt-4">Your subscription has ended, so most features are paused. Your data is kept safe. Ask to switch to a plan below, or open a support ticket, to restore access.</Alert>}
       </Section>
 
       <section aria-labelledby="plans-heading">
@@ -100,8 +97,6 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
                 <div className="mt-5">
                   {current ? (
                     <p className="text-sm text-ink/60">You&apos;re on this plan.</p>
-                  ) : stripeReady ? (
-                    <PlanButton planKey={plan.key} planName={plan.name} price={price} hasSubscription={Boolean(sub?.stripe_subscription_id) && status !== "suspended"} />
                   ) : (
                     <Link href="/dashboard/support/new" className="btn-secondary w-full">
                       Ask to switch

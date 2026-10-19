@@ -8,7 +8,8 @@ import { verifyTransaction, type VerifiedTransaction } from "@/lib/paystack";
 // what the browser or the webhook body says: we ask Paystack (verify) and
 // check it against the gift we recorded before sending the member to pay.
 
-export type Settlement = "received" | "failed" | "pending" | "already_settled" | "not_found" | "mismatch";
+/** What happened. "already_received"/"already_failed": the other path settled it first. */
+export type Settlement = "received" | "failed" | "pending" | "already_settled" | "already_received" | "already_failed" | "not_found" | "mismatch";
 
 export interface PendingGift {
   id: string;
@@ -55,7 +56,8 @@ export async function settlePaystackGift(reference: string): Promise<Settlement>
     .maybeSingle();
   if (error) throw new Error(`gift lookup failed: ${error.message}`);
   if (!gift) return "not_found";
-  if (gift.status !== "pending") return "already_settled";
+  if (gift.status === "succeeded") return "already_received";
+  if (gift.status !== "pending") return "already_failed";
 
   const tx = await verifyTransaction(reference);
   const outcome = decideSettlement(gift as PendingGift, tx);

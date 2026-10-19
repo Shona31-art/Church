@@ -106,3 +106,35 @@ export function transferReportSchema(today: string) {
       .refine((d) => d <= today, "The date can't be in the future."),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Card giving (Paystack) — "add the card fee so my church gets the full gift"
+// ---------------------------------------------------------------------------
+
+export interface CardFeeRate {
+  /** e.g. 2.9 for 2.9 % — copied from Paystack's pricing page into PAYSTACK_FEE_PERCENT. */
+  percent: number;
+  /** e.g. 100 for R1.00 — PAYSTACK_FEE_FLAT_CENTS. */
+  flatCents: number;
+}
+
+/**
+ * What to add so that, after Paystack takes `percent` % + flat of the TOTAL,
+ * the church is left with the whole gift: total = (gift + flat) / (1 − p),
+ * rounded up to the cent. Returns just the added amount.
+ */
+export function coverFeeCents(giftCents: number, rate: CardFeeRate): number {
+  const p = rate.percent / 100;
+  if (!(p >= 0 && p < 0.5) || rate.flatCents < 0) return 0;
+  const total = Math.ceil((giftCents + rate.flatCents) / (1 - p));
+  return total - giftCents;
+}
+
+/** The fee rate from the environment, or null when it isn't configured (then the option is hidden). */
+export function cardFeeRateFromEnv(env: Record<string, string | undefined> = process.env): CardFeeRate | null {
+  const percent = Number(env.PAYSTACK_FEE_PERCENT);
+  const flatCents = Number(env.PAYSTACK_FEE_FLAT_CENTS ?? "0");
+  if (!env.PAYSTACK_FEE_PERCENT || !Number.isFinite(percent) || percent <= 0 || percent >= 50) return null;
+  if (!Number.isInteger(flatCents) || flatCents < 0) return null;
+  return { percent, flatCents };
+}

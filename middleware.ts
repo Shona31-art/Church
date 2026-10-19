@@ -59,10 +59,10 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Everything except static files, images, the Stripe and notification-push
+  // Everything except static files, images, the Paystack and notification-push
   // webhooks (no user session; each verifies its own signature or secret), the public-domain
   // Bible text in /bibles/ — no personal data, and a session check on each of
   // the 66 files would slow reading and break offline downloads. Likewise the
   // offline service worker, web app manifest and poster fonts (public/fonts/).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/stripe/webhook|api/notifications/push|bibles/|fonts/|sw\\.js|offline\\.html|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/paystack/webhook|api/notifications/push|bibles/|fonts/|sw\\.js|offline\\.html|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };

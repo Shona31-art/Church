@@ -64,5 +64,5 @@ export const config = {
   // Bible text in /bibles/ — no personal data, and a session check on each of
   // the 66 files would slow reading and break offline downloads. Likewise the
   // offline service worker, web app manifest and poster fonts (public/fonts/).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/stripe/webhook|api/notifications/push|bibles/|fonts/|sw\\.js|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/stripe/webhook|api/notifications/push|bibles/|fonts/|sw\\.js|offline\\.html|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };

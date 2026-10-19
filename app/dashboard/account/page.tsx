@@ -8,6 +8,7 @@ import { ChatPrivacyForm } from "./ChatPrivacyForm";
 import { getAvatarUrls } from "@/lib/avatars";
 import { Alert } from "@/components/ui/Alert";
 import { PushSettings } from "@/components/notifications/PushSettings";
+import { InstallApp } from "@/components/install/InstallApp";
 
 export default async function MyAccountPage() {
   const me = (await getCurrentAppUser())!;
@@ -69,6 +70,12 @@ export default async function MyAccountPage() {
           />
         </Section>
       )}
+
+      <div id="install" className="scroll-mt-24">
+        <Section title="Install the app" description="Open Grace-bound from your phone's home screen, full screen, like any other app.">
+          <InstallApp />
+        </Section>
+      </div>
 
       {!prefsRes.error && (
         <div id="notifications" className="scroll-mt-24">

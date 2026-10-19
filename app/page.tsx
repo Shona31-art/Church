@@ -58,7 +58,7 @@ export default async function LandingPage() {
   if (user) redirect("/dashboard");
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen min-h-dvh">
       <header className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-5 sm:px-6">
         <BrandMark />
         <nav aria-label="Account" className="flex items-center gap-1 sm:gap-2">

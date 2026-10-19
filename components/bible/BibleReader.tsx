@@ -239,7 +239,7 @@ export function BibleReader() {
             id="bible-version"
             value={version.id}
             onChange={(e) => go({ versionId: e.target.value, verse }, { replace: true })}
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0 focus-visible:outline-none"
+            className="absolute inset-0 h-full w-full cursor-pointer text-base opacity-0 focus-visible:outline-none"
           >
             {VERSIONS.map((v) => (
               <option key={v.id} value={v.id}>

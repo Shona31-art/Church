@@ -10,8 +10,15 @@
 //      app's own header, and the copy is deleted on sign-out.
 //   3. /_next/static/*  the immutable, content-hashed scripts/styles/fonts those
 //      pages need. Cache-first, trimmed so it can't grow without limit.
+//   4. /offline.html  a static, data-free page saved once at install. Shown
+//      only when opening a page fails outright (no connection) — never
+//      instead of a slow page, and no other page is ever cached.
 // Everything else (other pages, server actions, Supabase, POSTs) goes straight
 // to the network, untouched.
+//
+// Updates: this file is served with no-cache (next.config.js), so browsers
+// pick up a new version on the next visit; it takes over at once
+// (skipWaiting) and components/ServiceWorker.tsx tells the person to refresh.
 //
 // It also shows phone pop-ups for the notification bell (push and
 // notificationclick handlers at the bottom of this file).
@@ -21,19 +28,35 @@
 
 const TEXT_CACHE = "bible-text-v1"; // must match lib/bible/offline.ts
 const SHELL_CACHE = "bible-shell-v1";
-const KEEP = [TEXT_CACHE, SHELL_CACHE];
+const OFFLINE_CACHE = "app-offline-v1";
+const OFFLINE_URL = "/offline.html";
+const KEEP = [TEXT_CACHE, SHELL_CACHE, OFFLINE_CACHE];
 const OFFLINE_PAGES = ["/dashboard/bible/read", "/dashboard/bible/search"];
 const MAX_STATIC_ENTRIES = 200;
 const NETWORK_TIMEOUT_MS = 6000;
 
-self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        const cache = await caches.open(OFFLINE_CACHE);
+        await cache.add(new Request(OFFLINE_URL, { cache: "reload" }));
+      } catch (error) {
+        // Installing while offline: carry on without the offline page rather
+        // than failing the whole worker (Bible offline and pop-ups still work).
+        console.warn("[sw] couldn't save the offline page:", error);
+      }
+      await self.skipWaiting();
+    })(),
+  );
+});
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
       // Remove caches from older versions of this worker.
       for (const key of await caches.keys()) {
-        if (key.startsWith("bible-") && !KEEP.includes(key)) await caches.delete(key);
+        if ((key.startsWith("bible-") || key.startsWith("app-")) && !KEEP.includes(key)) await caches.delete(key);
       }
       await self.clients.claim();
     })(),
@@ -65,8 +88,20 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate" && OFFLINE_PAGES.includes(url.pathname)) {
     event.respondWith(networkFirstPage(request, url.pathname));
+    return;
+  }
+
+  // Any other page: straight from the network, nothing stored. Only if the
+  // request fails outright (offline) do we show the saved offline page.
+  if (request.mode === "navigate" && !url.pathname.startsWith("/api/")) {
+    event.respondWith(fetch(request).catch(offlinePage));
   }
 });
+
+async function offlinePage() {
+  const saved = await caches.match(OFFLINE_URL, { cacheName: OFFLINE_CACHE });
+  return saved || Response.error();
+}
 
 async function cacheFirst(request, cacheName, trim = false) {
   const cache = await caches.open(cacheName);
@@ -96,7 +131,8 @@ async function networkFirstPage(request, pathname) {
     // reads the passage from the address bar, not from the saved HTML.
     const saved = await cache.match(pathname);
     if (saved) return saved;
-    throw error;
+    // Never opened online on this device: the offline page explains.
+    return offlinePage();
   }
 }
 

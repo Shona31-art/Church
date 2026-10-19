@@ -12,6 +12,8 @@ import { Avatar } from "@/components/ui/Avatar";
 import { initials } from "@/lib/initials";
 import { activeHref, type NavGroup } from "@/lib/navigation";
 import { NotificationBell, NotificationsProvider } from "@/components/notifications/NotificationBell";
+// Imported for its side effect: starts listening for the browser's one-time install prompt as early as possible.
+import "@/components/install/install-store";
 
 export interface AccountBanner {
   tone: "info" | "warning" | "error";
@@ -73,7 +75,7 @@ export function DashboardChrome({
 
   return (
     <NotificationsProvider userId={userId} initialUnread={initialUnread}>
-      <div className="min-h-screen md:flex">
+      <div className="min-h-screen min-h-dvh md:flex">
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2 focus:shadow-pop"
@@ -114,7 +116,7 @@ export function DashboardChrome({
         {mobileOpen && (
           <div className="fixed inset-0 z-30 md:hidden">
             <div className="absolute inset-0 bg-ink/40 backdrop-blur-[2px] motion-safe:animate-fade-in" onClick={() => setMobileOpen(false)} aria-hidden />
-            <aside id="mobile-nav" className="absolute bottom-0 left-0 top-0 flex w-72 max-w-[85vw] flex-col bg-surface shadow-pop motion-safe:animate-modal-in">
+            <aside id="mobile-nav" className="absolute bottom-0 left-0 top-0 flex w-72 max-w-[85vw] flex-col bg-surface pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] shadow-pop motion-safe:animate-modal-in">
               <button type="button" onClick={() => setMobileOpen(false)} className="btn-ghost btn-icon absolute right-2 top-3 z-10" aria-label="Close menu">
                 <X aria-hidden className="h-5 w-5" />
               </button>
@@ -125,7 +127,7 @@ export function DashboardChrome({
 
         <div className="flex min-w-0 flex-1 flex-col">
           {banner && <Banner banner={banner} />}
-          <main id="main" className="flex-1 px-4 py-6 sm:px-8 sm:py-8 lg:px-12 lg:py-10 motion-safe:animate-fade-in">
+          <main id="main" className="flex-1 px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-8 sm:py-8 lg:px-12 lg:py-10 motion-safe:animate-fade-in">
             {children}
           </main>
         </div>

@@ -373,7 +373,7 @@ export function Editor({
         <label htmlFor="poster-size" className="sr-only">
           Size
         </label>
-        <select id="poster-size" className="input w-auto py-1.5 text-sm" value={design.size} onChange={(e) => changeSize(e.target.value as PosterSize)}>
+        <select id="poster-size" className="input w-auto py-1.5 text-base sm:text-sm" value={design.size} onChange={(e) => changeSize(e.target.value as PosterSize)}>
           {POSTER_SIZE_KEYS.map((s) => (
             <option key={s} value={s}>
               {POSTER_SIZES[s].label} ({POSTER_SIZES[s].hint})

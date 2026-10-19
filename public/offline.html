@@ -1,0 +1,92 @@
+<!doctype html>
+<!--
+  Shown by public/sw.js when a dashboard page is opened with no connection.
+  Static and self-contained on purpose: it's saved once when the service
+  worker installs, contains no personal data, and needs nothing from the
+  server. Colours copy the tokens in app/globals.css (light and dark).
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#F8F7F4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0D0F15" media="(prefers-color-scheme: dark)" />
+    <title>You're offline · Grace-bound</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --ink: 20 22 31;
+        --parchment: 248 247 244;
+        --surface: 255 255 255;
+        --line: 232 230 224;
+        --ember: 27 42 74;
+        --on-ember: 255 255 255;
+        --gold: 168 138 74;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ink: 237 234 227;
+          --parchment: 13 15 21;
+          --surface: 21 24 32;
+          --line: 39 43 54;
+          --ember: 226 205 160;
+          --on-ember: 18 20 28;
+          --gold: 201 170 106;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        background: rgb(var(--parchment));
+        color: rgb(var(--ink));
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      }
+      .brand { display: inline-flex; align-items: center; gap: 10px; font-family: Georgia, serif; font-weight: 600; font-size: 18px; }
+      .mark { width: 14px; height: 14px; border-radius: 4px; background: rgb(var(--gold)); }
+      main { flex: 1; display: flex; align-items: center; justify-content: center; }
+      .card {
+        width: 100%;
+        max-width: 420px;
+        background: rgb(var(--surface));
+        border: 1px solid rgb(var(--line));
+        border-radius: 16px;
+        padding: 28px 24px;
+        box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px -4px rgb(0 0 0 / 0.06);
+      }
+      h1 { margin: 0; font-family: Georgia, serif; font-size: 28px; line-height: 1.2; letter-spacing: -0.015em; }
+      .rule { width: 32px; height: 2px; border-radius: 1px; background: rgb(var(--gold)); margin: 12px 0 16px; }
+      p { margin: 0 0 12px; font-size: 15px; line-height: 1.55; color: rgb(var(--ink) / 0.75); }
+      .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-height: 44px; padding: 0 18px; border-radius: 12px;
+        font: 600 14px/1 inherit; font-family: inherit; text-decoration: none; cursor: pointer;
+        touch-action: manipulation;
+      }
+      .primary { background: rgb(var(--ember)); color: rgb(var(--on-ember)); border: 0; }
+      .secondary { background: rgb(var(--surface)); color: rgb(var(--ink)); border: 1px solid rgb(var(--line)); }
+      .btn:focus-visible { outline: 2px solid rgb(var(--gold)); outline-offset: 2px; }
+    </style>
+  </head>
+  <body>
+    <div class="brand"><span class="mark" aria-hidden="true"></span>Grace-bound</div>
+    <main>
+      <div class="card">
+        <h1>You're offline</h1>
+        <div class="rule" aria-hidden="true"></div>
+        <p>This page needs an internet connection. Nothing you saved earlier has been lost.</p>
+        <p>Bible versions you've downloaded still open without a connection.</p>
+        <div class="actions">
+          <button type="button" class="btn primary" onclick="location.reload()">Try again</button>
+          <a class="btn secondary" href="/dashboard/bible/read">Open the Bible</a>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

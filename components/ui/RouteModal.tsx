@@ -87,7 +87,7 @@ export function RouteModal({ children, size = "lg" }: { children: React.ReactNod
           <X aria-hidden className="h-4 w-4" />
         </button>
       </div>
-      <div className="px-5 pb-6 md:px-8 md:pb-8">{children}</div>
+      <div className="px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-8 md:pb-8">{children}</div>
       {confirmDialog}
     </dialog>
   );

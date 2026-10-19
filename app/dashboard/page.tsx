@@ -29,6 +29,7 @@ import {
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
+import { InstallBanner } from "@/components/install/InstallBanner";
 
 // Dashboard home, shaped by role. Every card degrades on its own: a failed
 // query shows that card's empty state rather than breaking the page. Only
@@ -233,6 +234,8 @@ export default async function DashboardHomePage() {
           </div>
         )}
       </header>
+
+      <InstallBanner />
 
       {shepherd && (
         <section aria-labelledby="stats-heading">

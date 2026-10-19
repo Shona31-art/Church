@@ -9,7 +9,7 @@ import { PhotoPlaceholder } from "./PhotoPlaceholder";
  */
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-h-screen lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+    <main className="min-h-screen min-h-dvh lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
       <aside className="hidden bg-panel text-on-panel lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:gap-10 lg:p-12 xl:p-16">
         <BrandMark onPanel />
         <PhotoPlaceholder onPanel label="Awaiting church photo — 1200×900" className="flex-1" />
@@ -20,7 +20,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
         </figure>
       </aside>
 
-      <div className="flex min-h-screen flex-col px-4 py-6 sm:px-8">
+      <div className="flex min-h-screen min-h-dvh flex-col px-4 py-6 sm:px-8">
         <BrandMark className="self-start lg:hidden" />
         <div className="flex flex-1 items-center justify-center py-10 motion-safe:animate-fade-in">{children}</div>
       </div>

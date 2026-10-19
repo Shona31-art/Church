@@ -8,7 +8,6 @@ import { can, roleLabel } from "@/lib/permissions";
 import { DashboardChrome, type AccountBanner } from "./DashboardChrome";
 import { getAvatarUrls } from "@/lib/avatars";
 import { getMemberLimitStatus } from "@/lib/member-limit";
-import { ServiceWorker } from "@/components/ServiceWorker";
 
 /** Unread bell count for the first paint. 0 (and a log) if it can't be read, e.g. before migration #28 runs. */
 async function unreadNotifications(userId: string): Promise<number> {
@@ -113,7 +112,6 @@ export default async function DashboardLayout({ children, modal }: { children: R
     >
       {children}
       {modal}
-      <ServiceWorker />
     </DashboardChrome>
   );
 }

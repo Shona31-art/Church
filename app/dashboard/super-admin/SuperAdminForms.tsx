@@ -146,7 +146,7 @@ export function ModuleOverrideControl({ churchId, moduleKey, moduleName, mode, p
       <label htmlFor={`m-${moduleKey}`} className="sr-only">
         {moduleName} access
       </label>
-      <select id={`m-${moduleKey}`} name="mode" defaultValue={mode} onChange={() => ref.current?.requestSubmit()} className="input w-auto py-1.5 text-xs">
+      <select id={`m-${moduleKey}`} name="mode" defaultValue={mode} onChange={() => ref.current?.requestSubmit()} className="input w-auto py-1.5 text-base sm:text-xs">
         <option value="plan">Follow plan ({planIncludes ? "on" : "off"})</option>
         <option value="on">Force on</option>
         <option value="off">Force off</option>

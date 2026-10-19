@@ -39,6 +39,19 @@ const config: Config = {
         // Bible verse highlights only (components/bible/) — a member's own colour choice, not state.
         hl: { yellow: token("hl-yellow"), green: token("hl-green"), blue: token("hl-blue"), pink: token("hl-pink"), purple: token("hl-purple") },
       },
+      // Type scale. Use these instead of text-[NNpx]. Exceptions on purpose:
+      // the Bible reader's reading sizes (components/bible/ChapterText.tsx),
+      // crossword grid numbers and kids-mode game text, which scale content.
+      fontSize: {
+        micro: ["10px", { lineHeight: "14px" }], // counter badges, date-tile months
+        eyebrow: ["11px", { lineHeight: "16px" }], // uppercase labels (.eyebrow), timestamps
+        lede: ["15px", { lineHeight: "1.55" }], // page descriptions, intro lines
+        "title-sm": ["22px", { lineHeight: "1.35" }],
+        title: ["28px", { lineHeight: "1.2" }], // page titles on phones
+        "title-lg": ["32px", { lineHeight: "1.2" }], // page titles from sm up
+        display: ["40px", { lineHeight: "1.1" }], // landing hero on phones
+        "display-lg": ["56px", { lineHeight: "1.08" }], // landing hero on desktop
+      },
       fontFamily: {
         // Loaded with next/font in app/layout.tsx (self-hosted, no layout shift).
         sans: ["var(--font-sans)", "-apple-system", "BlinkMacSystemFont", "sans-serif"],

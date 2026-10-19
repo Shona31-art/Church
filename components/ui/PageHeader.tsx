@@ -25,10 +25,10 @@ export function PageHeader({
       {back && <BackLink href={back.href} label={back.label} />}
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <h1 className="text-[28px] font-semibold leading-tight break-words sm:text-[32px]">{title}</h1>
+          <h1 className="text-title font-semibold leading-tight break-words sm:text-title-lg">{title}</h1>
           <div className="rule-gold mt-3" />
           {meta && <div className="mt-3 flex flex-wrap items-center gap-2">{meta}</div>}
-          {description && <p className="mt-3 max-w-2xl text-[15px] text-ink/60">{description}</p>}
+          {description && <p className="mt-3 max-w-2xl text-lede text-ink/60">{description}</p>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>

@@ -289,6 +289,10 @@ the Aperture default). Conventions every screen follows:
   on a light surface uses `text-gold-deep`. The navy `panel` / `on-panel`
   tokens are for brand panels that stay dark in both themes.
 - **Icons** come from lucide-react only — no emoji as icons.
+- **Type sizes** come from the scale in `tailwind.config.ts` (`text-micro`,
+  `text-eyebrow`, `text-lede`, `text-title-sm`, `text-title`, `text-title-lg`,
+  `text-display`, `text-display-lg`) plus Tailwind's `text-xs`…`text-3xl` —
+  not `text-[NNpx]`. Exceptions: Bible reading sizes, crossword numbers, kids mode.
 
 ---
 

@@ -169,7 +169,7 @@ function ChatList({ rows, photos }: { rows: ChatRow[]; photos: Map<string, strin
                     </span>
                   )}
                   {showCount && (
-                    <span className="tabular min-w-[1.25rem] rounded-full bg-ember px-1.5 py-0.5 text-center text-[11px] font-semibold text-on-ember">
+                    <span className="tabular min-w-[1.25rem] rounded-full bg-ember px-1.5 py-0.5 text-center text-eyebrow font-semibold text-on-ember">
                       {r.unread > 99 ? "99+" : r.unread}
                       <span className="sr-only"> unread</span>
                     </span>

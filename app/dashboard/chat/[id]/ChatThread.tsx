@@ -489,7 +489,7 @@ export function ChatThread({
             <div key={m.id}>
               {newDay && (
                 <div className="my-4 flex justify-center" role="separator" aria-label={dayLabel(m.created_at)}>
-                  <span className="rounded-full border border-line bg-parchment px-3 py-1 text-[11px] font-medium text-ink/60">{dayLabel(m.created_at)}</span>
+                  <span className="rounded-full border border-line bg-parchment px-3 py-1 text-eyebrow font-medium text-ink/60">{dayLabel(m.created_at)}</span>
                 </div>
               )}
               <MessageBubble

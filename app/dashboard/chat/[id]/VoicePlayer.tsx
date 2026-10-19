@@ -100,7 +100,7 @@ export function VoicePlayer({
           aria-valuetext={`${formatDuration(position * 1000)} of ${formatDuration(durationMs)}`}
           className={`h-1 w-full cursor-pointer ${onDark ? "accent-[rgb(var(--on-ember))]" : "accent-[rgb(var(--gold))]"}`}
         />
-        <p className={`mt-1 text-[11px] tabular ${muted}`}>
+        <p className={`mt-1 text-eyebrow tabular ${muted}`}>
           {error ?? (state === "playing" || position > 0 ? `${formatDuration(position * 1000)} / ${formatDuration(durationMs)}` : formatDuration(durationMs))}
         </p>
       </div>

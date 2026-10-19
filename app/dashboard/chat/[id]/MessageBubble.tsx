@@ -111,7 +111,7 @@ export function MessageBubble({
               <p className="whitespace-pre-wrap break-words">{message.content}</p>
             )}
 
-            <p className={`mt-1 flex items-center justify-end gap-1.5 text-[11px] tabular ${isMine && !deleted ? "text-on-ember/65" : "text-ink/60"}`}>
+            <p className={`mt-1 flex items-center justify-end gap-1.5 text-eyebrow tabular ${isMine && !deleted ? "text-on-ember/65" : "text-ink/60"}`}>
               {message.edited_at && !deleted && <span>Edited</span>}
               <time dateTime={message.created_at}>{message.pending ? "Sending…" : formatTime(message.created_at)}</time>
               {receipt && receipt !== "sending" && !deleted && (

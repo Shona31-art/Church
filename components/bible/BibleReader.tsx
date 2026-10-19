@@ -261,7 +261,7 @@ export function BibleReader() {
       </div>
 
       <article aria-labelledby="chapter-title" aria-busy={load.status === "loading"}>
-        <h1 id="chapter-title" className="text-[28px] font-semibold leading-tight sm:text-[32px]">
+        <h1 id="chapter-title" className="text-title font-semibold leading-tight sm:text-title-lg">
           {title}
         </h1>
         <div className="rule-gold mb-6 mt-3" />

@@ -8,7 +8,7 @@ export default function NotFound() {
       <div className="flex flex-1 items-center justify-center py-10">
         <div className="max-w-sm text-center">
           <p className="eyebrow">Error 404</p>
-          <h1 className="mt-3 text-[28px] font-semibold leading-tight">Page not found</h1>
+          <h1 className="mt-3 text-title font-semibold leading-tight">Page not found</h1>
           <div className="rule-gold mx-auto mt-3" />
           <p className="mt-4 text-sm text-ink/60">That page doesn&apos;t exist or may have moved.</p>
           <Link href="/dashboard" className="btn-primary mt-6">

@@ -174,7 +174,7 @@ function Sidebar({
         <Link href="/dashboard" className="flex min-w-0 flex-1 items-center gap-3">
           <Monogram text={initials(churchName)} />
           <div className="min-w-0">
-            <p className="truncate font-display text-[17px] font-semibold leading-tight">{churchName}</p>
+            <p className="truncate font-display text-lg font-semibold leading-tight">{churchName}</p>
             <p className="eyebrow mt-0.5">Grace-bound</p>
           </div>
         </Link>
@@ -232,7 +232,7 @@ function Monogram({ text, small = false }: { text: string; small?: boolean }) {
     <span
       aria-hidden
       className={`relative flex shrink-0 items-center justify-center rounded-xl bg-ember font-display font-semibold text-on-ember shadow-[inset_0_1px_0_rgb(255_255_255/0.15)] ${
-        small ? "h-7 w-7 text-xs" : "h-10 w-10 text-[15px]"
+        small ? "h-7 w-7 text-xs" : "h-10 w-10 text-lede"
       }`}
     >
       {text}

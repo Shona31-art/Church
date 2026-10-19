@@ -267,7 +267,7 @@ function Stock({ onUse, onBackground }: { onUse: (c: PhotoChoice) => void; onBac
                   <button type="button" className="text-xs font-medium text-ink/60 hover:text-ink" onClick={() => onBackground(choice(p))}>
                     Background
                   </button>
-                  <a href={p.photographerUrl} target="_blank" rel="noopener noreferrer" className="truncate text-[11px] text-ink/60 hover:text-ink" title={`Photo by ${p.photographer} on Pexels`}>
+                  <a href={p.photographerUrl} target="_blank" rel="noopener noreferrer" className="truncate text-eyebrow text-ink/60 hover:text-ink" title={`Photo by ${p.photographer} on Pexels`}>
                     {p.photographer}
                   </a>
                 </div>

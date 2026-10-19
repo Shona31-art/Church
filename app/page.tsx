@@ -75,7 +75,7 @@ export default async function LandingPage() {
         <section className="mx-auto grid max-w-6xl items-center gap-12 px-4 pb-20 pt-12 sm:px-6 sm:pt-16 lg:grid-cols-2 lg:gap-16 lg:pb-28">
           <div className="motion-safe:animate-fade-in">
             <p className="eyebrow">For churches of every size</p>
-            <h1 className="mt-4 max-w-xl text-[40px] font-semibold leading-[1.1] sm:text-5xl lg:text-[56px]">
+            <h1 className="mt-4 max-w-xl text-display font-semibold leading-[1.1] sm:text-5xl lg:text-display-lg">
               A church operating system for people, not just Sundays.
             </h1>
             <div className="rule-gold mt-6" />
@@ -99,7 +99,7 @@ export default async function LandingPage() {
         <section aria-labelledby="features-heading" className="border-t border-line bg-surface">
           <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
             <p className="eyebrow">What&apos;s inside</p>
-            <h2 id="features-heading" className="mt-3 max-w-xl text-3xl font-semibold leading-tight sm:text-[34px]">
+            <h2 id="features-heading" className="mt-3 max-w-xl text-3xl font-semibold leading-tight sm:text-title-lg">
               Everything your church does through the week
             </h2>
             <div className="rule-gold mt-5" />
@@ -120,7 +120,7 @@ export default async function LandingPage() {
         <section aria-labelledby="privacy-heading" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
           <div className="grid gap-10 rounded-3xl bg-panel p-8 text-on-panel sm:p-12 lg:grid-cols-[2fr_3fr] lg:gap-16">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-on-panel/60">Private by design</p>
+              <p className="text-eyebrow font-semibold uppercase tracking-[0.08em] text-on-panel/60">Private by design</p>
               <h2 id="privacy-heading" className="mt-3 text-3xl font-semibold leading-tight">
                 What&apos;s shared in confidence stays that way.
               </h2>
@@ -128,7 +128,7 @@ export default async function LandingPage() {
             </div>
             <ul className="space-y-5 self-center">
               {PRIVACY_POINTS.map((point) => (
-                <li key={point} className="flex gap-3 text-[15px] leading-relaxed text-on-panel/85">
+                <li key={point} className="flex gap-3 text-lede leading-relaxed text-on-panel/85">
                   <span aria-hidden className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
                   {point}
                 </li>

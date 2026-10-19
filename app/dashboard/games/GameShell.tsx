@@ -79,7 +79,7 @@ export function GameShell<View>({
       <Link href={mode === "kids" ? "/dashboard/games?kids=1" : "/dashboard/games"} className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-ink/60 hover:text-ink">
         <ChevronLeft aria-hidden className="h-4 w-4" /> Games
       </Link>
-      <h1 className="text-[28px] font-semibold leading-tight sm:text-[32px]">{info.title}</h1>
+      <h1 className="text-title font-semibold leading-tight sm:text-title-lg">{info.title}</h1>
       {mode !== "practice" && (
         <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-gold/50 bg-gold/10 px-3 py-1 text-xs font-semibold text-ink/80">
           {mode === "daily" ? <CalendarCheck aria-hidden className="h-3.5 w-3.5 text-gold" /> : <Smile aria-hidden className="h-3.5 w-3.5 text-gold" />}
@@ -91,7 +91,7 @@ export function GameShell<View>({
       {(phase.kind === "intro" || phase.kind === "starting") && (
         <div className="card-elevated space-y-6 rounded-2xl p-6">
           {phase.kind === "intro" && phase.error && <Alert tone="error">{phase.error}</Alert>}
-          <p className="text-[15px] text-ink/70">{rules}</p>
+          <p className="text-lede text-ink/70">{rules}</p>
 
           {mode === "daily" && (
             <Alert tone="info" title="One try today">

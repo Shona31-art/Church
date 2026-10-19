@@ -83,7 +83,7 @@ export default async function CounselingConversationPage({ params }: { params: {
                   <div className={`rounded-2xl px-4 py-3 text-sm max-w-[85%] whitespace-pre-wrap ${fromMember ? "bg-ember text-on-ember" : "bg-parchment border border-line"}`}>
                     <span className="sr-only">{fromMember ? (isOwner ? "You" : "Member") : "Assistant"}: </span>
                     {m.content}
-                    <time className={`block mt-1 text-[11px] ${fromMember ? "text-on-ember/70" : "text-ink/60"}`} dateTime={m.created_at}>
+                    <time className={`block mt-1 text-eyebrow ${fromMember ? "text-on-ember/70" : "text-ink/60"}`} dateTime={m.created_at}>
                       {formatDateTime(m.created_at, { weekday: undefined })}
                     </time>
                   </div>

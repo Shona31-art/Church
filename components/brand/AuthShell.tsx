@@ -14,7 +14,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
         <BrandMark onPanel />
         <PhotoPlaceholder onPanel label="Awaiting church photo — 1200×900" className="flex-1" />
         <figure>
-          <blockquote className="max-w-md font-display text-[26px] leading-snug">“Let all that you do be done in love.”</blockquote>
+          <blockquote className="max-w-md font-display text-title leading-snug">“Let all that you do be done in love.”</blockquote>
           <div className="rule-gold mt-4" />
           <figcaption className="mt-3 text-sm text-on-panel/65">1 Corinthians 16:14 (WEB)</figcaption>
         </figure>
@@ -33,7 +33,7 @@ export function AuthHeading({ eyebrow, title, children }: { eyebrow?: string; ti
   return (
     <div>
       {eyebrow && <p className="eyebrow mb-2">{eyebrow}</p>}
-      <h1 className="text-[28px] font-semibold leading-tight">{title}</h1>
+      <h1 className="text-title font-semibold leading-tight">{title}</h1>
       <div className="rule-gold mt-3" />
       {children && <p className="mt-3 text-sm text-ink/60">{children}</p>}
     </div>

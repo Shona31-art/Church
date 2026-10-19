@@ -196,7 +196,7 @@ export function BibleSearch() {
                 <p className="text-sm font-semibold">
                   {BOOKS[h.bookIndex].name} {h.chapter}:{h.verse}
                 </p>
-                <p className="mt-1 text-[15px] leading-relaxed text-ink/80">
+                <p className="mt-1 text-lede leading-relaxed text-ink/80">
                   <Marked text={h.text} terms={terms} />
                 </p>
               </Link>

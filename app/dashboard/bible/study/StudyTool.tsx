@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { runBibleStudy, StudyMode } from "./actions";
+import { Alert } from "@/components/ui/Alert";
 
 const MODE_OPTIONS: { value: StudyMode; label: string; hint: string }[] = [
   { value: "explain", label: "Explain", hint: "Context, meaning and application" },
@@ -76,7 +77,7 @@ export function StudyTool({ initialQuery }: { initialQuery: string }) {
         </section>
       )}
       {result?.error && (
-        <p role="alert" className="text-sm text-danger bg-danger-tint border border-danger-line rounded-lg p-3">⚠ {result.error}</p>
+        <Alert tone="error">{result.error}</Alert>
       )}
       {result?.text && (
         <section className="card-elevated rounded-2xl p-5" aria-live="polite">

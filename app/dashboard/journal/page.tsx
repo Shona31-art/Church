@@ -11,6 +11,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Pagination } from "@/components/ui/Pagination";
 import { DeleteEntry } from "./JournalForms";
 import { NAV_ICONS } from "@/components/ui/NavIcon";
+import { PrivacyNote } from "@/components/ui/PrivacyNote";
 
 export default async function JournalPage({ searchParams }: { searchParams: { page?: string } }) {
   const gate = await moduleGate("journal");
@@ -40,7 +41,9 @@ export default async function JournalPage({ searchParams }: { searchParams: { pa
     <div className="max-w-3xl">
       <PageHeader
         title="My journal"
-        description="🔒 Private and encrypted. Only you can read these — not your pastor, not your church admin, not the platform owner."
+        description={
+          <PrivacyNote>Private and encrypted. Only you can read these — not your pastor, not your church admin, not the platform owner.</PrivacyNote>
+        }
         actions={configured ? newButton : null}
       />
 

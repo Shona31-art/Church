@@ -6,6 +6,8 @@ import { togglePrayed, deletePrayerComment, removeFromWall } from "../actions";
 import { CommentForm } from "./CommentForm";
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
 import { moduleGate } from "@/lib/gate";
+import { Alert } from "@/components/ui/Alert";
+import { HandHeart } from "lucide-react";
 
 // Church prayer wall (ported from the Android Prayer Board): requests members
 // chose to share, plus answered-prayer testimonies. Private prayers never
@@ -67,9 +69,9 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
       </p>
 
       {error && (
-        <p role="alert" className="text-sm text-danger bg-danger-tint border border-danger-line rounded-lg p-3 mb-6">
-          ⚠ Couldn&apos;t load the prayer wall — refresh to try again.
-        </p>
+        <Alert tone="error" className="mb-6">
+          Couldn&apos;t load the prayer wall — refresh to try again.
+        </Alert>
       )}
       {!error && visible.length === 0 && (
         <div className="card-elevated rounded-2xl p-6 text-center">
@@ -113,12 +115,10 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
                   <form action={togglePrayed}>
                     <input type="hidden" name="id" value={p.id} />
                     <PendingButton
-                      className={`text-sm rounded-lg px-3 py-1.5 border ${
-                        iPrayed ? "bg-ember text-on-ember border-ember" : "border-ink/20 hover:bg-ink/5"
-                      }`}
+                      className={`${iPrayed ? "btn-primary" : "btn-secondary"} btn-sm`}
                       pendingLabel="…"
                     >
-                      🙏 {iPrayed ? "You prayed" : "I prayed"}
+                      <HandHeart aria-hidden className="h-4 w-4" /> {iPrayed ? "You prayed" : "I prayed"}
                     </PendingButton>
                   </form>
                 )}

@@ -5,6 +5,8 @@ import { useFormState } from "react-dom";
 import { FileUpload } from "../FileUpload";
 import { replyToTicket } from "./actions";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
+import { Paperclip } from "lucide-react";
+import { FieldError } from "@/components/ui/Alert";
 
 export function ReplyForm({ ticketId }: { ticketId: string }) {
   const [state, formAction] = useFormState(replyToTicket, null);
@@ -33,9 +35,9 @@ export function ReplyForm({ ticketId }: { ticketId: string }) {
           aria-expanded={showUpload}
           aria-label="Attach a screenshot"
           title="Attach a screenshot"
-          className="btn-secondary px-3"
+          className="btn-icon btn-secondary"
         >
-          📎
+          <Paperclip aria-hidden className="h-4 w-4" />
         </button>
         <PendingButton pendingLabel="Sending…">
           Send
@@ -48,7 +50,7 @@ export function ReplyForm({ ticketId }: { ticketId: string }) {
           <input type="hidden" name="attachment_path" value={attachmentPath} />
         </div>
       )}
-      {state?.error && <p role="alert" className="text-sm text-danger">⚠ {state.error}</p>}
+      <FieldError>{state?.error}</FieldError>
     </form>
   );
 }

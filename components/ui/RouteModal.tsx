@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
+import { useConfirm } from "./ConfirmDialog";
 
 const WIDTHS = {
   md: "md:max-w-xl",
@@ -49,8 +50,18 @@ export function RouteModal({ children, size = "lg" }: { children: React.ReactNod
     };
   }, []);
 
-  function close() {
-    if (dirty.current && !window.confirm("Discard your changes? Anything you've typed in this form will be lost.")) return;
+  const [confirm, confirmDialog] = useConfirm();
+
+  async function close() {
+    if (
+      dirty.current &&
+      !(await confirm({
+        title: "Discard your changes?",
+        message: "Anything you've typed in this form will be lost.",
+        confirmLabel: "Discard",
+      }))
+    )
+      return;
     // The modal only ever appears after an in-app navigation, so there is
     // always a previous page in history to go back to.
     router.back();
@@ -60,6 +71,9 @@ export function RouteModal({ children, size = "lg" }: { children: React.ReactNod
     <dialog
       ref={dialogRef}
       onCancel={(e) => {
+        // React passes a nested dialog's Escape up to here (e.g. a delete
+        // confirmation inside the form) — only react to our own.
+        if (e.target !== e.currentTarget) return;
         e.preventDefault(); // Escape: run the same unsaved-changes check as the close button
         close();
       }}
@@ -74,6 +88,7 @@ export function RouteModal({ children, size = "lg" }: { children: React.ReactNod
         </button>
       </div>
       <div className="px-5 pb-6 md:px-8 md:pb-8">{children}</div>
+      {confirmDialog}
     </dialog>
   );
 }

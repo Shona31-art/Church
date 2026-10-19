@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
 import { createPrayer } from "./actions";
 import { draftPrayerWithAi } from "../actions";
+import { Alert, FieldError } from "@/components/ui/Alert";
+import { Sparkles } from "lucide-react";
 
 /** Add-a-prayer form. `aiAvailable` is false on plans without AI writing help (Basic). */
 export function NewPrayerForm({ aiAvailable }: { aiAvailable: boolean }) {
@@ -29,9 +31,7 @@ export function NewPrayerForm({ aiAvailable }: { aiAvailable: boolean }) {
       <h1 className="text-2xl font-semibold">Add a prayer</h1>
 
       {state?.error && (
-        <p role="alert" className="text-sm text-danger bg-danger-tint border border-danger-line rounded-lg p-3">
-          ⚠ {state.error}
-        </p>
+        <Alert tone="error">{state.error}</Alert>
       )}
 
       <div>
@@ -56,13 +56,19 @@ export function NewPrayerForm({ aiAvailable }: { aiAvailable: boolean }) {
             type="button"
             onClick={handleDraft}
             disabled={drafting || text.trim().length < 3}
-            className="text-xs border border-ink/20 rounded-lg px-3 py-1.5 hover:bg-ink/5 disabled:opacity-40 shrink-0"
+            className="btn-secondary btn-sm shrink-0"
           >
-            {drafting ? "Drafting…" : "✨ Help me write it"}
+            {drafting ? (
+              "Drafting…"
+            ) : (
+              <>
+                <Sparkles aria-hidden className="h-3.5 w-3.5" /> Help me write it
+              </>
+            )}
           </button>
         </div>
         )}
-        {aiError && <p role="alert" className="text-xs text-danger mt-1">⚠ {aiError}</p>}
+        <FieldError>{aiError}</FieldError>
       </div>
 
       <div>

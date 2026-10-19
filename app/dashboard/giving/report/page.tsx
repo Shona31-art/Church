@@ -82,12 +82,12 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
       ) : (
         <>
           <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-            <div className="card-elevated rounded-xl p-4 col-span-2 lg:col-span-1">
+            <div className="card-elevated rounded-2xl p-4 col-span-2 lg:col-span-1">
               <p className="text-xs text-ink/60">Total {year}</p>
               <p className="text-2xl font-semibold tabular-nums">{formatMoney(total)}</p>
             </div>
             {[...byFund.entries()].map(([f, cents]) => (
-              <div key={f} className="card-elevated rounded-xl p-4">
+              <div key={f} className="card-elevated rounded-2xl p-4">
                 <p className="text-xs text-ink/60">{fundLabel(f)}</p>
                 <p className="text-lg font-semibold tabular-nums">{formatMoney(cents)}</p>
               </div>

@@ -99,7 +99,7 @@ export default async function AllChurchesPage({ searchParams }: { searchParams: 
           <ul className="md:hidden space-y-2">
             {pageRows.map((c) => (
               <li key={c.id}>
-                <Link href={`/dashboard/super-admin/churches/${c.id}`} className="card-elevated rounded-xl p-4 flex items-center justify-between gap-3">
+                <Link href={`/dashboard/super-admin/churches/${c.id}`} className="card-elevated rounded-2xl p-4 flex items-center justify-between gap-3">
                   <div>
                     <p className="font-medium">{c.name}</p>
                     <p className="text-xs text-ink/60">

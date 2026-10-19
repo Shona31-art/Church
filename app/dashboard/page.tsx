@@ -11,6 +11,7 @@ import { APP_TIMEZONE, formatDate, formatDateTime, formatMoney, todayInAppZone }
 import { PLAN_LABELS, type ModuleKey } from "@/lib/subscription";
 import { Section } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Pin } from "lucide-react";
 
 // Dashboard home, shaped by role. Every card degrades on its own: a failed
 // query shows that card's empty state rather than breaking the page. Only
@@ -268,7 +269,7 @@ export default async function DashboardHomePage() {
                     <Link href={`/dashboard/announcements/${a.id}`} className="block hover:opacity-80">
                       <p className="text-sm font-medium">
                         {a.pinned && <span className="sr-only">Pinned: </span>}
-                        {a.pinned ? "📌 " : ""}
+                        {a.pinned && <Pin aria-hidden className="mr-1 inline h-3.5 w-3.5 -translate-y-px text-gold" />}
                         {a.title}
                       </p>
                       <p className="text-xs text-ink/60 line-clamp-2">{a.body}</p>

@@ -11,6 +11,7 @@ import { Alert } from "@/components/ui/Alert";
 import { StatusBadge, type BadgeTone } from "@/components/ui/StatusBadge";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { PlanButton, PortalButton } from "./BillingButtons";
+import { Check } from "lucide-react";
 
 const STATUS: Record<string, { tone: BadgeTone; label: string }> = {
   active: { tone: "success", label: "Active" },
@@ -91,7 +92,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
                 <ul className="mt-4 space-y-1 text-sm flex-1">
                   {features.map((f) => (
                     <li key={f} className="flex gap-2">
-                      <span aria-hidden className="text-success">✓</span>
+                      <Check aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                       {f}
                     </li>
                   ))}

@@ -7,6 +7,7 @@ import { generatePosterTagline, savePoster } from "./actions";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { POSTER_COLORS, POSTER_TEMPLATES } from "@/lib/posters";
 import { Alert } from "@/components/ui/Alert";
+import { Sparkles } from "lucide-react";
 
 export interface PosterValues {
   id: string;
@@ -86,7 +87,13 @@ export function PosterEditor({ churchName, poster }: { churchName: string; poste
                 disabled={generating || !form.eventTitle.trim()}
                 className="btn-secondary whitespace-nowrap"
               >
-                {generating ? "Thinking…" : "✨ AI suggest"}
+                {generating ? (
+                  "Thinking…"
+                ) : (
+                  <>
+                    <Sparkles aria-hidden className="h-4 w-4" /> AI suggest
+                  </>
+                )}
               </button>
             </div>
             {aiNotice && <p role="status" className="text-xs text-ink/60 mt-1">{aiNotice}</p>}

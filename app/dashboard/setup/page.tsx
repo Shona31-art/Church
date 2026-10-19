@@ -7,6 +7,7 @@ import { MODULE_LABELS, PLAN_LABELS, MODULE_KEYS } from "@/lib/subscription";
 import { PageHeader, Section } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PermissionDenied } from "@/components/ui/Gates";
+import { Check, Circle } from "lucide-react";
 
 export default async function ChurchSettingsPage() {
   const me = await getCurrentAppUser();
@@ -70,9 +71,11 @@ export default async function ChurchSettingsPage() {
             const on = access?.modules.has(k);
             return (
               <li key={k} className="flex items-center gap-2">
-                <span aria-hidden className={on ? "text-success" : "text-ink/30"}>
-                  {on ? "✓" : "○"}
-                </span>
+                {on ? (
+                  <Check aria-hidden className="h-4 w-4 shrink-0 text-success" />
+                ) : (
+                  <Circle aria-hidden className="h-4 w-4 shrink-0 text-ink/30" />
+                )}
                 <span className={on ? "" : "text-ink/50"}>{MODULE_LABELS[k]}</span>
                 <span className="sr-only">{on ? "(included)" : "(not on your plan)"}</span>
               </li>

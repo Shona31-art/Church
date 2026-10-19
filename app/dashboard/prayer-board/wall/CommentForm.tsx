@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useFormState } from "react-dom";
 import { addPrayerComment } from "../actions";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
+import { FieldError } from "@/components/ui/Alert";
 
 export function CommentForm({ prayerId }: { prayerId: string }) {
   const [state, formAction] = useFormState(addPrayerComment, null);
@@ -33,11 +34,7 @@ export function CommentForm({ prayerId }: { prayerId: string }) {
           Post
         </PendingButton>
       </div>
-      {state?.error && (
-        <p role="alert" className="text-xs text-danger mt-1">
-          ⚠ {state.error}
-        </p>
-      )}
+      <FieldError>{state?.error}</FieldError>
     </form>
   );
 }

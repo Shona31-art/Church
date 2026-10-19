@@ -6,6 +6,7 @@ import { deleteEvent, rsvp, setEventCancelled } from "../actions";
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
 import { Alert } from "@/components/ui/Alert";
 import { RSVP_LABELS, type RsvpStatus } from "@/lib/events";
+import { Check } from "lucide-react";
 
 export function RsvpButtons({ eventId, mine }: { eventId: string; mine: RsvpStatus | null }) {
   const [state, action] = useFormState(rsvp, null);
@@ -24,7 +25,7 @@ export function RsvpButtons({ eventId, mine }: { eventId: string; mine: RsvpStat
               aria-pressed={mine === s}
               className={mine === s ? "btn-primary" : "btn-secondary"}
             >
-              {mine === s ? "✓ " : ""}
+              {mine === s && <Check aria-hidden className="h-4 w-4" />}
               {RSVP_LABELS[s]}
             </button>
           ))}

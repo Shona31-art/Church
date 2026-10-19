@@ -7,6 +7,7 @@ import { saveAnnouncement, draftAnnouncementWithAi, type AnnouncementChannel } f
 import { Alert } from "@/components/ui/Alert";
 import { FormField, RequiredNote } from "@/components/ui/FormField";
 import { showToast } from "@/components/ui/Toaster";
+import { Sparkles } from "lucide-react";
 
 const CHANNELS: { value: AnnouncementChannel; label: string }[] = [
   { value: "app", label: "This app" },
@@ -106,7 +107,9 @@ export function AnnouncementForm({
 
       {aiAvailable && (
         <div className="rounded-xl border border-line bg-parchment p-4 space-y-3">
-          <p className="text-sm font-medium">✨ AI writer</p>
+          <p className="flex items-center gap-1.5 text-sm font-medium">
+            <Sparkles aria-hidden className="h-4 w-4 text-gold" /> AI writer
+          </p>
           <div className="flex flex-wrap items-end gap-2">
             <div>
               <label htmlFor="channel" className="block text-xs text-ink/60 mb-1">

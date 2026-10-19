@@ -11,6 +11,7 @@ import { Alert } from "@/components/ui/Alert";
 import { PriorityBadge, TicketStatusBadge } from "../SupportBadges";
 import { ReplyForm } from "./ReplyForm";
 import { StatusButtons } from "./StatusButtons";
+import { Paperclip } from "lucide-react";
 
 // Signed links last an hour — long enough to read a ticket, short enough that
 // a copied link stops working.
@@ -80,7 +81,9 @@ export default async function TicketDetailPage({ params }: { params: { id: strin
                     <img src={signed.get(m.attachment_path)} alt="Screenshot attached to this message" className="max-h-48 rounded-lg border border-line" />
                   </a>
                 ) : (
-                  <p className="text-xs text-ink/60 mt-2">📎 Attachment unavailable — refresh the page to try again.</p>
+                  <p className="mt-2 flex items-center gap-1.5 text-xs text-ink/60">
+                    <Paperclip aria-hidden className="h-3.5 w-3.5" /> Attachment unavailable — refresh the page to try again.
+                  </p>
                 ))}
             </article>
           );

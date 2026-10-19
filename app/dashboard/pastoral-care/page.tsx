@@ -15,6 +15,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { DeleteCareLog, FollowUpToggle } from "./CareLogControls";
 import { NAV_ICONS } from "@/components/ui/NavIcon";
+import { PrivacyNote } from "@/components/ui/PrivacyNote";
 
 export default async function PastoralCarePage({ searchParams }: { searchParams: { type?: string; q?: string; page?: string; due?: string } }) {
   const gate = await moduleGate("pastoral_care");
@@ -56,7 +57,11 @@ export default async function PastoralCarePage({ searchParams }: { searchParams:
     <div className="max-w-3xl">
       <PageHeader
         title="Pastoral care"
-        description="🔒 Confidential. Visible only to your church's pastors and admins — never to members or platform staff. Every change is audit-logged."
+        description={
+          <PrivacyNote>
+            Confidential. Visible only to your church&apos;s pastors and admins — never to members or platform staff. Every change is audit-logged.
+          </PrivacyNote>
+        }
         actions={addButton}
       />
 

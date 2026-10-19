@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { TriangleAlert } from "lucide-react";
 
 // Catches any unexpected error while rendering a dashboard page, so people
 // get a way forward instead of a stack trace. The real error is logged
@@ -15,7 +16,9 @@ export default function DashboardError({ error, reset }: { error: Error & { dige
 
   return (
     <div className="max-w-lg card-elevated rounded-2xl p-6" role="alert">
-      <p aria-hidden className="text-2xl text-danger">⚠</p>
+      <span aria-hidden className="flex h-10 w-10 items-center justify-center rounded-xl bg-danger-tint text-danger">
+        <TriangleAlert className="h-5 w-5" strokeWidth={2} />
+      </span>
       <h1 className="mt-2 text-xl font-semibold">{offline ? "You're offline" : "Something went wrong loading this page"}</h1>
       <p className="text-sm text-ink/70 mt-2">
         {offline

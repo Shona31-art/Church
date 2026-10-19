@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { FieldError } from "@/components/ui/Alert";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { MAX_NOTE_LENGTH } from "@/lib/bible/annotations";
 
 /**
@@ -48,9 +49,16 @@ export function NoteDialog({
     }
   }, [open, initialText]);
 
-  function close() {
+  const [confirm, confirmDialog] = useConfirm();
+
+  async function close() {
     if (busy) return;
-    if (text.trim() !== initialText.trim() && text.trim() && !window.confirm("Discard this note? What you've written will be lost.")) return;
+    if (
+      text.trim() !== initialText.trim() &&
+      text.trim() &&
+      !(await confirm({ title: "Discard this note?", message: "What you've written will be lost.", confirmLabel: "Discard" }))
+    )
+      return;
     onClose();
   }
 
@@ -77,6 +85,7 @@ export function NoteDialog({
     <dialog
       ref={dialogRef}
       onCancel={(e) => {
+        if (e.target !== e.currentTarget) return; // a nested confirm's Escape, handled there
         e.preventDefault();
         close();
       }}
@@ -147,6 +156,7 @@ export function NoteDialog({
           </div>
         </div>
       </form>
+      {confirmDialog}
     </dialog>
   );
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useFormState } from "react-dom";
 import { markPrayerAnswered } from "./actions";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
+import { Check } from "lucide-react";
 
 export function AnswerPrayerForm({ id }: { id: string }) {
   const [open, setOpen] = useState(false);
@@ -12,7 +13,7 @@ export function AnswerPrayerForm({ id }: { id: string }) {
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className="btn-secondary btn-sm" aria-expanded={false}>
-        ✓ Mark answered
+        <Check aria-hidden className="h-4 w-4" /> Mark answered
       </button>
     );
   }

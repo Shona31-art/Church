@@ -169,7 +169,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
           <ul className="md:hidden space-y-2">
             {members.map((m: any) => (
               <li key={m.id}>
-                <Link href={`/dashboard/members/${m.id}`} className="card-elevated rounded-xl p-4 flex items-start justify-between gap-3">
+                <Link href={`/dashboard/members/${m.id}`} className="card-elevated rounded-2xl p-4 flex items-start justify-between gap-3">
                   <Avatar name={m.name} src={photos.get(m.id)} />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium truncate">{m.name}</p>

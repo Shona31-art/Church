@@ -8,6 +8,7 @@ import { formatDate, formatRelative } from "@/lib/format";
 import { isDirectMediaFile, isSafeHttpUrl, youtubeEmbedUrl } from "@/lib/media";
 import { PageHeader, Section } from "@/components/ui/PageHeader";
 import { DeleteNoteButton, NoteForm, SermonAdminActions } from "../SermonControls";
+import { PrivacyNote } from "@/components/ui/PrivacyNote";
 
 export default async function SermonDetailPage({ params }: { params: { id: string } }) {
   const gate = await moduleGate("sermon_ai");
@@ -99,7 +100,7 @@ export default async function SermonDetailPage({ params }: { params: { id: strin
         </Section>
       )}
 
-      <Section title="My notes" description="🔒 Private — only you can see these.">
+      <Section title="My notes" description={<PrivacyNote>Private — only you can see these.</PrivacyNote>}>
         <NoteForm sermonId={sermon.id} />
         {myNotes?.length ? (
           <ul className="mt-5 space-y-2">

@@ -106,7 +106,7 @@ export default async function PlatformUsersPage({ searchParams }: { searchParams
           <ul className="md:hidden space-y-2">
             {users.map((u: any) => (
               <li key={u.id}>
-                <Link href={`/dashboard/super-admin/users/${u.id}`} className="card-elevated rounded-xl p-4 flex items-start justify-between gap-3">
+                <Link href={`/dashboard/super-admin/users/${u.id}`} className="card-elevated rounded-2xl p-4 flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-medium truncate">{u.name}</p>
                     <p className="text-xs text-ink/60 truncate">

@@ -52,7 +52,7 @@ export function MonthView({ ym, today, events }: { ym: YearMonth; today: string;
         </div>
       </div>
 
-      <table className="w-full table-fixed border-collapse card-elevated rounded-xl overflow-hidden">
+      <table className="w-full table-fixed border-collapse card-elevated rounded-2xl overflow-hidden">
         <caption className="sr-only">Events in {label}</caption>
         <thead>
           <tr>
@@ -124,7 +124,7 @@ export function MonthView({ ym, today, events }: { ym: YearMonth; today: string;
           <ul className="space-y-2">
             {events.map((e) => (
               <li key={e.id}>
-                <Link href={`/dashboard/calendar/${e.id}`} className="card-elevated rounded-xl p-3 block">
+                <Link href={`/dashboard/calendar/${e.id}`} className="card-elevated rounded-2xl p-3 block">
                   <p className={`font-medium ${e.cancelled_at ? "line-through text-ink/50" : ""}`}>{e.title}</p>
                   <p className="text-sm text-ink/60">
                     {formatDate(e.start_time)} · {formatTime(e.start_time)}

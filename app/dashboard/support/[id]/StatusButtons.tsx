@@ -4,6 +4,8 @@ import { useFormState } from "react-dom";
 import { updateTicketStatus } from "./actions";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { TICKET_STATUSES } from "@/lib/support";
+import { Check } from "lucide-react";
+import { FieldError } from "@/components/ui/Alert";
 
 export function StatusButtons({ ticketId, status }: { ticketId: string; status: string }) {
   const [state, formAction] = useFormState(updateTicketStatus, null);
@@ -20,12 +22,13 @@ export function StatusButtons({ ticketId, status }: { ticketId: string; status: 
               pendingLabel="Saving…"
               className={`${status === s ? "btn-primary" : "btn-secondary"} btn-sm capitalize`}
             >
-              {status === s ? `✓ ${s.replace("_", " ")}` : s.replace("_", " ")}
+              {status === s && <Check aria-hidden className="h-3.5 w-3.5" />}
+              {s.replace("_", " ")}
             </PendingButton>
           </form>
         ))}
       </div>
-      {state?.error && <p role="alert" className="text-sm text-danger mt-2">⚠ {state.error}</p>}
+      <FieldError>{state?.error}</FieldError>
     </div>
   );
 }

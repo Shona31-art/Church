@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { startConversation } from "./actions";
 import { NAV_ICONS } from "@/components/ui/NavIcon";
+import { PrivacyNote } from "@/components/ui/PrivacyNote";
 
 export default async function CounselingHome() {
   const gate = await moduleGate("ai_counseling");
@@ -105,7 +106,7 @@ export default async function CounselingHome() {
           }
         />
       ) : (
-        <Section title="My conversations" description="🔒 Only you can read these unless you choose to share one with a pastor.">
+        <Section title="My conversations" description={<PrivacyNote>Only you can read these unless you choose to share one with a pastor.</PrivacyNote>}>
           {!mine?.length ? (
             <p className="text-sm text-ink/60">You haven&apos;t started a conversation yet. Use “New conversation” whenever you&apos;re ready.</p>
           ) : (

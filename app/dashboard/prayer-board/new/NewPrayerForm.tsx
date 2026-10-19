@@ -7,6 +7,7 @@ import { draftPrayerWithAi } from "../actions";
 import { Alert, FieldError } from "@/components/ui/Alert";
 import { Sparkles } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
 
 /** Add-a-prayer form. `aiAvailable` is false on plans without AI writing help (Basic). */
 export function NewPrayerForm({ aiAvailable }: { aiAvailable: boolean }) {
@@ -19,7 +20,7 @@ export function NewPrayerForm({ aiAvailable }: { aiAvailable: boolean }) {
   async function handleDraft() {
     setDrafting(true);
     setAiError(null);
-    const result = await draftPrayerWithAi(text, category);
+    const result = await callAction(() => draftPrayerWithAi(text, category), { error: CONNECTION_FAILED });
     setDrafting(false);
     if (result.error) setAiError(result.error);
     else if (result.text) setText(result.text);

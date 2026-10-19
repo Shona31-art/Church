@@ -69,7 +69,7 @@ export function VoicePlayer({
     }
   }
 
-  const muted = onDark ? "text-on-ember/70" : "text-ink/55";
+  const muted = onDark ? "text-on-ember/70" : "text-ink/60";
   const Icon = state === "playing" ? Pause : state === "loading" ? LoaderCircle : Play;
 
   return (

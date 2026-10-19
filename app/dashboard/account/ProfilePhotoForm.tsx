@@ -13,6 +13,7 @@ import { FormField } from "@/components/ui/FormField";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { showToast } from "@/components/ui/Toaster";
 import { removeMyPhoto, setMyPhoto, updateMyAbout } from "./actions";
+import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
 
 /**
  * Profile photo: pick → shrink to a 512px square in the browser → upload to
@@ -72,7 +73,7 @@ export function ProfilePhotoForm({
   async function onRemove() {
     setBusy("removing");
     setError(null);
-    const result = await removeMyPhoto();
+    const result = await callAction(() => removeMyPhoto(), { error: CONNECTION_FAILED });
     setBusy(null);
     if (result.error) return setError(result.error);
     setPreview(null);

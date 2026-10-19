@@ -59,7 +59,7 @@ export function MessageBubble({
           <div
             className={`rounded-2xl px-3.5 py-2 text-sm shadow-xs ${
               deleted
-                ? "border border-dashed border-line-strong bg-transparent text-ink/50"
+                ? "border border-dashed border-line-strong bg-transparent text-ink/60"
                 : isMine
                 ? `bg-ember text-on-ember ${showHeader ? "rounded-tr-md" : ""}`
                 : `border border-line bg-surface ${showHeader ? "rounded-tl-md" : ""}`
@@ -111,7 +111,7 @@ export function MessageBubble({
               <p className="whitespace-pre-wrap break-words">{message.content}</p>
             )}
 
-            <p className={`mt-1 flex items-center justify-end gap-1.5 text-[11px] tabular ${isMine && !deleted ? "text-on-ember/65" : "text-ink/45"}`}>
+            <p className={`mt-1 flex items-center justify-end gap-1.5 text-[11px] tabular ${isMine && !deleted ? "text-on-ember/65" : "text-ink/60"}`}>
               {message.edited_at && !deleted && <span>Edited</span>}
               <time dateTime={message.created_at}>{message.pending ? "Sending…" : formatTime(message.created_at)}</time>
               {receipt && receipt !== "sending" && !deleted && (

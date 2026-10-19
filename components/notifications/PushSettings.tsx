@@ -160,7 +160,7 @@ export function PushSettings({ initialPreferences }: { initialPreferences: Recor
             <li key={category} className="flex items-center justify-between gap-4 px-4 py-3">
               <label htmlFor={`push-${category}`} className="min-w-0 cursor-pointer">
                 <span className="block text-sm font-semibold">{CATEGORY_LABELS[category].label}</span>
-                <span className="block text-sm text-ink/55">{CATEGORY_LABELS[category].description}</span>
+                <span className="block text-sm text-ink/60">{CATEGORY_LABELS[category].description}</span>
               </label>
               <button
                 id={`push-${category}`}

@@ -7,6 +7,7 @@ import { GAMES, LEVELS, LEVEL_LABELS, type GameKey, type Level } from "@/lib/gam
 import { formatDuration } from "@/lib/chat";
 import { Alert } from "@/components/ui/Alert";
 import { finishGame, startGame, type FinishResult, type GameMode } from "./actions";
+import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
 
 export interface BoardProps<View> {
   sessionId: string;
@@ -53,7 +54,7 @@ export function GameShell<View>({
 
   async function start() {
     setPhase({ kind: "starting" });
-    const result = await startGame(game, level, timed, mode);
+    const result = await callAction(() => startGame(game, level, timed, mode), { error: CONNECTION_FAILED });
     if ("error" in result) return setPhase({ kind: "intro", error: result.error });
     setPhase({ kind: "playing", sessionId: result.sessionId, view: result.view, level: result.level, timed: result.timed, parSeconds: result.parSeconds, startedAt: Date.now() });
   }
@@ -62,7 +63,7 @@ export function GameShell<View>({
     if (phase.kind !== "playing") return;
     setFinishError(null);
     setPhase({ ...phase, kind: "finishing" });
-    const result = await finishGame(phase.sessionId, answers ?? null);
+    const result = await callAction(() => finishGame(phase.sessionId, answers ?? null), { error: CONNECTION_FAILED });
     if (result.error) {
       // Rare (lost connection, expired session): keep the board so nothing is lost.
       setPhase({ ...phase, kind: "playing" });
@@ -75,7 +76,7 @@ export function GameShell<View>({
   return (
     // Kids mode: everything a size larger.
     <div className={`max-w-3xl ${mode === "kids" ? "text-[17px] [&_.btn]:min-h-[48px] [&_.btn]:text-base" : ""}`}>
-      <Link href={mode === "kids" ? "/dashboard/games?kids=1" : "/dashboard/games"} className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-ink/55 hover:text-ink">
+      <Link href={mode === "kids" ? "/dashboard/games?kids=1" : "/dashboard/games"} className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-ink/60 hover:text-ink">
         <ChevronLeft aria-hidden className="h-4 w-4" /> Games
       </Link>
       <h1 className="text-[28px] font-semibold leading-tight sm:text-[32px]">{info.title}</h1>
@@ -123,7 +124,7 @@ export function GameShell<View>({
             <input type="checkbox" checked={timed} onChange={(e) => setTimed(e.target.checked)} className="mt-0.5 accent-[rgb(var(--ember))]" />
             <span>
               <span className="font-medium">Timed mode</span>
-              <span className="block text-xs text-ink/55">
+              <span className="block text-xs text-ink/60">
                 Finish a perfect game in under {formatDuration(info.parSeconds[level] * 1000)} for up to 50% bonus points. Without it, take as long as you like.
               </span>
             </span>
@@ -173,7 +174,7 @@ function Clock({ startedAt, parSeconds }: { startedAt: number; parSeconds: numbe
     <span className={`tabular inline-flex items-center gap-1 ${over ? "text-warning" : "text-ink/60"}`} aria-label={`Time ${formatDuration(elapsed)}`}>
       <Timer aria-hidden className="h-4 w-4" />
       {formatDuration(elapsed)}
-      {parSeconds !== null && <span className="text-ink/40">/ {formatDuration(parSeconds * 1000)}</span>}
+      {parSeconds !== null && <span className="text-ink/60">/ {formatDuration(parSeconds * 1000)}</span>}
     </span>
   );
 }
@@ -220,8 +221,8 @@ function ResultCard({
           <dd className="mt-1 text-lg font-semibold">{LEVEL_LABELS[level]}</dd>
         </div>
       </dl>
-      {timed && !perfect && <p className="mt-3 text-xs text-ink/50">Time bonus is for perfect games.</p>}
-      {mode === "kids" && <p className="mt-3 text-xs text-ink/50">Kids mode games don&apos;t go on the church scoreboard.</p>}
+      {timed && !perfect && <p className="mt-3 text-xs text-ink/60">Time bonus is for perfect games.</p>}
+      {mode === "kids" && <p className="mt-3 text-xs text-ink/60">Kids mode games don&apos;t go on the church scoreboard.</p>}
 
       {result.newBadges && result.newBadges.length > 0 && (
         <div className="mx-auto mt-6 max-w-sm space-y-2">
@@ -252,7 +253,7 @@ function ResultCard({
                 )}
                 <span className="flex-1">
                   <span className="font-semibold">{item.label}</span> · {item.prompt}
-                  {item.reference && <span className="block text-xs text-ink/50">{item.reference}</span>}
+                  {item.reference && <span className="block text-xs text-ink/60">{item.reference}</span>}
                 </span>
                 <span className="font-semibold tracking-wide">{item.answer}</span>
               </li>

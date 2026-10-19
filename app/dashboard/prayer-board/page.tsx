@@ -99,7 +99,7 @@ function PrayerCard({ item }: { item: any }) {
       <p className="font-medium whitespace-pre-line">{item.prayer_text}</p>
       {item.scripture_refs?.length > 0 && <p className="text-sm text-ember mt-2">{item.scripture_refs.join(" · ")}</p>}
       {isAnswered && item.answered_reflection && <p className="text-sm text-ink/70 border-l-2 border-gold pl-3 my-3">{item.answered_reflection}</p>}
-      <p className="text-xs text-ink/50 mt-auto pt-3">{isAnswered ? `Answered ${formatDate(item.answered_at)}` : `Added ${formatDate(item.created_at)}`}</p>
+      <p className="text-xs text-ink/60 mt-auto pt-3">{isAnswered ? `Answered ${formatDate(item.answered_at)}` : `Added ${formatDate(item.created_at)}`}</p>
 
       <div className="flex flex-wrap gap-2 mt-3">
         {!isAnswered && <AnswerPrayerForm id={item.id} />}

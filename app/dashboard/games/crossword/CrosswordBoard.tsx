@@ -149,7 +149,7 @@ export function CrosswordBoard({ view, finish, finishing }: BoardProps<Crossword
                 const label = here.map((e) => `${e.number} ${e.direction}, letter ${(e.direction === "across" ? c - e.col : r - e.row) + 1} of ${e.length}`).join("; ");
                 return (
                   <div key={c} role="gridcell" className="relative" style={{ width: cell, height: cell }}>
-                    {number && <span aria-hidden className="pointer-events-none absolute left-0.5 top-0 text-[9px] font-semibold leading-none text-ink/55 sm:text-[10px]">{number}</span>}
+                    {number && <span aria-hidden className="pointer-events-none absolute left-0.5 top-0 text-[9px] font-semibold leading-none text-ink/60 sm:text-[10px]">{number}</span>}
                     <input
                       ref={(el) => {
                         (refs.current[r] ??= [])[c] = el;
@@ -199,13 +199,13 @@ export function CrosswordBoard({ view, finish, finishing }: BoardProps<Crossword
                           const [r, c] = cellsOf(e).find(([er, ec]) => !letters[er][ec]) ?? [e.row, e.col];
                           focus(r, c, e.direction);
                         }}
-                        className={`flex w-full gap-2 rounded-lg px-2 py-1.5 text-left text-sm ${isCurrent ? "bg-gold/15" : "hover:bg-ink/5"} ${done && !isCurrent ? "text-ink/45" : ""}`}
+                        className={`flex w-full gap-2 rounded-lg px-2 py-1.5 text-left text-sm ${isCurrent ? "bg-gold/15" : "hover:bg-ink/5"} ${done && !isCurrent ? "text-ink/60" : ""}`}
                       >
                         <span className="tabular w-5 shrink-0 font-semibold">{e.number}</span>
                         <span className="flex-1">
-                          {e.clue} <span className="text-ink/45">({e.length})</span>
+                          {e.clue} <span className="text-ink/60">({e.length})</span>
                         </span>
-                        {done && <CheckCircle2 aria-label="filled in" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink/40" />}
+                        {done && <CheckCircle2 aria-label="filled in" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink/60" />}
                       </button>
                     </li>
                   );

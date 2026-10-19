@@ -119,7 +119,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
         )
       ) : (
         <>
-          <p className="text-xs text-ink/50 mb-2" aria-live="polite">
+          <p className="text-xs text-ink/60 mb-2" aria-live="polite">
             Showing {from}–{to} of {total} {total === 1 ? "person" : "people"}
           </p>
 
@@ -127,7 +127,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
           <div className="hidden md:block card-elevated rounded-2xl overflow-hidden">
             <table className="w-full text-sm">
               <caption className="sr-only">Church members</caption>
-              <thead className="bg-ink/[0.03] text-left text-xs uppercase tracking-wide text-ink/50">
+              <thead className="bg-ink/[0.03] text-left text-xs uppercase tracking-wide text-ink/60">
                 <tr>
                   <th scope="col" className="px-4 py-3 font-semibold">Name</th>
                   <th scope="col" className="px-4 py-3 font-semibold">Role</th>
@@ -146,12 +146,12 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
                           <Link href={`/dashboard/members/${m.id}`} className="font-medium hover:underline">
                             {m.name}
                           </Link>
-                          <p className="text-xs text-ink/50">{m.email}</p>
+                          <p className="text-xs text-ink/60">{m.email}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">{roleLabel(m.role)}</td>
-                    <td className="px-4 py-3">{m.departments?.name ?? <span className="text-ink/40">—</span>}</td>
+                    <td className="px-4 py-3">{m.departments?.name ?? <span className="text-ink/60">—</span>}</td>
                     <td className="px-4 py-3">
                       <MemberStatusBadge status={m.status as AccountStatus} />
                     </td>
@@ -173,7 +173,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
                   <Avatar name={m.name} src={photos.get(m.id)} />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium truncate">{m.name}</p>
-                    <p className="text-xs text-ink/50 truncate">{m.email}</p>
+                    <p className="text-xs text-ink/60 truncate">{m.email}</p>
                     <p className="text-xs text-ink/60 mt-1">
                       {roleLabel(m.role)}
                       {m.departments?.name ? ` · ${m.departments.name}` : ""}

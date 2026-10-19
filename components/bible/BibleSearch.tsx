@@ -93,7 +93,7 @@ export function BibleSearch() {
         </label>
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" />
+            <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/60" />
             <input
               id="bible-search"
               type="search"
@@ -141,7 +141,7 @@ export function BibleSearch() {
       </form>
 
       {run.status === "idle" && (
-        <p className="text-sm text-ink/55">The first search in a version downloads it (about {mb(version.downloadBytes)} MB); after that it&apos;s quick.</p>
+        <p className="text-sm text-ink/60">The first search in a version downloads it (about {mb(version.downloadBytes)} MB); after that it&apos;s quick.</p>
       )}
 
       {run.status === "invalid" && (
@@ -182,7 +182,7 @@ export function BibleSearch() {
       )}
 
       {run.status === "done" && !hits.length && !run.failedBooks && (
-        <p className="text-sm text-ink/55">Try fewer words, a shorter word (e.g. “pray” also finds “prayer”), or another version.</p>
+        <p className="text-sm text-ink/60">Try fewer words, a shorter word (e.g. “pray” also finds “prayer”), or another version.</p>
       )}
 
       {hits.length > 0 && (

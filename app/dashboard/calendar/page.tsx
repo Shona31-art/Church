@@ -127,7 +127,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: { w
         <div className="space-y-6">
           {[...groups.entries()].map(([month, list]) => (
             <section key={month} aria-labelledby={`m-${month}`}>
-              <h2 id={`m-${month}`} className="text-sm font-semibold uppercase tracking-wide text-ink/50 mb-2">
+              <h2 id={`m-${month}`} className="text-sm font-semibold uppercase tracking-wide text-ink/60 mb-2">
                 {month}
               </h2>
               <ul className="space-y-2">
@@ -138,11 +138,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: { w
                     <li key={e.id}>
                       <Link href={`/dashboard/calendar/${e.id}`} className="card-interactive rounded-xl p-4 flex gap-4">
                         <div className="w-14 shrink-0 text-center" aria-hidden>
-                          <p className="text-xs uppercase text-ink/50">{new Date(e.start_time).toLocaleDateString("en-ZA", { weekday: "short", timeZone: APP_TIMEZONE })}</p>
+                          <p className="text-xs uppercase text-ink/60">{new Date(e.start_time).toLocaleDateString("en-ZA", { weekday: "short", timeZone: APP_TIMEZONE })}</p>
                           <p className="text-2xl font-semibold leading-tight">{new Date(e.start_time).toLocaleDateString("en-ZA", { day: "numeric", timeZone: APP_TIMEZONE })}</p>
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className={`font-semibold ${e.cancelled_at ? "line-through text-ink/50" : ""}`}>{e.title}</p>
+                          <p className={`font-semibold ${e.cancelled_at ? "line-through text-ink/60" : ""}`}>{e.title}</p>
                           <p className="text-sm text-ink/60">
                             <span className="sr-only">{formatDate(e.start_time)}, </span>
                             {formatTime(e.start_time)}

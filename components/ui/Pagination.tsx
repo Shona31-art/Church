@@ -16,7 +16,7 @@ export function Pagination({
   hrefFor: (page: number) => string;
   summary?: string;
 }) {
-  if (page === 0 && !hasMore) return summary ? <p className="mt-4 text-xs text-ink/50">{summary}</p> : null;
+  if (page === 0 && !hasMore) return summary ? <p className="mt-4 text-xs text-ink/60">{summary}</p> : null;
   return (
     <nav aria-label="Pagination" className="mt-6 flex items-center justify-between gap-3 text-sm">
       {page > 0 ? (
@@ -26,7 +26,7 @@ export function Pagination({
       ) : (
         <span />
       )}
-      <span className="tabular text-xs text-ink/50">{summary ?? `Page ${page + 1}`}</span>
+      <span className="tabular text-xs text-ink/60">{summary ?? `Page ${page + 1}`}</span>
       {hasMore ? (
         <Link href={hrefFor(page + 1)} className="btn-secondary btn-sm" rel="next">
           Next <ChevronRight aria-hidden className="h-4 w-4" />

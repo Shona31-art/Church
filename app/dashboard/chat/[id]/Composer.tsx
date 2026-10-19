@@ -119,14 +119,14 @@ export function Composer({
             <p className="font-semibold">{mode.kind === "reply" ? `Replying to ${mode.name}` : "Editing message"}</p>
             {mode.kind === "reply" && <p className="truncate text-ink/60">{mode.preview}</p>}
           </div>
-          <button type="button" onClick={onCancelMode} className="rounded-full p-0.5 text-ink/50 hover:bg-ink/5 hover:text-ink" aria-label={mode.kind === "reply" ? "Cancel reply" : "Cancel edit"}>
+          <button type="button" onClick={onCancelMode} className="rounded-full p-0.5 text-ink/60 hover:bg-ink/5 hover:text-ink" aria-label={mode.kind === "reply" ? "Cancel reply" : "Cancel edit"}>
             <X aria-hidden className="h-4 w-4" />
           </button>
         </div>
       )}
 
       {/* Visual only: announcing every keystroke elsewhere would swamp screen readers. */}
-      <p aria-hidden className="mb-1 h-4 truncate px-1 text-xs italic text-ink/50">
+      <p aria-hidden className="mb-1 h-4 truncate px-1 text-xs italic text-ink/60">
         {typingText}
       </p>
 

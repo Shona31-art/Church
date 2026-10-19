@@ -94,13 +94,13 @@ export function ChapterText({
       {text ? (
         <VerseText text={text} />
       ) : (
-        <span className="text-[0.88em] italic text-ink/50">
+        <span className="text-[0.88em] italic text-ink/60">
           This verse isn&apos;t in the {versionAbbreviation} text. Older versions such as the KJV include it.
         </span>
       )}
       {notedVerses.has(n) && (
         <>
-          <NotebookPen aria-hidden className="ml-1.5 inline h-[0.8em] w-[0.8em] -translate-y-px text-ink/45" />
+          <NotebookPen aria-hidden className="ml-1.5 inline h-[0.8em] w-[0.8em] -translate-y-px text-ink/60" />
           <span className="sr-only"> Has a note.</span>
         </>
       )}

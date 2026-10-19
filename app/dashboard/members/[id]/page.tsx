@@ -197,9 +197,9 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
                   <li key={a.id} className="flex flex-wrap justify-between gap-2">
                     <span>
                       {ACTIVITY_LABELS[a.action] ?? a.action}
-                      {a.actor?.name ? <span className="text-ink/50"> · by {a.actor.name}</span> : null}
+                      {a.actor?.name ? <span className="text-ink/60"> · by {a.actor.name}</span> : null}
                     </span>
-                    <time dateTime={a.created_at} className="text-xs text-ink/50">
+                    <time dateTime={a.created_at} className="text-xs text-ink/60">
                       {formatRelative(a.created_at)}
                     </time>
                   </li>

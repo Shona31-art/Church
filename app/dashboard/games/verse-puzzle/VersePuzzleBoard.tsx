@@ -5,6 +5,7 @@ import { CheckCircle2, Eye, RotateCcw } from "lucide-react";
 import type { VersePuzzleView } from "../engine";
 import type { BoardProps } from "../GameShell";
 import { checkVerseAttempt, revealVerse } from "../actions";
+import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
 
 type Status = { kind: "playing" } | { kind: "wrong"; triesLeft: number } | { kind: "solved" } | { kind: "revealed"; text: string };
 
@@ -24,7 +25,7 @@ export function VersePuzzleBoard({ sessionId, view, finish, finishing }: BoardPr
   async function check() {
     setBusy(true);
     setError(null);
-    const result = await checkVerseAttempt(sessionId, index, placed.map((i) => verse.words[i]));
+    const result = await callAction(() => checkVerseAttempt(sessionId, index, placed.map((i) => verse.words[i])), { error: CONNECTION_FAILED });
     setBusy(false);
     if (result.error) return setError(result.error);
     if (result.correct) {
@@ -35,7 +36,7 @@ export function VersePuzzleBoard({ sessionId, view, finish, finishing }: BoardPr
 
   async function reveal() {
     setBusy(true);
-    const result = await revealVerse(sessionId, index);
+    const result = await callAction(() => revealVerse(sessionId, index), { error: CONNECTION_FAILED });
     setBusy(false);
     if (result.error || !result.text) return setError(result.error ?? "Couldn't show the verse.");
     setStatus({ kind: "revealed", text: result.text });
@@ -53,7 +54,7 @@ export function VersePuzzleBoard({ sessionId, view, finish, finishing }: BoardPr
 
   return (
     <div className="card-elevated rounded-2xl p-6">
-      <div className="mb-4 flex items-center justify-between text-xs text-ink/55">
+      <div className="mb-4 flex items-center justify-between text-xs text-ink/60">
         <span className="tabular">
           Verse {index + 1} of {view.verses.length}
         </span>
@@ -63,7 +64,7 @@ export function VersePuzzleBoard({ sessionId, view, finish, finishing }: BoardPr
 
       {/* The verse being built */}
       <div className="mt-4 flex min-h-[4.5rem] flex-wrap gap-2 rounded-xl border border-dashed border-line-strong bg-parchment p-3" aria-label="Your verse" role="group">
-        {placed.length === 0 && <span className="self-center text-sm text-ink/40">Tap the words below in order…</span>}
+        {placed.length === 0 && <span className="self-center text-sm text-ink/60">Tap the words below in order…</span>}
         {placed.map((i, n) => (
           <button
             key={i}

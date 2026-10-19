@@ -49,7 +49,7 @@ export function MazeBoard({ view, finish, finishing }: BoardProps<MazeView>) {
   return (
     <div className="card-elevated rounded-2xl p-4 sm:p-6">
       <p className="font-display text-lg font-semibold">{view.title}</p>
-      <p className="text-xs text-ink/50">{view.reference}</p>
+      <p className="text-xs text-ink/60">{view.reference}</p>
 
       <div
         ref={boardRef}

@@ -16,6 +16,7 @@ import {
 import { showToast } from "@/components/ui/Toaster";
 import { markNotificationsRead } from "@/app/dashboard/notifications/actions";
 import { relativeTime, safeNotificationLink, type NotificationItem } from "@/lib/notifications";
+import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
 
 const ICONS: Record<string, LucideIcon> = {
   announcement: Megaphone,
@@ -50,7 +51,7 @@ export function NotificationList({
     onOpen?.();
     if (!item.readAt) {
       onMarkedRead?.(item.id);
-      markNotificationsRead([item.id]).then((res) => {
+      callAction(() => markNotificationsRead([item.id]), { ok: false, error: CONNECTION_FAILED }).then((res) => {
         if (!res.ok) showToast(res.error, "error");
       });
     }
@@ -83,7 +84,7 @@ export function NotificationList({
                   {item.title}
                 </span>
                 {item.body && <span className="line-clamp-2 block text-sm text-ink/60">{item.body}</span>}
-                <span className="tabular mt-0.5 block text-xs text-ink/45">{relativeTime(item.updatedAt)}</span>
+                <span className="tabular mt-0.5 block text-xs text-ink/60">{relativeTime(item.updatedAt)}</span>
               </span>
               {unread && <span aria-hidden className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-ember" />}
             </button>

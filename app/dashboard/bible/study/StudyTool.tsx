@@ -83,7 +83,7 @@ export function StudyTool({ initialQuery }: { initialQuery: string }) {
       )}
       {result?.text && (
         <section className="card-elevated rounded-2xl p-5" aria-live="polite">
-          <p className="text-xs text-ink/40 mb-3">AI-generated study notes — a starting point, not a replacement for your pastor or small group.</p>
+          <p className="text-xs text-ink/60 mb-3">AI-generated study notes — a starting point, not a replacement for your pastor or small group.</p>
           <div className="whitespace-pre-line leading-relaxed text-sm">{result.text}</div>
         </section>
       )}

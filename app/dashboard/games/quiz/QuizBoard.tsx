@@ -5,6 +5,7 @@ import { CheckCircle2, XCircle } from "lucide-react";
 import type { QuizView } from "../engine";
 import type { BoardProps } from "../GameShell";
 import { revealQuizAnswer } from "../actions";
+import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
 
 /** One question at a time. Your first pick is locked in on the server, then the answer is shown. */
 export function QuizBoard({ sessionId, view, finish, finishing }: BoardProps<QuizView>) {
@@ -22,7 +23,7 @@ export function QuizBoard({ sessionId, view, finish, finishing }: BoardProps<Qui
     if (picked !== null || checking) return;
     setChecking(true);
     setError(null);
-    const result = await revealQuizAnswer(sessionId, index, choice);
+    const result = await callAction(() => revealQuizAnswer(sessionId, index, choice), { error: CONNECTION_FAILED });
     setChecking(false);
     if (result.error || result.correctIndex === undefined) return setError(result.error ?? "Couldn't check that answer.");
     setPicked(result.chosen ?? choice);
@@ -41,7 +42,7 @@ export function QuizBoard({ sessionId, view, finish, finishing }: BoardProps<Qui
 
   return (
     <div className="card-elevated rounded-2xl p-6">
-      <div className="mb-4 flex items-center justify-between text-xs text-ink/55">
+      <div className="mb-4 flex items-center justify-between text-xs text-ink/60">
         <span className="tabular">
           Question {index + 1} of {view.questions.length}
         </span>

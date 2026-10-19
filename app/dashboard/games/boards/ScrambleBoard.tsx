@@ -29,7 +29,7 @@ export function ScrambleBoard({ view, finish, finishing }: BoardProps<ScrambleVi
             </div>
             <label htmlFor={`scramble-${i}`} className="mt-2 block text-sm text-ink/65">
               <span className="sr-only">Unscramble {item.letters.split("").join(" ")}. </span>
-              {item.hint} <span className="text-ink/40">({item.length} letters)</span>
+              {item.hint} <span className="text-ink/60">({item.length} letters)</span>
             </label>
             <input
               id={`scramble-${i}`}

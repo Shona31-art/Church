@@ -83,7 +83,7 @@ export default async function CounselingConversationPage({ params }: { params: {
                   <div className={`rounded-2xl px-4 py-3 text-sm max-w-[85%] whitespace-pre-wrap ${fromMember ? "bg-ember text-on-ember" : "bg-parchment border border-line"}`}>
                     <span className="sr-only">{fromMember ? (isOwner ? "You" : "Member") : "Assistant"}: </span>
                     {m.content}
-                    <time className={`block mt-1 text-[11px] ${fromMember ? "text-on-ember/70" : "text-ink/50"}`} dateTime={m.created_at}>
+                    <time className={`block mt-1 text-[11px] ${fromMember ? "text-on-ember/70" : "text-ink/60"}`} dateTime={m.created_at}>
                       {formatDateTime(m.created_at, { weekday: undefined })}
                     </time>
                   </div>
@@ -95,7 +95,7 @@ export default async function CounselingConversationPage({ params }: { params: {
         {isOwner && settings?.enabled && (
           <div className="mt-5 border-t border-line pt-4">
             <MessageComposer conversationId={conversation.id} />
-            <p className="text-xs text-ink/50 mt-2">Not a substitute for pastoral care or professional help. In an emergency call 10111 or SADAG on 0800 567 567.</p>
+            <p className="text-xs text-ink/60 mt-2">Not a substitute for pastoral care or professional help. In an emergency call 10111 or SADAG on 0800 567 567.</p>
           </div>
         )}
       </section>

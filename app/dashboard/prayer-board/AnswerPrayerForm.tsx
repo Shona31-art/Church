@@ -22,7 +22,7 @@ export function AnswerPrayerForm({ id }: { id: string }) {
     <form action={formAction} className="w-full space-y-2 mt-2">
       <input type="hidden" name="id" value={id} />
       <label htmlFor={`reflection-${id}`} className="label">
-        How did God answer? <span className="font-normal text-ink/50">(optional)</span>
+        How did God answer? <span className="font-normal text-ink/60">(optional)</span>
       </label>
       <textarea id={`reflection-${id}`} name="reflection" rows={3} maxLength={2000} className="input" />
       {state?.error && (

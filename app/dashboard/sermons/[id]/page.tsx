@@ -108,7 +108,7 @@ export default async function SermonDetailPage({ params }: { params: { id: strin
               <li key={n.id} className="rounded-xl border border-line p-3 text-sm">
                 <p className="whitespace-pre-line">{n.note}</p>
                 <div className="mt-2 flex items-center justify-between gap-2">
-                  <time className="text-xs text-ink/50" dateTime={n.created_at}>
+                  <time className="text-xs text-ink/60" dateTime={n.created_at}>
                     {formatRelative(n.created_at)}
                   </time>
                   <DeleteNoteButton noteId={n.id} sermonId={sermon.id} />

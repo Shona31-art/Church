@@ -394,7 +394,7 @@ export function Editor({
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <span className="sr-only text-xs text-ink/50 md:not-sr-only md:inline" role="status">
+          <span className="sr-only text-xs text-ink/60 md:not-sr-only md:inline" role="status">
             {saving ? "Saving…" : dirty ? "Unsaved changes" : posterId ? "All changes saved" : ""}
           </span>
           {conflict && (
@@ -410,11 +410,11 @@ export function Editor({
             <div className="absolute right-0 z-20 mt-1 w-56 rounded-xl border border-line bg-surface p-1 shadow-pop">
               <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-raised" onClick={(e) => { (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; download("png"); }}>
                 <span className="block font-semibold">PNG</span>
-                <span className="block text-xs text-ink/55">Best quality, for print and sharing</span>
+                <span className="block text-xs text-ink/60">Best quality, for print and sharing</span>
               </button>
               <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-raised" onClick={(e) => { (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; download("jpeg"); }}>
                 <span className="block font-semibold">JPG</span>
-                <span className="block text-xs text-ink/55">Smaller file, for WhatsApp</span>
+                <span className="block text-xs text-ink/60">Smaller file, for WhatsApp</span>
               </button>
             </div>
           </details>
@@ -556,7 +556,7 @@ export function Editor({
                 type="button"
                 aria-pressed={panel === key}
                 onClick={() => setPanel(key)}
-                className={`flex flex-1 items-center justify-center gap-1.5 py-3 text-sm font-medium ${panel === key ? "border-b-2 border-ember text-ink" : "text-ink/55"}`}
+                className={`flex flex-1 items-center justify-center gap-1.5 py-3 text-sm font-medium ${panel === key ? "border-b-2 border-ember text-ink" : "text-ink/60"}`}
               >
                 <Icon aria-hidden className="h-4 w-4" />
                 {label}

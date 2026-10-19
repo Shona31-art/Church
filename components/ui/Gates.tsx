@@ -52,7 +52,7 @@ export function FeatureUnavailable({
 export function PermissionDenied({ message, backHref = "/dashboard" }: { message: string; backHref?: string }) {
   return (
     <div className="max-w-lg card-elevated rounded-2xl p-7" role="status">
-      <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-2xl border border-line bg-parchment text-ink/50">
+      <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-2xl border border-line bg-parchment text-ink/60">
         <Lock className="h-5 w-5" strokeWidth={1.75} />
       </span>
       <h1 className="mt-4 text-2xl font-semibold">You don&apos;t have access to this page</h1>

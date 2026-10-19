@@ -58,7 +58,7 @@ export function PhotosPanel({
           </button>
         ))}
       </div>
-      <p className="text-xs text-ink/55">{targetLabel}</p>
+      <p className="text-xs text-ink/60">{targetLabel}</p>
       {tab === "library" ? <Library onUse={onUse} onBackground={onBackground} onUrls={onUrls} /> : <Stock onUse={onUse} onBackground={onBackground} />}
     </div>
   );
@@ -136,7 +136,7 @@ function Library({ onUse, onBackground, onUrls }: { onUse: (c: PhotoChoice) => v
           <input type="checkbox" checked={isLogo} onChange={(e) => setIsLogo(e.target.checked)} />
           It&apos;s a logo (keep a transparent background)
         </label>
-        <p className="text-xs text-ink/50">Only use photos you have permission to use. Speaker photos can be deleted any time.</p>
+        <p className="text-xs text-ink/60">Only use photos you have permission to use. Speaker photos can be deleted any time.</p>
       </div>
 
       {failed ? (
@@ -147,11 +147,11 @@ function Library({ onUse, onBackground, onUrls }: { onUse: (c: PhotoChoice) => v
           </button>
         </p>
       ) : photos === null ? (
-        <p className="text-sm text-ink/55" role="status">
+        <p className="text-sm text-ink/60" role="status">
           Loading your photos…
         </p>
       ) : !photos.length ? (
-        <p className="text-sm text-ink/55">No photos yet. Upload speaker photos, your logo or church pictures to reuse them on any poster.</p>
+        <p className="text-sm text-ink/60">No photos yet. Upload speaker photos, your logo or church pictures to reuse them on any poster.</p>
       ) : (
         <ul className="grid grid-cols-2 gap-2">
           {photos.map((p) => (
@@ -160,7 +160,7 @@ function Library({ onUse, onBackground, onUrls }: { onUse: (c: PhotoChoice) => v
                 {p.url ? (
                   <Image src={p.url} alt="" width={240} height={Math.round((240 * p.height) / p.width)} unoptimized className="aspect-square w-full bg-surface-raised object-cover" />
                 ) : (
-                  <span className="flex aspect-square items-center justify-center bg-surface-raised text-xs text-ink/50">Unavailable</span>
+                  <span className="flex aspect-square items-center justify-center bg-surface-raised text-xs text-ink/60">Unavailable</span>
                 )}
               </button>
               <div className="flex items-center justify-between gap-1">
@@ -178,7 +178,7 @@ function Library({ onUse, onBackground, onUrls }: { onUse: (c: PhotoChoice) => v
                       </button>
                     </span>
                   ) : (
-                    <button type="button" aria-label="Delete photo" title="Delete photo" className="text-ink/45 hover:text-danger" onClick={() => setConfirmDelete(p.id)}>
+                    <button type="button" aria-label="Delete photo" title="Delete photo" className="text-ink/60 hover:text-danger" onClick={() => setConfirmDelete(p.id)}>
                       <Trash2 aria-hidden className="h-3.5 w-3.5" />
                     </button>
                   ))}
@@ -250,11 +250,11 @@ function Stock({ onUse, onBackground }: { onUse: (c: PhotoChoice) => void; onBac
         </p>
       )}
       {busy && !results && (
-        <p className="text-sm text-ink/55" role="status">
+        <p className="text-sm text-ink/60" role="status">
           Searching…
         </p>
       )}
-      {results && !results.photos.length && <p className="text-sm text-ink/55">No photos for “{results.q}”. Try a simpler word.</p>}
+      {results && !results.photos.length && <p className="text-sm text-ink/60">No photos for “{results.q}”. Try a simpler word.</p>}
       {results && results.photos.length > 0 && (
         <>
           <ul className="grid grid-cols-2 gap-2">
@@ -267,7 +267,7 @@ function Stock({ onUse, onBackground }: { onUse: (c: PhotoChoice) => void; onBac
                   <button type="button" className="text-xs font-medium text-ink/60 hover:text-ink" onClick={() => onBackground(choice(p))}>
                     Background
                   </button>
-                  <a href={p.photographerUrl} target="_blank" rel="noopener noreferrer" className="truncate text-[11px] text-ink/45 hover:text-ink" title={`Photo by ${p.photographer} on Pexels`}>
+                  <a href={p.photographerUrl} target="_blank" rel="noopener noreferrer" className="truncate text-[11px] text-ink/60 hover:text-ink" title={`Photo by ${p.photographer} on Pexels`}>
                     {p.photographer}
                   </a>
                 </div>
@@ -281,7 +281,7 @@ function Stock({ onUse, onBackground }: { onUse: (c: PhotoChoice) => void; onBac
           )}
         </>
       )}
-      <p className="text-xs text-ink/50">
+      <p className="text-xs text-ink/60">
         <a href="https://www.pexels.com" target="_blank" rel="noopener noreferrer" className="link">
           Photos provided by Pexels
         </a>

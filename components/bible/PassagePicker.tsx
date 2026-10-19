@@ -106,7 +106,7 @@ export function PassagePicker({
                 Book or reference
               </label>
               <div className="relative">
-                <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" />
+                <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/60" />
                 <input
                   id="passage-query"
                   className="input pl-9"
@@ -137,7 +137,7 @@ export function PassagePicker({
               filtered.length ? (
                 <BookGrid indexes={filtered} current={current.bookIndex} onPick={(i) => setStep({ kind: "chapter", bookIndex: i })} />
               ) : (
-                <p className="py-6 text-center text-sm text-ink/55">No book starts with “{query.trim()}”.</p>
+                <p className="py-6 text-center text-sm text-ink/60">No book starts with “{query.trim()}”.</p>
               )
             ) : (
               <>
@@ -161,7 +161,7 @@ export function PassagePicker({
               <h3 ref={headingRef} tabIndex={-1} className="mb-1 text-xl font-semibold outline-none">
                 {BOOKS[step.bookIndex].name}
               </h3>
-              <p className="mb-4 text-sm text-ink/55">Choose a chapter</p>
+              <p className="mb-4 text-sm text-ink/60">Choose a chapter</p>
               <NumberGrid
                 count={BOOKS[step.bookIndex].chapters}
                 current={step.bookIndex === current.bookIndex ? current.chapter : undefined}
@@ -274,7 +274,7 @@ function VerseStep({
         {BOOKS[bookIndex].name} {chapter}
       </h3>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-ink/55">Choose a verse</p>
+        <p className="text-sm text-ink/60">Choose a verse</p>
         <button type="button" className="btn-secondary btn-sm" onClick={() => onPick({ bookIndex, chapter })}>
           Open whole chapter
         </button>
@@ -282,9 +282,9 @@ function VerseStep({
       {verseCount !== null ? (
         <NumberGrid count={verseCount} label={(n) => `Verse ${n}`} onPick={(n) => onPick({ bookIndex, chapter, verse: n })} />
       ) : failed ? (
-        <p className="text-sm text-ink/55">Couldn&apos;t load the verse list. You can still open the whole chapter.</p>
+        <p className="text-sm text-ink/60">Couldn&apos;t load the verse list. You can still open the whole chapter.</p>
       ) : (
-        <p className="text-sm text-ink/55" role="status">
+        <p className="text-sm text-ink/60" role="status">
           Loading verses…
         </p>
       )}

@@ -9,6 +9,7 @@ import { Alert } from "@/components/ui/Alert";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { Avatar } from "@/components/ui/Avatar";
 import { showToast } from "@/components/ui/Toaster";
+import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
 
 /** Who can start a DM with me, read receipts, and the people I've blocked. */
 export function ChatPrivacyForm({
@@ -24,7 +25,7 @@ export function ChatPrivacyForm({
   const [blockedList, setBlockedList] = useState(blocked);
 
   async function unblock(person: { id: string; name: string }) {
-    const result = await unblockMember(person.id);
+    const result = await callAction(() => unblockMember(person.id), { error: CONNECTION_FAILED });
     if (result.error) return showToast(result.error, "error");
     setBlockedList((list) => list.filter((p) => p.id !== person.id));
     showToast(`${person.name} is unblocked.`);
@@ -51,7 +52,7 @@ export function ChatPrivacyForm({
           <input type="checkbox" name="share_read_receipts" defaultChecked={shareReadReceipts} className="mt-0.5 accent-[rgb(var(--ember))]" />
           <span>
             <span className="font-medium">Read receipts</span>
-            <span className="block text-xs text-ink/55">
+            <span className="block text-xs text-ink/60">
               Show people when you&apos;ve read their messages (✓✓). If you turn this off, you won&apos;t see theirs either.
             </span>
           </span>

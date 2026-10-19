@@ -121,7 +121,7 @@ export default async function SuperAdminHome() {
         )}
       </Section>
 
-      <p className="text-xs text-ink/50">Plans: {Object.values(PLAN_LABELS).join(" · ")}</p>
+      <p className="text-xs text-ink/60">Plans: {Object.values(PLAN_LABELS).join(" · ")}</p>
     </div>
   );
 }

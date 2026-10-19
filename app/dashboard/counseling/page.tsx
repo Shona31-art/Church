@@ -81,7 +81,7 @@ export default async function CounselingHome() {
                       <span className="flex flex-wrap items-center gap-2">
                         {open ? <StatusBadge tone="danger">Needs follow-up</StatusBadge> : c.flagged ? <StatusBadge tone="neutral">Followed up</StatusBadge> : null}
                         {c.shared_with_pastor && <StatusBadge tone="info">Shared</StatusBadge>}
-                        <span className="text-xs text-ink/50">{formatRelative(c.last_message_at)}</span>
+                        <span className="text-xs text-ink/60">{formatRelative(c.last_message_at)}</span>
                       </span>
                     </Link>
                   </li>

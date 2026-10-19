@@ -222,7 +222,7 @@ export function BibleReader() {
           className="btn-ghost min-w-0 flex-1 px-2 text-base font-semibold text-ink"
         >
           <span className="truncate">{title}</span>
-          <ChevronDown aria-hidden className="h-4 w-4 shrink-0 text-ink/50" />
+          <ChevronDown aria-hidden className="h-4 w-4 shrink-0 text-ink/60" />
         </button>
         {/* Shows just "WEB" so it fits a phone toolbar; the real (invisible)
             select on top keeps native keyboard/screen-reader behaviour and
@@ -230,7 +230,7 @@ export function BibleReader() {
         <div className="relative shrink-0 rounded-xl border border-line hover:border-line-strong focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-gold">
           <span aria-hidden className="flex h-10 items-center gap-1 px-2.5 text-sm font-semibold">
             {version.abbreviation}
-            <ChevronDown className="h-3.5 w-3.5 text-ink/50" />
+            <ChevronDown className="h-3.5 w-3.5 text-ink/60" />
           </span>
           <label htmlFor="bible-version" className="sr-only">
             Version
@@ -339,7 +339,7 @@ export function BibleReader() {
         )}
       </nav>
 
-      <p className="mt-8 text-xs text-ink/45">
+      <p className="mt-8 text-xs text-ink/60">
         {version.name} ({version.abbreviation}, {version.year}). {version.licence}.
       </p>
 

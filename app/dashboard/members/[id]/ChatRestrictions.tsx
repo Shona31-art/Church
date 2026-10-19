@@ -34,7 +34,7 @@ export function ChatRestrictions({ memberId, memberName, active }: { memberId: s
               <div className="min-w-0 text-sm">
                 <StatusBadge tone="warning">{RESTRICTION_KINDS[r.kind]}</StatusBadge>
                 <p className="mt-1.5">{r.reason}</p>
-                <p className="mt-1 text-xs text-ink/55">
+                <p className="mt-1 text-xs text-ink/60">
                   {r.until ? `Until ${formatDateTime(r.until)}` : "Until lifted"} · set by {r.createdByName}, {formatDateTime(r.createdAt)}
                 </p>
               </div>

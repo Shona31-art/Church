@@ -102,7 +102,7 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <caption className="sr-only">Gifts received in {year}</caption>
-                    <thead className="text-left text-xs uppercase tracking-wide text-ink/50">
+                    <thead className="text-left text-xs uppercase tracking-wide text-ink/60">
                       <tr>
                         <th scope="col" className="py-2 pr-4">Date</th>
                         <th scope="col" className="py-2 pr-4">Donor</th>
@@ -114,7 +114,7 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
                       {list.map((g) => (
                         <tr key={g.id}>
                           <td className="py-2 pr-4 whitespace-nowrap">{formatDate(g.created_at, { weekday: undefined })}</td>
-                          <td className="py-2 pr-4">{g.app_users?.name ?? <span className="text-ink/50">Former member</span>}</td>
+                          <td className="py-2 pr-4">{g.app_users?.name ?? <span className="text-ink/60">Former member</span>}</td>
                           <td className="py-2 pr-4">{fundLabel(g.fund)}</td>
                           <td className="py-2 text-right tabular-nums">{formatMoney(g.amount_cents)}</td>
                         </tr>

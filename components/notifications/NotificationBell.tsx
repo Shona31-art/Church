@@ -231,7 +231,7 @@ function NotificationsPanel({
           <div className="px-6 py-10 text-center">
             <Bell aria-hidden className="mx-auto h-6 w-6 text-ink/30" />
             <p className="mt-2 font-semibold">You&apos;re all caught up</p>
-            <p className="mt-1 text-sm text-ink/55">New announcements, messages and prayers for you will show here.</p>
+            <p className="mt-1 text-sm text-ink/60">New announcements, messages and prayers for you will show here.</p>
           </div>
         )}
       </div>

@@ -10,7 +10,7 @@ import { fontsInDesign, loadFonts } from "@/lib/posters/fonts";
 
 const EditorCanvas = dynamic(() => import("./EditorCanvas").then((m) => m.EditorCanvas), {
   ssr: false,
-  loading: () => <p className="text-sm text-ink/55">Loading poster…</p>,
+  loading: () => <p className="text-sm text-ink/60">Loading poster…</p>,
 });
 
 /** A saved design, read-only, with PNG/JPG download. For people who can see a poster but not edit it. */

@@ -25,7 +25,7 @@ export function ContinueReading() {
         <span className="mt-1 block text-xl font-semibold">
           {last === undefined ? "…" : place ? `${BOOKS[place.bookIndex].name} ${place.chapter}` : "John 1"}
         </span>
-        <span className="mt-0.5 block text-sm text-ink/55">
+        <span className="mt-0.5 block text-sm text-ink/60">
           {place ? versionById(place.versionId).name : "A good place to begin: the Gospel of John"}
         </span>
       </span>

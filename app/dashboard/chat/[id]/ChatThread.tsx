@@ -29,6 +29,7 @@ import { deleteChatMessage, editChatMessage, unblockMember } from "../actions";
 import { MessageBubble } from "./MessageBubble";
 import { Composer } from "./Composer";
 import type { RecordedVoiceNote } from "./VoiceRecorder";
+import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
 
 export interface ChatPerson {
   name: string;
@@ -424,7 +425,7 @@ export function ChatThread({
 
   async function unblockOther() {
     if (!otherUserId) return;
-    const result = await unblockMember(otherUserId);
+    const result = await callAction(() => unblockMember(otherUserId), { error: CONNECTION_FAILED });
     if (result.error) return showToast(result.error, "error");
     router.refresh();
   }
@@ -433,7 +434,7 @@ export function ChatThread({
     const target = deleting;
     setDeleting(null);
     if (!target) return;
-    const result = await deleteChatMessage(target.id);
+    const result = await callAction(() => deleteChatMessage(target.id), { error: CONNECTION_FAILED });
     if (result.error) return showToast(result.error, "error");
     setMessages((prev) =>
       prev.map((m) => (m.id === target.id ? { ...m, content: "", media_path: null, deleted_at: new Date().toISOString(), deleted_by: currentUserId } : m))
@@ -474,7 +475,7 @@ export function ChatThread({
   return (
     <div className="card-elevated flex h-[calc(100dvh-15rem)] min-h-[26rem] flex-col overflow-hidden rounded-2xl">
       <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-5" role="log" aria-live="polite" aria-label="Messages">
-        {truncated && <p className="mb-2 text-center text-xs text-ink/50">Showing the most recent messages.</p>}
+        {truncated && <p className="mb-2 text-center text-xs text-ink/60">Showing the most recent messages.</p>}
 
         {messages.map((m, i) => {
           const previous = messages[i - 1];
@@ -488,7 +489,7 @@ export function ChatThread({
             <div key={m.id}>
               {newDay && (
                 <div className="my-4 flex justify-center" role="separator" aria-label={dayLabel(m.created_at)}>
-                  <span className="rounded-full border border-line bg-parchment px-3 py-1 text-[11px] font-medium text-ink/55">{dayLabel(m.created_at)}</span>
+                  <span className="rounded-full border border-line bg-parchment px-3 py-1 text-[11px] font-medium text-ink/60">{dayLabel(m.created_at)}</span>
                 </div>
               )}
               <MessageBubble
@@ -566,7 +567,7 @@ export function ChatThread({
           ) : !isDm && groupMute ? (
             <>
               A pastor has paused your posting in group chats{groupMute.until ? ` until ${formatDateTime(groupMute.until)}` : ""}. Reason: {groupMute.reason}
-              <span className="mt-1 block text-xs text-ink/50">You can still read this channel and use private messages.</span>
+              <span className="mt-1 block text-xs text-ink/60">You can still read this channel and use private messages.</span>
             </>
           ) : null
         }

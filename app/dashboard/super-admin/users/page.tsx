@@ -70,7 +70,7 @@ export default async function PlatformUsersPage({ searchParams }: { searchParams
           <div className="hidden md:block card-elevated rounded-2xl overflow-hidden">
             <table className="w-full text-sm">
               <caption className="sr-only">Platform users</caption>
-              <thead className="bg-ink/[0.03] text-left text-xs uppercase tracking-wide text-ink/50">
+              <thead className="bg-ink/[0.03] text-left text-xs uppercase tracking-wide text-ink/60">
                 <tr>
                   <th scope="col" className="px-4 py-3">User</th>
                   <th scope="col" className="px-4 py-3">Church</th>
@@ -85,9 +85,9 @@ export default async function PlatformUsersPage({ searchParams }: { searchParams
                   <tr key={u.id} className="hover:bg-ink/[0.02]">
                     <td className="px-4 py-3">
                       <p className="font-medium">{u.name}</p>
-                      <p className="text-xs text-ink/50">{u.email}</p>
+                      <p className="text-xs text-ink/60">{u.email}</p>
                     </td>
-                    <td className="px-4 py-3">{u.churches?.name ?? (u.role === "super_admin" ? <span className="text-ink/50">Platform</span> : "—")}</td>
+                    <td className="px-4 py-3">{u.churches?.name ?? (u.role === "super_admin" ? <span className="text-ink/60">Platform</span> : "—")}</td>
                     <td className="px-4 py-3">{roleLabel(u.role)}</td>
                     <td className="px-4 py-3">
                       <MemberStatusBadge status={u.status as AccountStatus} />

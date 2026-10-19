@@ -14,7 +14,7 @@ export default async function BibleSearchPage() {
     <>
       <PageHeader title="Search the Bible" back={{ href: "/dashboard/bible", label: "Bible" }} />
       {/* The search reads its query from the URL (useSearchParams), which needs a Suspense boundary. */}
-      <Suspense fallback={<p className="text-sm text-ink/55">Loading search…</p>}>
+      <Suspense fallback={<p className="text-sm text-ink/60">Loading search…</p>}>
         <BibleSearch />
       </Suspense>
     </>

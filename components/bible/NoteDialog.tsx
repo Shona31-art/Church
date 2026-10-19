@@ -98,7 +98,7 @@ export function NoteDialog({
             <h2 id="note-dialog-title" className="text-xl font-semibold">
               {title}
             </h2>
-            <p className="mt-1 text-sm text-ink/55">Only you can see your notes.</p>
+            <p className="mt-1 text-sm text-ink/60">Only you can see your notes.</p>
           </div>
           <button type="button" onClick={close} className="btn-secondary btn-sm h-9 w-9 rounded-full p-0" aria-label="Close">
             <X aria-hidden className="h-4 w-4" />

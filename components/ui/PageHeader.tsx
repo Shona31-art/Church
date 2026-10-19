@@ -43,7 +43,7 @@ export function PageHeader({
  */
 export function BackLink({ href, label, className = "mb-3" }: { href: string; label: string; className?: string }) {
   return (
-    <Link href={href} data-page-back className={`inline-flex items-center gap-1 text-sm font-medium text-ink/55 hover:text-ink ${className}`}>
+    <Link href={href} data-page-back className={`inline-flex items-center gap-1 text-sm font-medium text-ink/60 hover:text-ink ${className}`}>
       <ChevronLeft aria-hidden className="h-4 w-4" /> {label}
     </Link>
   );
@@ -84,8 +84,8 @@ export function DetailList({ items }: { items: { label: string; value: React.Rea
     <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-[10rem_1fr] text-sm">
       {items.map((item) => (
         <div key={item.label} className="contents">
-          <dt className="font-medium text-ink/50">{item.label}</dt>
-          <dd className="break-words">{item.value ?? <span className="text-ink/40">—</span>}</dd>
+          <dt className="font-medium text-ink/60">{item.label}</dt>
+          <dd className="break-words">{item.value ?? <span className="text-ink/60">—</span>}</dd>
         </div>
       ))}
     </dl>

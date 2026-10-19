@@ -101,7 +101,7 @@ export default async function AnnouncementsPage({ searchParams }: { searchParams
                 </div>
                 <h2 className="font-semibold text-lg">{a.title}</h2>
                 <p className="text-sm text-ink/70 mt-1 line-clamp-3 whitespace-pre-line">{a.body}</p>
-                <p className="text-xs text-ink/50 mt-3">
+                <p className="text-xs text-ink/60 mt-3">
                   {a.author?.name ?? "Former member"} · {formatDate(a.published_at ?? a.created_at)}
                 </p>
               </Link>

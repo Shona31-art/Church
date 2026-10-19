@@ -57,7 +57,7 @@ export function MonthView({ ym, today, events }: { ym: YearMonth; today: string;
         <thead>
           <tr>
             {WEEKDAYS.map((d) => (
-              <th key={d} scope="col" className="py-2 text-xs font-medium uppercase tracking-wide text-ink/50 border-b border-line">
+              <th key={d} scope="col" className="py-2 text-xs font-medium uppercase tracking-wide text-ink/60 border-b border-line">
                 {d}
               </th>
             ))}
@@ -125,7 +125,7 @@ export function MonthView({ ym, today, events }: { ym: YearMonth; today: string;
             {events.map((e) => (
               <li key={e.id}>
                 <Link href={`/dashboard/calendar/${e.id}`} className="card-elevated rounded-2xl p-3 block">
-                  <p className={`font-medium ${e.cancelled_at ? "line-through text-ink/50" : ""}`}>{e.title}</p>
+                  <p className={`font-medium ${e.cancelled_at ? "line-through text-ink/60" : ""}`}>{e.title}</p>
                   <p className="text-sm text-ink/60">
                     {formatDate(e.start_time)} · {formatTime(e.start_time)}
                     {e.cancelled_at ? " · Cancelled" : ""}

@@ -266,7 +266,7 @@ export default async function DashboardHomePage() {
                       <span className="text-sm">{a.label}</span>
                       <span className="flex shrink-0 items-center gap-2">
                         <StatusBadge tone={a.tone}>{a.count}</StatusBadge>
-                        <ChevronRight aria-hidden className="h-4 w-4 text-ink/40 group-hover:text-ink/70" />
+                        <ChevronRight aria-hidden className="h-4 w-4 text-ink/60 group-hover:text-ink/70" />
                       </span>
                     </Link>
                   </li>

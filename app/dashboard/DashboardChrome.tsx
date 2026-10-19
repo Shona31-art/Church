@@ -199,7 +199,7 @@ function Sidebar({
                       }`}
                     >
                       {active && <span aria-hidden className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-gold" />}
-                      <NavIcon name={item.icon} className={`h-[18px] w-[18px] shrink-0 ${active ? "text-gold" : "text-ink/45 group-hover:text-ink/70"}`} />
+                      <NavIcon name={item.icon} className={`h-[18px] w-[18px] shrink-0 ${active ? "text-gold" : "text-ink/60 group-hover:text-ink/70"}`} />
                       {item.label}
                     </Link>
                   </li>

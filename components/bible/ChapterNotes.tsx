@@ -22,7 +22,7 @@ export function ChapterNotes({
           <h2 id="chapter-notes-title" className="text-xl font-semibold">
             My notes
           </h2>
-          <p className="mt-1 text-sm text-ink/55">Private to you. Tap a verse, then Note, to add one to that verse.</p>
+          <p className="mt-1 text-sm text-ink/60">Private to you. Tap a verse, then Note, to add one to that verse.</p>
         </div>
         <button type="button" onClick={onAdd} className="btn-secondary btn-sm">
           <NotebookPen aria-hidden className="h-4 w-4" />
@@ -50,7 +50,7 @@ export function ChapterNotes({
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-ink/55">No notes on this chapter yet.</p>
+        <p className="text-sm text-ink/60">No notes on this chapter yet.</p>
       )}
     </section>
   );

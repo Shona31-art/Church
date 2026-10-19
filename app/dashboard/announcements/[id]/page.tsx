@@ -51,7 +51,7 @@ export default async function AnnouncementDetailPage({ params }: { params: { id:
 
       <div className="card-elevated rounded-2xl p-6">
         <p className="whitespace-pre-line leading-relaxed">{a.body}</p>
-        <p className="text-xs text-ink/50 mt-6">
+        <p className="text-xs text-ink/60 mt-6">
           {(a as any).author?.name ?? "Former member"} · {a.published_at ? `Published ${formatDateTime(a.published_at)}` : `Created ${formatDateTime(a.created_at)}`}
           {a.updated_at !== a.created_at ? ` · Edited ${formatDateTime(a.updated_at)}` : ""}
         </p>

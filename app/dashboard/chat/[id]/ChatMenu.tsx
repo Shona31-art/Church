@@ -140,20 +140,20 @@ export function ChatMenu({
       {open && (
         <div ref={menuRef} role="menu" aria-label="Chat options" className="absolute right-0 top-12 z-30 w-64 rounded-2xl border border-line bg-surface p-1.5 shadow-pop motion-safe:animate-modal-in">
           <button type="button" role="menuitem" className={item} onClick={() => run(() => setChatPinned(channelId, !pinned), pinned ? "Chat unpinned." : "Chat pinned to the top of your list.")}>
-            {pinned ? <PinOff aria-hidden className="h-4 w-4 text-ink/50" /> : <Pin aria-hidden className="h-4 w-4 text-ink/50" />}
+            {pinned ? <PinOff aria-hidden className="h-4 w-4 text-ink/60" /> : <Pin aria-hidden className="h-4 w-4 text-ink/60" />}
             {pinned ? "Unpin chat" : "Pin chat"}
           </button>
 
           {mutedUntil ? (
             <button type="button" role="menuitem" className={item} onClick={() => run(() => setChatMute(channelId, null), "Chat unmuted.")}>
-              <Bell aria-hidden className="h-4 w-4 text-ink/50" />
+              <Bell aria-hidden className="h-4 w-4 text-ink/60" />
               <span>
-                Unmute <span className="block text-xs text-ink/50">{muteLabel(mutedUntil)}</span>
+                Unmute <span className="block text-xs text-ink/60">{muteLabel(mutedUntil)}</span>
               </span>
             </button>
           ) : (
             <div role="group" aria-label="Mute" className="border-y border-line py-1">
-              <p className="flex items-center gap-2.5 px-3 py-1 text-xs font-semibold text-ink/50">
+              <p className="flex items-center gap-2.5 px-3 py-1 text-xs font-semibold text-ink/60">
                 <BellOff aria-hidden className="h-3.5 w-3.5" /> Mute (hides unread counts)
               </p>
               {MUTE_OPTIONS.map((o) => (
@@ -165,13 +165,13 @@ export function ChatMenu({
           )}
 
           <button type="button" role="menuitem" className={item} onClick={() => (setOpen(false), setConfirming("clear"))}>
-            <Eraser aria-hidden className="h-4 w-4 text-ink/50" /> Clear my chat history
+            <Eraser aria-hidden className="h-4 w-4 text-ink/60" /> Clear my chat history
           </button>
 
           {dmWith &&
             (dmWith.blockedByMe ? (
               <button type="button" role="menuitem" className={item} onClick={() => run(() => unblockMember(dmWith.id), `${dmWith.name} is unblocked.`)}>
-                <Ban aria-hidden className="h-4 w-4 text-ink/50" /> Unblock {dmWith.name}
+                <Ban aria-hidden className="h-4 w-4 text-ink/60" /> Unblock {dmWith.name}
               </button>
             ) : (
               <button type="button" role="menuitem" className={`${item} text-danger`} onClick={() => (setOpen(false), setConfirming("block"))}>
@@ -194,7 +194,7 @@ export function ChatMenu({
             <div className="mt-1 border-t border-line pt-1">
               {canEdit && (
                 <Link href={`/dashboard/chat/${channelId}/edit`} role="menuitem" className={item} onClick={() => setOpen(false)}>
-                  <Pencil aria-hidden className="h-4 w-4 text-ink/50" /> Edit channel
+                  <Pencil aria-hidden className="h-4 w-4 text-ink/60" /> Edit channel
                 </Link>
               )}
               {canDelete && (

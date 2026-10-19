@@ -61,7 +61,7 @@ export default async function ServicePlanDetailPage({ params, searchParams }: { 
             {list.map((item, i) => (
               <li key={item.id} className="py-3 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-6 text-right text-sm tabular-nums text-ink/50" aria-hidden>
+                  <span className="w-6 text-right text-sm tabular-nums text-ink/60" aria-hidden>
                     {i + 1}.
                   </span>
                   <div className="min-w-0">

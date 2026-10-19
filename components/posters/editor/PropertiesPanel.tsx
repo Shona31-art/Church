@@ -268,7 +268,7 @@ function OverlayFields({ overlay, onChange, idPrefix }: { overlay?: { color: str
 function PhotoCredit({ src }: { src: ImageSource }) {
   if (src.kind !== "stock") return null;
   return (
-    <p className="text-xs text-ink/55">
+    <p className="text-xs text-ink/60">
       Photo by{" "}
       <a href={src.photographerUrl} target="_blank" rel="noopener noreferrer" className="link">
         {src.photographer}
@@ -319,7 +319,7 @@ function BackgroundSettings({ design, onChange, onApplyStyle }: { design: Poster
         </div>
       </fieldset>
       <h2 className="border-t border-line pt-4 font-sans text-sm font-semibold">Background</h2>
-      <p className="text-sm text-ink/55">Select something on the poster to edit it, or change the background here.</p>
+      <p className="text-sm text-ink/60">Select something on the poster to edit it, or change the background here.</p>
       <ColorField label="Colour" id="prop-bg" value={bg.color} onChange={(color) => onChange({ ...bg, color }, "bg:color")} />
       <label className="flex items-center gap-2 text-sm">
         <input
@@ -341,7 +341,7 @@ function BackgroundSettings({ design, onChange, onApplyStyle }: { design: Poster
           <OverlayFields overlay={bg.image.overlay} idPrefix="prop-bg" onChange={(overlay) => onChange({ ...bg, image: { ...bg.image!, overlay } }, "bg:overlay")} />
         </div>
       )}
-      {!bg.image && <p className="text-sm text-ink/55">To use a photo as the background, open Photos and choose “Background” under any photo.</p>}
+      {!bg.image && <p className="text-sm text-ink/60">To use a photo as the background, open Photos and choose “Background” under any photo.</p>}
       {bg.gradient && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
@@ -398,7 +398,7 @@ function RangeField({ label, value, min, max, step, format, onChange }: { label:
         <label htmlFor={id} className="label mb-0 text-xs">
           {label}
         </label>
-        <span className="tabular text-xs text-ink/55">{format(value)}</span>
+        <span className="tabular text-xs text-ink/60">{format(value)}</span>
       </div>
       <input id={id} type="range" className="w-full accent-[rgb(var(--ember))]" value={value} min={min} max={max} step={step} onChange={(e) => onChange(Number(e.target.value))} />
     </div>

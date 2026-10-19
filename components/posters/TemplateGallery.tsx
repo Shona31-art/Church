@@ -56,7 +56,7 @@ export function TemplateGallery() {
                 className={`rounded-lg px-3 py-1.5 text-left text-sm ${size === s ? "bg-surface font-semibold text-ink shadow-xs" : "text-ink/60 hover:text-ink"}`}
               >
                 {POSTER_SIZES[s].label}
-                <span className="block text-xs font-normal text-ink/50">{POSTER_SIZES[s].hint}</span>
+                <span className="block text-xs font-normal text-ink/60">{POSTER_SIZES[s].hint}</span>
               </button>
             ))}
           </div>
@@ -101,7 +101,7 @@ export function TemplateGallery() {
         <label htmlFor="template-search" className="sr-only">
           Search templates
         </label>
-        <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" />
+        <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/60" />
         <input
           id="template-search"
           type="search"
@@ -111,7 +111,7 @@ export function TemplateGallery() {
           onChange={(e) => setQuery(e.target.value)}
         />
       </div>
-      <p className="text-sm text-ink/55" role="status">
+      <p className="text-sm text-ink/60" role="status">
         {shown.length} {shown.length === 1 ? "template" : "templates"}
         {occasion !== "All" || words.length ? " match" : ""}
       </p>
@@ -120,13 +120,13 @@ export function TemplateGallery() {
         <li>
           <Link href={`/dashboard/posters/editor/new?size=${size}`} className="card-interactive flex h-full flex-col rounded-xl p-2">
             <span
-              className="flex items-center justify-center rounded-lg border-2 border-dashed border-line-strong bg-surface text-ink/50"
+              className="flex items-center justify-center rounded-lg border-2 border-dashed border-line-strong bg-surface text-ink/60"
               style={{ aspectRatio: `${width} / ${height}` }}
             >
               <Plus aria-hidden className="h-8 w-8" />
             </span>
             <span className="mt-2 px-1 text-sm font-semibold">Blank poster</span>
-            <span className="px-1 text-xs text-ink/55">Start from scratch</span>
+            <span className="px-1 text-xs text-ink/60">Start from scratch</span>
           </Link>
         </li>
         {shown.map((t) => (
@@ -134,7 +134,7 @@ export function TemplateGallery() {
             <Link href={`/dashboard/posters/editor/new?size=${size}&template=${t.key}${style !== "original" ? `&style=${style}` : ""}`} className="card-interactive flex h-full flex-col rounded-xl p-2">
               <TemplatePreview templateKey={t.key} size={size} style={style} fontVersion={fontVersion} />
               <span className="mt-2 px-1 text-sm font-semibold">{t.name}</span>
-              <span className="px-1 text-xs text-ink/55">{t.description}</span>
+              <span className="px-1 text-xs text-ink/60">{t.description}</span>
             </Link>
           </li>
         ))}

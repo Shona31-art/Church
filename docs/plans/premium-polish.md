@@ -67,3 +67,27 @@ audit (each such fix is called out in the step report).
 - Touching ~60 files for consistency carries regression risk; mitigated by
   keeping each step a separate commit and not changing logic in steps 1–4.
 - Placeholders for logo/photos must not survive to launch.
+
+## Step 5 results — button & workflow audit (2026-10-19)
+
+Static audit of every file in `app/` and `components/`, done with scripted
+scans plus reading each hit. "Verified" means checked in code and by
+typecheck/lint/tests — not clicked through in a browser.
+
+| Check | Scope | Result |
+|---|---|---|
+| Server action re-checks session + permission | 125 actions | All pass (directly or via a helper such as `signedInMember`, `posterMaker`, `editablePoster`) |
+| API route checks user or secret | 6 routes | All pass |
+| Client calls to server actions survive a failed request | 14 call sites | **13 fixed** (+1 fire-and-forget): a throw (offline, redeploy) left buttons stuck on "Saving…"/"Checking…" and games stuck "finishing". Now `lib/call-action.ts` returns the action's normal `{ error }` |
+| `<button>` has an explicit `type` | all | 2 fixed (AI question generator) |
+| Empty click handlers / `href="#"` | all | None |
+| Destructive actions confirm and name the thing | 22 files | All confirm (ConfirmSubmitButton or own dialog); discarding AI-generated questions now confirms too |
+| Edit forms pre-fill and guard concurrent edits | 7 edit routes | All pre-fill; `updated_at` checks present |
+| Pagination keeps filters; new search resets to page 1 | 14 lists | All pass |
+| Save errors visible where the user is looking | — | 1 fixed: saving AI-generated questions failed silently (error rendered on the other view) |
+| Required fields marked | — | 1 fixed: support ticket form |
+| Small grey text contrast ≥ 4.5:1 (light theme) | 67 files | `text-ink/40–55` → `/60` everywhere (hover/placeholder/disabled variants untouched) |
+| Sign-out reports failure | shell | Fixed in step 3 |
+
+Multi-step workflows: none exist beyond the Bible passage picker (book →
+chapter → verse, with Back), so no Next/Previous/Finish controls were added.

@@ -64,7 +64,7 @@ export default async function AllChurchesPage({ searchParams }: { searchParams: 
           <div className="hidden md:block card-elevated rounded-2xl overflow-hidden">
             <table className="w-full text-sm">
               <caption className="sr-only">Churches</caption>
-              <thead className="bg-ink/[0.03] text-left text-xs uppercase tracking-wide text-ink/50">
+              <thead className="bg-ink/[0.03] text-left text-xs uppercase tracking-wide text-ink/60">
                 <tr>
                   <th scope="col" className="px-4 py-3">Church</th>
                   <th scope="col" className="px-4 py-3">Plan</th>
@@ -80,7 +80,7 @@ export default async function AllChurchesPage({ searchParams }: { searchParams: 
                       <Link href={`/dashboard/super-admin/churches/${c.id}`} className="font-medium hover:underline">
                         {c.name}
                       </Link>
-                      <p className="text-xs text-ink/50">{c.email}</p>
+                      <p className="text-xs text-ink/60">{c.email}</p>
                     </td>
                     <td className="px-4 py-3">
                       {c.sub ? PLAN_LABELS[c.sub.plan_key] ?? c.sub.plan_key : "—"}

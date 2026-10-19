@@ -78,11 +78,11 @@ export function ChannelForm({
       {audience === "members" && (
         <fieldset>
           <legend className="label">
-            Members <span className="tabular font-normal text-ink/50">({chosen.size} chosen)</span>
+            Members <span className="tabular font-normal text-ink/60">({chosen.size} chosen)</span>
           </legend>
           {fe.member_ids && <p className="mb-2 text-xs text-danger">{fe.member_ids}</p>}
           <div className="relative mb-2">
-            <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" />
+            <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/60" />
             <label htmlFor="member-search" className="sr-only">
               Search people
             </label>
@@ -98,7 +98,7 @@ export function ChannelForm({
                 </label>
               </li>
             ))}
-            {shown.length === 0 && <li className="px-3 py-3 text-sm text-ink/50">No one matches “{query}”.</li>}
+            {shown.length === 0 && <li className="px-3 py-3 text-sm text-ink/60">No one matches “{query}”.</li>}
           </ul>
           {/* The chosen ids travel with the form, even ones hidden by the search. */}
           {[...chosen].map((id) => (

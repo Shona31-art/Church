@@ -36,7 +36,7 @@ export function ThemeSwitcher() {
             title={label}
             onClick={() => choose(value)}
             className={`flex h-7 w-8 items-center justify-center rounded-[10px] ${
-              active ? "bg-surface text-ink shadow-xs" : "text-ink/50 hover:text-ink"
+              active ? "bg-surface text-ink shadow-xs" : "text-ink/60 hover:text-ink"
             }`}
           >
             <Icon aria-hidden className="h-3.5 w-3.5" strokeWidth={2} />

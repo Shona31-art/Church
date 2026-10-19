@@ -76,7 +76,7 @@ export default async function ChurchSettingsPage() {
                 ) : (
                   <Circle aria-hidden className="h-4 w-4 shrink-0 text-ink/30" />
                 )}
-                <span className={on ? "" : "text-ink/50"}>{MODULE_LABELS[k]}</span>
+                <span className={on ? "" : "text-ink/60"}>{MODULE_LABELS[k]}</span>
                 <span className="sr-only">{on ? "(included)" : "(not on your plan)"}</span>
               </li>
             );

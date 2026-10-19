@@ -27,7 +27,7 @@ export function BooksBoard({ view, finish, finishing }: BoardProps<BooksView>) {
       </p>
 
       <ol className="mt-4 min-h-[4rem] space-y-1.5 rounded-xl border border-dashed border-line-strong bg-parchment p-3" aria-label="Your order">
-        {placed.length === 0 && <li className="text-sm text-ink/40">Tap the books below, first to last…</li>}
+        {placed.length === 0 && <li className="text-sm text-ink/60">Tap the books below, first to last…</li>}
         {placed.map((i, n) => (
           <li key={i}>
             <button type="button" onClick={() => setPlaced((p) => p.filter((x) => x !== i))} className="flex w-full items-center gap-3 rounded-lg bg-ember px-3 py-2 text-left text-sm text-on-ember" aria-label={`${n + 1}. ${view.books[i]}. Tap to remove.`}>

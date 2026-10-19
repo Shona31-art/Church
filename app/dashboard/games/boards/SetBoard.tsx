@@ -5,6 +5,7 @@ import { CheckCircle2, XCircle } from "lucide-react";
 import type { SetView } from "../engine";
 import type { BoardProps } from "../GameShell";
 import { answerSetQuestion } from "../actions";
+import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
 
 /**
  * One question at a time, for emoji stories, "Who said it?" and fill in the
@@ -26,7 +27,7 @@ export function SetBoard({ sessionId, view, finish, finishing, promptStyle }: Bo
     if (result || busy) return;
     setBusy(true);
     setError(null);
-    const r = await answerSetQuestion(sessionId, index, answer);
+    const r = await callAction(() => answerSetQuestion(sessionId, index, answer), { error: CONNECTION_FAILED });
     setBusy(false);
     if (r.error || r.correct === undefined) return setError(r.error ?? "Couldn't check that answer.");
     setResult({ correct: r.correct, answer: r.answer ?? "", reference: r.reference, picked: typeof answer === "number" ? answer : undefined, answerIndex: r.answerIndex });
@@ -51,7 +52,7 @@ export function SetBoard({ sessionId, view, finish, finishing, promptStyle }: Bo
 
   return (
     <div className="card-elevated rounded-2xl p-6">
-      <div className="mb-4 flex items-center justify-between text-xs text-ink/55">
+      <div className="mb-4 flex items-center justify-between text-xs text-ink/60">
         <span className="tabular">
           {index + 1} of {view.questions.length}
         </span>
@@ -126,7 +127,7 @@ export function SetBoard({ sessionId, view, finish, finishing, promptStyle }: Bo
           <p className={result.correct ? "font-medium text-success" : "text-ink/75"}>
             {result.correct ? "Correct! " : "Not quite — "}
             <span className="font-semibold">{result.answer}</span>
-            {result.reference && <span className="text-ink/50"> · {result.reference}</span>}
+            {result.reference && <span className="text-ink/60"> · {result.reference}</span>}
           </p>
         )}
       </div>

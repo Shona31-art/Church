@@ -9,7 +9,7 @@ export const EditorLoader = dynamic(() => import("./Editor").then((m) => m.Edito
   ssr: false,
   loading: () => (
     <div className="flex min-h-[60vh] items-center justify-center" role="status">
-      <p className="text-sm text-ink/55">Opening the editor…</p>
+      <p className="text-sm text-ink/60">Opening the editor…</p>
     </div>
   ),
 });

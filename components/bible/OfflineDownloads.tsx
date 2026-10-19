@@ -78,7 +78,7 @@ export function OfflineDownloads() {
               <li key={v.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                 <div className="min-w-0">
                   <p className="font-semibold">
-                    {v.name} <span className="font-normal text-ink/55">({v.abbreviation})</span>
+                    {v.name} <span className="font-normal text-ink/60">({v.abbreviation})</span>
                   </p>
                   {row.downloading ? (
                     <div className="mt-1.5 w-48 max-w-full">
@@ -92,7 +92,7 @@ export function OfflineDownloads() {
                       >
                         <div className="h-full rounded-full bg-ember transition-[width]" style={{ width: `${(saved / total) * 100}%` }} />
                       </div>
-                      <p className="tabular mt-1 text-xs text-ink/55">
+                      <p className="tabular mt-1 text-xs text-ink/60">
                         {saved} of {total} books
                       </p>
                     </div>
@@ -105,7 +105,7 @@ export function OfflineDownloads() {
                       Download stopped at {saved} of {total} books. Check your connection and try again.
                     </p>
                   ) : (
-                    <p className="tabular mt-0.5 text-sm text-ink/55">
+                    <p className="tabular mt-0.5 text-sm text-ink/60">
                       {saved > 0 ? `${saved} of ${total} books saved · ` : ""}
                       {(v.downloadBytes / 1_000_000).toFixed(1)} MB
                     </p>

@@ -30,13 +30,13 @@ export function InsertPanel({
         </h2>
         <div className="space-y-1.5">
           <AddButton onClick={() => onAddText("heading")} className="text-lg font-extrabold">
-            <Type aria-hidden className="h-4 w-4 shrink-0 text-ink/45" /> Add a heading
+            <Type aria-hidden className="h-4 w-4 shrink-0 text-ink/60" /> Add a heading
           </AddButton>
           <AddButton onClick={() => onAddText("subheading")} className="text-base font-semibold">
-            <Type aria-hidden className="h-4 w-4 shrink-0 text-ink/45" /> Add a subheading
+            <Type aria-hidden className="h-4 w-4 shrink-0 text-ink/60" /> Add a subheading
           </AddButton>
           <AddButton onClick={() => onAddText("body")} className="text-sm">
-            <Type aria-hidden className="h-4 w-4 shrink-0 text-ink/45" /> Add body text
+            <Type aria-hidden className="h-4 w-4 shrink-0 text-ink/60" /> Add body text
           </AddButton>
         </div>
       </section>
@@ -97,10 +97,10 @@ export function InsertPanel({
         </h2>
         <div className="space-y-1.5">
           <AddButton onClick={onOpenPhotos} className="text-sm">
-            <ImageIcon aria-hidden className="h-4 w-4 shrink-0 text-ink/45" /> Upload or find a photo
+            <ImageIcon aria-hidden className="h-4 w-4 shrink-0 text-ink/60" /> Upload or find a photo
           </AddButton>
           <AddButton onClick={onAddPhotoSlot} className="text-sm">
-            <Square aria-hidden className="h-4 w-4 shrink-0 text-ink/45" /> Add an empty photo slot
+            <Square aria-hidden className="h-4 w-4 shrink-0 text-ink/60" /> Add an empty photo slot
           </AddButton>
         </div>
       </section>
@@ -110,7 +110,7 @@ export function InsertPanel({
           Speakers
         </h2>
         <AddButton onClick={onAddSpeaker} className="text-sm">
-          <UserRound aria-hidden className="h-4 w-4 shrink-0 text-ink/45" /> Add a speaker
+          <UserRound aria-hidden className="h-4 w-4 shrink-0 text-ink/60" /> Add a speaker
         </AddButton>
         <p className="hint">Photo, name and title that move together. Add as many as you need.</p>
       </section>
@@ -124,7 +124,7 @@ export function LayersPanel({ design, selectedId, onSelect }: { design: PosterDe
   return (
     <section aria-labelledby="layers-title">
       <h2 id="layers-title" className="eyebrow mb-2">
-        Layers <span className="normal-case tracking-normal text-ink/40">(top first)</span>
+        Layers <span className="normal-case tracking-normal text-ink/60">(top first)</span>
       </h2>
       {layers.length ? (
         <ul className="space-y-0.5">
@@ -139,10 +139,10 @@ export function LayersPanel({ design, selectedId, onSelect }: { design: PosterDe
                 }`}
               >
                 <span className="min-w-0 flex-1 truncate">{labelFor(e)}</span>
-                <span className="text-xs text-ink/40">{e.type === "shape" ? e.shape : e.type}</span>
+                <span className="text-xs text-ink/60">{e.type === "shape" ? e.shape : e.type}</span>
                 {e.locked && (
                   <>
-                    <Lock aria-hidden className="h-3.5 w-3.5 text-ink/40" />
+                    <Lock aria-hidden className="h-3.5 w-3.5 text-ink/60" />
                     <span className="sr-only">(locked)</span>
                   </>
                 )}
@@ -151,7 +151,7 @@ export function LayersPanel({ design, selectedId, onSelect }: { design: PosterDe
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-ink/55">Nothing on the poster yet. Add text or shapes above.</p>
+        <p className="text-sm text-ink/60">Nothing on the poster yet. Add text or shapes above.</p>
       )}
     </section>
   );

@@ -141,7 +141,7 @@ function ChatList({ rows, photos }: { rows: ChatRow[]; photos: Map<string, strin
               {r.kind === "dm" ? (
                 <Avatar name={r.name} src={r.otherId ? photos.get(r.otherId) : null} size="md" />
               ) : (
-                <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-line bg-parchment text-ink/55">
+                <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-line bg-parchment text-ink/60">
                   {r.kind === "department" ? <Users className="h-5 w-5" /> : r.membersOnly ? <Lock className="h-5 w-5" /> : <Hash className="h-5 w-5" />}
                 </span>
               )}
@@ -151,20 +151,20 @@ function ChatList({ rows, photos }: { rows: ChatRow[]; photos: Map<string, strin
                   {r.kind === "church" && <StatusBadge tone="neutral">Church-wide</StatusBadge>}
                   {r.membersOnly && <StatusBadge tone="neutral">Members only</StatusBadge>}
                 </div>
-                <p className={`truncate text-sm ${showCount ? "text-ink/80" : "text-ink/55"}`}>{r.last ? messagePreview(r.last) : "No messages yet"}</p>
+                <p className={`truncate text-sm ${showCount ? "text-ink/80" : "text-ink/60"}`}>{r.last ? messagePreview(r.last) : "No messages yet"}</p>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1">
-                {r.last && <span className="tabular text-xs text-ink/50">{formatDate(r.last.created_at) === today ? formatTime(r.last.created_at) : formatDate(r.last.created_at, { weekday: undefined, year: undefined })}</span>}
+                {r.last && <span className="tabular text-xs text-ink/60">{formatDate(r.last.created_at) === today ? formatTime(r.last.created_at) : formatDate(r.last.created_at, { weekday: undefined, year: undefined })}</span>}
                 <span className="flex items-center gap-1.5">
                   {r.pinnedAt && (
                     <span title="Pinned">
-                      <Pin aria-hidden className="h-3.5 w-3.5 text-ink/45" />
+                      <Pin aria-hidden className="h-3.5 w-3.5 text-ink/60" />
                       <span className="sr-only">Pinned</span>
                     </span>
                   )}
                   {r.muted && (
                     <span title="Muted">
-                      <BellOff aria-hidden className="h-3.5 w-3.5 text-ink/45" />
+                      <BellOff aria-hidden className="h-3.5 w-3.5 text-ink/60" />
                       <span className="sr-only">Muted</span>
                     </span>
                   )}

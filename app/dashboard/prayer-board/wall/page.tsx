@@ -76,7 +76,7 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
       {!error && visible.length === 0 && (
         <div className="card-elevated rounded-2xl p-6 text-center">
           <p className="text-ink/60">No shared prayers yet.</p>
-          <p className="text-sm text-ink/40 mt-1">
+          <p className="text-sm text-ink/60 mt-1">
             Share a request from your{" "}
             <Link href="/dashboard/prayer-board" className="text-ember">
               prayer board
@@ -95,7 +95,7 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
 
           return (
             <article key={p.id} className="card-elevated rounded-2xl p-5">
-              <div className="flex items-center justify-between text-xs text-ink/50">
+              <div className="flex items-center justify-between text-xs text-ink/60">
                 <span>
                   <span className="font-semibold text-ink">{p.app_users?.name ?? "A member"}</span>
                   {p.category ? ` · ${p.category}` : ""}
@@ -122,7 +122,7 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
                     </PendingButton>
                   </form>
                 )}
-                <span className="text-xs text-ink/50">
+                <span className="text-xs text-ink/60">
                   {prayedBy.length} {prayedBy.length === 1 ? "person has" : "people have"} prayed
                   {thread.length ? ` · ${thread.length} ${thread.length === 1 ? "message" : "messages"}` : ""}
                 </span>

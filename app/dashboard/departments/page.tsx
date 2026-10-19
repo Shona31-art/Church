@@ -57,7 +57,7 @@ export default async function DepartmentsPage() {
                       {count} {count === 1 ? "member" : "members"}
                     </p>
                   </div>
-                  <span aria-hidden className="text-ink/40">→</span>
+                  <span aria-hidden className="text-ink/60">→</span>
                 </Link>
               </li>
             );

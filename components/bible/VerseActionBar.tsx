@@ -100,7 +100,7 @@ export function VerseActionBar({
             </button>
           </div>
         </div>
-        {!annotationsReady && unavailableReason && <p className="text-xs text-ink/55">{unavailableReason}</p>}
+        {!annotationsReady && unavailableReason && <p className="text-xs text-ink/60">{unavailableReason}</p>}
       </div>
     </div>
   );

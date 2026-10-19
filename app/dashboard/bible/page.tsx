@@ -75,7 +75,7 @@ export default async function BibleHomePage() {
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
           {verseOfDay && (
             <Link href={readerHref({ ...verseOfDay })} className="link">
-              {verseRef} <span className="font-normal text-ink/50">(WEB)</span>
+              {verseRef} <span className="font-normal text-ink/60">(WEB)</span>
             </Link>
           )}
           {studyAvailable && (
@@ -177,7 +177,7 @@ function SavedList({
             ))}
         </ul>
       ) : (
-        <p className="text-sm text-ink/55">{empty}</p>
+        <p className="text-sm text-ink/60">{empty}</p>
       )}
     </section>
   );

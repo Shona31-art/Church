@@ -76,7 +76,7 @@ export function MessageMenu({
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         aria-label={`Message options (${senderLabel})`}
-        className="flex h-7 w-7 items-center justify-center rounded-full text-ink/50 hover:bg-ink/5 hover:text-ink"
+        className="flex h-7 w-7 items-center justify-center rounded-full text-ink/60 hover:bg-ink/5 hover:text-ink"
       >
         <ChevronDown aria-hidden className="h-4 w-4" />
       </button>
@@ -112,12 +112,12 @@ export function MessageMenu({
           )}
           {onReply && (
             <button type="button" role="menuitem" className={itemClass} onClick={() => run(onReply)}>
-              <Reply aria-hidden className="h-4 w-4 text-ink/50" /> Reply
+              <Reply aria-hidden className="h-4 w-4 text-ink/60" /> Reply
             </button>
           )}
           {onEdit && (
             <button type="button" role="menuitem" className={itemClass} onClick={() => run(onEdit)}>
-              <Pencil aria-hidden className="h-4 w-4 text-ink/50" /> Edit
+              <Pencil aria-hidden className="h-4 w-4 text-ink/60" /> Edit
             </button>
           )}
           {onDelete && (

@@ -147,15 +147,17 @@ export async function removeItem(_prev: FormResult, formData: FormData): Promise
   if (!planId.success || !itemId.success) return { error: "That item couldn't be found." };
 
   const supabase = createClient();
-  const { error } = await supabase
+  const { data: removed, error } = await supabase
     .from("service_plan_items")
     .delete()
     .eq("id", itemId.data)
-    .eq("service_plan_id", planId.data);
+    .eq("service_plan_id", planId.data)
+    .select("id");
   if (error) {
     console.error("[service-planner] remove failed:", error.message);
     return { error: "Couldn't remove that item — please try again." };
   }
+  if (!removed?.length) return { error: "That item was already removed. Refresh to see the latest plan." };
 
   revalidatePath(`/dashboard/service-planner/${planId.data}`);
   return { ok: true };

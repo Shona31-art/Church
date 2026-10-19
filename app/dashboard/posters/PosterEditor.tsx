@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useFormState } from "react-dom";
 import { PosterPreview, PosterData } from "./PosterCanvas";
@@ -8,6 +9,7 @@ import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { POSTER_COLORS, POSTER_TEMPLATES } from "@/lib/posters";
 import { Alert } from "@/components/ui/Alert";
 import { Sparkles } from "lucide-react";
+import { FormActions } from "@/components/ui/FormField";
 
 export interface PosterValues {
   id: string;
@@ -165,9 +167,12 @@ export function PosterEditor({ churchName, poster }: { churchName: string; poste
             </select>
           </div>
 
-          <PendingButton pendingLabel="Saving…" className="btn-primary w-full">
-            {poster ? "Save changes" : "Save poster"}
-          </PendingButton>
+          <FormActions>
+            <PendingButton pendingLabel="Saving…">{poster ? "Save changes" : "Save poster"}</PendingButton>
+            <Link href={poster ? `/dashboard/posters/${poster.id}` : "/dashboard/posters"} className="btn-secondary">
+              Cancel
+            </Link>
+          </FormActions>
         </form>
 
         <div>

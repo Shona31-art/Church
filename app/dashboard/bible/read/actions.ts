@@ -168,6 +168,9 @@ export async function deleteNote(id: string): Promise<Result> {
   const parsed = z.string().uuid().safeParse(id);
   if (!parsed.success) return BAD_INPUT;
 
-  const { error } = await createClient().from("bible_notes").delete().eq("id", parsed.data).eq("user_id", auth.me.id);
-  return error ? failed("delete note", error) : { ok: true, data: undefined };
+  const { data: deleted, error } = await createClient().from("bible_notes").delete().eq("id", parsed.data).eq("user_id", auth.me.id).select("id");
+  if (error) return failed("delete note", error);
+  // Zero rows: already deleted (e.g. in another tab) — say so rather than claim success.
+  if (!deleted?.length) return { ok: false, error: "That note was already deleted. Refresh to see your latest notes." };
+  return { ok: true, data: undefined };
 }

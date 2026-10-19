@@ -9,6 +9,8 @@ import { checkModuleAccess } from "@/lib/paywall";
 import { generateText } from "@/lib/ai";
 import { consumeAiQuota } from "@/lib/ai-quota";
 import { logAudit } from "@/lib/audit";
+import { flash } from "@/lib/flash";
+import { SESSION_EXPIRED } from "@/lib/forms";
 
 // Every action re-checks the session and relies on RLS as the hard boundary
 // (a member can only update their own prayers; see personal_growth_schema.sql
@@ -90,11 +92,17 @@ export async function toggleSharing(formData: FormData) {
 
 export async function deletePrayer(formData: FormData) {
   const me = await getCurrentAppUser();
+  if (!me) return flash(SESSION_EXPIRED, "error");
   const parsed = id.safeParse(formData.get("id"));
-  if (!me || !parsed.success) return;
-  const supabase = createClient();
-  await supabase.from("prayer_board_items").delete().eq("id", parsed.data).eq("user_id", me.id);
+  if (!parsed.success) return flash("That prayer couldn't be found. Refresh and try again.", "error");
+  const { data: deleted, error } = await createClient().from("prayer_board_items").delete().eq("id", parsed.data).eq("user_id", me.id).select("id");
+  // Zero rows and no error: already deleted, or not this person's prayer (RLS).
+  if (error || !deleted?.length) {
+    if (error) console.error("[prayer] delete failed:", error.message);
+    return flash("Couldn't delete that prayer. It may already be gone — refresh and try again.", "error");
+  }
   refresh();
+  flash("Prayer deleted.");
 }
 
 /** Toggle "I prayed for this" for the current member. */
@@ -144,12 +152,17 @@ export async function addPrayerComment(_prev: ActionResult, formData: FormData):
 
 export async function deletePrayerComment(formData: FormData) {
   const me = await getCurrentAppUser();
+  if (!me) return flash(SESSION_EXPIRED, "error");
   const parsed = id.safeParse(formData.get("id"));
-  if (!me || !parsed.success) return;
-  const supabase = createClient();
+  if (!parsed.success) return flash("That comment couldn't be found. Refresh and try again.", "error");
   // RLS allows the author, or a pastor/church_admin moderating.
-  await supabase.from("prayer_comments").delete().eq("id", parsed.data);
+  const { data: deleted, error } = await createClient().from("prayer_comments").delete().eq("id", parsed.data).select("id");
+  if (error || !deleted?.length) {
+    if (error) console.error("[prayer] comment delete failed:", error.message);
+    return flash("Couldn't delete that comment. It may already be gone — refresh and try again.", "error");
+  }
   refresh();
+  flash("Comment deleted.");
 }
 
 /** Pastor/admin moderation: takes a request off the wall (never edits or reads private items). */

@@ -235,8 +235,9 @@ export async function deleteSermonNote(_prev: FormState, formData: FormData): Pr
   const id = z.string().uuid().safeParse(formData.get("note_id"));
   const sermonId = z.string().uuid().safeParse(formData.get("sermon_id"));
   if (!id.success || !sermonId.success) return { error: "That note couldn't be found." };
-  const { error } = await createClient().from("sermon_notes").delete().eq("id", id.data).eq("user_id", me.id);
-  if (error) return { error: "Couldn't delete the note — please try again." };
+  const { data: deleted, error } = await createClient().from("sermon_notes").delete().eq("id", id.data).eq("user_id", me.id).select("id");
+  if (error) console.error("[sermons] note delete failed:", error.message);
+  if (error || !deleted?.length) return { error: "Couldn't delete the note. It may already be gone — refresh and try again." };
   revalidatePath(`/dashboard/sermons/${sermonId.data}`);
   return { ok: true };
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
 import { createPrayer } from "./actions";
 import { draftPrayerWithAi } from "../actions";
@@ -8,6 +9,7 @@ import { Alert, FieldError } from "@/components/ui/Alert";
 import { Sparkles } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
+import { FormActions } from "@/components/ui/FormField";
 
 /** Add-a-prayer form. `aiAvailable` is false on plans without AI writing help (Basic). */
 export function NewPrayerForm({ aiAvailable }: { aiAvailable: boolean }) {
@@ -108,7 +110,12 @@ export function NewPrayerForm({ aiAvailable }: { aiAvailable: boolean }) {
 
       <p className="text-xs text-ink/60">We'll suggest a few relevant Bible verses automatically when you save.</p>
 
-      <SubmitButton />
+      <FormActions>
+        <SubmitButton />
+        <Link href="/dashboard/prayer-board" className="btn-secondary">
+          Cancel
+        </Link>
+      </FormActions>
     </form>
   );
 }

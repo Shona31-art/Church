@@ -359,7 +359,13 @@ export async function deletePlatformUser(_prev: FormState, formData: FormData): 
   if (!target) return { error: "That user couldn't be found." };
   if (target.role === "super_admin") return { error: "Platform admin accounts can't be deleted from here." };
 
-  await admin.from("pastoral_care_logs").delete().eq("member_id", userId.data);
+  // Care logs only lose their member link when an account goes (they keep the
+  // typed name), so a failed delete here must stop the erasure.
+  const { error: careError } = await admin.from("pastoral_care_logs").delete().eq("member_id", userId.data);
+  if (careError) {
+    console.error("[super-admin] care log delete failed:", careError.message);
+    return { error: "Couldn't remove this person's care records, so nothing was deleted. Try again." };
+  }
   const { error } = await admin.auth.admin.deleteUser(userId.data);
   if (error) {
     console.error("[super-admin] delete failed:", error.message);

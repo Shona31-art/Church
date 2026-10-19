@@ -8,6 +8,8 @@ import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitBu
 import { moduleGate } from "@/lib/gate";
 import { Alert } from "@/components/ui/Alert";
 import { HandHeart, Plus } from "lucide-react";
+import { Pagination } from "@/components/ui/Pagination";
+import { buildQuery, pageFrom } from "@/lib/list";
 
 // Church prayer wall (ported from the Android Prayer Board): requests members
 // chose to share, plus answered-prayer testimonies. Private prayers never
@@ -21,7 +23,7 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
 
   const me = await getCurrentAppUser();
   const supabase = createClient();
-  const page = Math.max(0, Number(searchParams.page) || 0);
+  const page = pageFrom(searchParams.page);
 
   const { data: prayers, error } = await supabase
     .from("prayer_board_items")
@@ -142,7 +144,7 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
               </div>
 
               {thread.length > 0 && (
-                <ul className="mt-4 space-y-2 border-t border-ink/10 pt-3">
+                <ul className="mt-4 space-y-2 border-t border-line pt-3">
                   {thread.map((c) => (
                     <li key={c.id} className="text-sm flex items-start justify-between gap-3">
                       <p>
@@ -171,22 +173,7 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
         })}
       </div>
 
-      {(page > 0 || hasMore) && (
-        <nav className="flex justify-between mt-6 text-sm" aria-label="Pagination">
-          {page > 0 ? (
-            <Link href={`?page=${page - 1}`} className="text-ember">
-              ← Newer
-            </Link>
-          ) : (
-            <span />
-          )}
-          {hasMore && (
-            <Link href={`?page=${page + 1}`} className="text-ember">
-              Older →
-            </Link>
-          )}
-        </nav>
-      )}
+      <Pagination page={page} hasMore={hasMore} hrefFor={(p) => buildQuery({ page: p })} />
     </div>
   );
 }

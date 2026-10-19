@@ -162,7 +162,7 @@ export async function setChatMute(channelId: string, option: MuteOption | null):
 
 /** Input: channel id, pinned true/false. Pinned chats sit at the top of your list. */
 export async function setChatPinned(channelId: string, pinned: boolean): Promise<ChatActionResult> {
-  return saveMySettings(channelId, { pinned_at: pinned ? new Date().toISOString() : null });
+  return saveMySettings(channelId, { pinned_at: pinned === true ? new Date().toISOString() : null });
 }
 
 /** Input: channel id. Hides everything sent before now — for you only; nobody else's copy changes. */

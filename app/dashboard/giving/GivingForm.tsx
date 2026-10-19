@@ -21,7 +21,7 @@ export function GivingForm({ disabled }: { disabled: boolean }) {
 
       <fieldset>
         <legend className="label">Choose an amount</legend>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {QUICK_AMOUNTS.map((a) => (
             <button
               key={a}

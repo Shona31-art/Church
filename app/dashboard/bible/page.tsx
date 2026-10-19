@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bookmark, Highlighter, Search, Sparkles } from "lucide-react";
+import { Bookmark, Highlighter, Search, Sparkles, ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
@@ -79,8 +79,8 @@ export default async function BibleHomePage() {
             </Link>
           )}
           {studyAvailable && (
-            <Link href={`/dashboard/bible/study?ref=${encodeURIComponent(verseRef)}`} className="link">
-              Study this verse →
+            <Link href={`/dashboard/bible/study?ref=${encodeURIComponent(verseRef)}`} className="link inline-flex items-center gap-1">
+              Study this verse <ArrowRight aria-hidden className="h-3.5 w-3.5" />
             </Link>
           )}
         </div>

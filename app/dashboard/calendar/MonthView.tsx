@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatDate, formatTime } from "@/lib/format";
 import { buildMonthGrid, eventDays, monthKey, shiftMonth, type YearMonth } from "@/lib/calendar-grid";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export interface MonthEvent {
   id: string;
@@ -43,11 +44,11 @@ export function MonthView({ ym, today, events }: { ym: YearMonth; today: string;
               Today
             </Link>
           )}
-          <Link href={href(shiftMonth(ym, -1))} className="btn-secondary px-3 py-1.5 text-sm" aria-label="Previous month">
-            ‹
+          <Link href={href(shiftMonth(ym, -1))} className="btn-secondary btn-icon" aria-label="Previous month">
+            <ChevronLeft aria-hidden className="h-4 w-4" />
           </Link>
-          <Link href={href(shiftMonth(ym, 1))} className="btn-secondary px-3 py-1.5 text-sm" aria-label="Next month">
-            ›
+          <Link href={href(shiftMonth(ym, 1))} className="btn-secondary btn-icon" aria-label="Next month">
+            <ChevronRight aria-hidden className="h-4 w-4" />
           </Link>
         </div>
       </div>

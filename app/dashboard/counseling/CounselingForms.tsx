@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { useFormState } from "react-dom";
 import { acknowledgeEscalation, saveCounselingSettings, sendCounselingMessage, setShareWithPastor } from "./actions";
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
 import { Alert } from "@/components/ui/Alert";
-import { FormField } from "@/components/ui/FormField";
+import { FormField, FormActions } from "@/components/ui/FormField";
 
 export function MessageComposer({ conversationId }: { conversationId: string }) {
   const [state, action] = useFormState(sendCounselingMessage, null);
@@ -101,7 +102,12 @@ export function SettingsForm({
           ))}
         </select>
       </FormField>
-      <PendingButton>Save settings</PendingButton>
+      <FormActions>
+        <PendingButton>Save settings</PendingButton>
+        <Link href="/dashboard/counseling" className="btn-secondary">
+          Cancel
+        </Link>
+      </FormActions>
     </form>
   );
 }

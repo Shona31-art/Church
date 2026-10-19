@@ -64,7 +64,7 @@ export function FileUpload({ id, onUploaded }: { id: string; onUploaded: (path: 
       <FieldError>{error}</FieldError>
       {preview && !uploading && (
         // Local blob preview — next/image can't optimise blob: URLs.
-        <img src={preview} alt="Attachment preview" className="mt-2 max-h-32 rounded-lg border border-ink/10" />
+        <img src={preview} alt="Attachment preview" className="mt-2 max-h-32 rounded-lg border border-line" />
       )}
     </div>
   );

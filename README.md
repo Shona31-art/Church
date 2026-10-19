@@ -66,6 +66,7 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 29 | `poster_editor.sql` | Poster editor: editable designs on `posters` (size-limited), the church poster photo library `poster_assets` (poster makers only; delete own, pastors/admins any), and a private `poster-assets` bucket with no browser access (the server signs every upload/download). Plain-language notes at the top of the file |
 | 30 | `eft_giving.sql` | Giving by bank transfer: `church_giving_details` (each church's bank account — readable by that church's members, changed only by its church admins; every change audit-logged and sent to every church admin's bell), new `givings` columns and statuses (`reported` → `succeeded`/`not_received`), members may only record their own transfer and delete it while waiting, admins confirm through `confirm_eft_gift()`. Plain-language notes at the top of the file. Why: `docs/adr/0004-giving-by-bank-transfer.md` |
 | 31 | `paystack_card_giving.sql` | Card giving: `church_card_giving` (each church's Paystack subaccount — readable by its members, written only by the server after an admin check; paused automatically when bank details change), `givings.provider` / `provider_reference` (unique) / `fee_cents`. Plain-language notes at the top of the file |
+| 32 | `church_move.sql` | When the platform admin moves someone to another church: their birthday moves with them, their shared prayers come off the old church's wall (kept privately), upcoming bookings with the old church are cancelled and RSVPs to its upcoming events removed; one audit entry. Gifts, care notes, counselling records and messages stay with the old church. Plan: `docs/plans/church-move-cleanup.md` |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so
@@ -404,8 +405,10 @@ the Aperture default). Conventions every screen follows:
   timezones would need a `churches.timezone` column.
 - **Member email changes** aren't supported in the app (email is the sign-in;
   a church admin or super admin would change it in Supabase Auth).
-- **Moving someone to another church** (Super Admin) leaves their old prayers,
-  messages and gifts with the old church.
+- **Moving someone to another church** (Super Admin) keeps the old church's
+  own records — gifts, pastoral care notes, counselling records, messages —
+  with the old church on purpose. The person's birthday, shared prayers,
+  upcoming bookings and RSVPs are tidied automatically (migration #32).
 - **Crisis detection** is keyword matching — a tripwire, not a safety system.
   Review with a mental-health professional; helplines are South African.
 - **Bible text**: the reader and search use public-domain KJV, WEB, ASV and

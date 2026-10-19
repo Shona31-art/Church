@@ -44,6 +44,7 @@ export const MIGRATION_ORDER = [
   "poster_editor.sql",
   "eft_giving.sql",
   "paystack_card_giving.sql",
+  "church_move.sql",
 ];
 
 const SUPABASE_STUBS = `

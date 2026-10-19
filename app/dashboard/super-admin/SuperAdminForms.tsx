@@ -283,7 +283,7 @@ export function EditUserForm({
       {moving ? (
         <ConfirmSubmitButton
           title="Move this person to another church?"
-          message="They'll see the new church's data from their next page load and lose access to the old church. Their existing prayers, messages and giving stay with the old church."
+          message="They'll see the new church from their next page load and lose access to the old church. Their birthday moves with them; prayers they shared come off the old church's wall (kept privately); their upcoming bookings and event RSVPs with the old church are cancelled. Gifts, care notes and messages stay with the old church."
           confirmLabel="Move and save"
           tone="primary"
           className="btn-primary"

@@ -1,6 +1,6 @@
 # Moving a member to another church — plan
 
-Status: **PROPOSED** (2026-10-19), awaiting approval. Closes the README gap
+Status: **BUILT** (2026-10-19), approved. Closes the README gap
 "Moving someone to another church leaves their old prayers, messages and gifts
 with the old church".
 

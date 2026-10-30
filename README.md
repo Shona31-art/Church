@@ -439,3 +439,5 @@ the Aperture default). Conventions every screen follows:
 
 Running costs and when each service would start costing money: see
 [`docs/costs.md`](docs/costs.md).
+#   C h u r c h  
+ 

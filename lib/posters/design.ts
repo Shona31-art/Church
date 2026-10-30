@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AnimationSchema } from "./animation";
 
 // The saved format of an editable poster (posters.design, version 1).
 // Shared by the editor (client) and the save action (server): the server
@@ -63,6 +64,8 @@ const base = {
   locked: z.boolean().optional(),
   /** Shown in the Layers panel, e.g. "Speaker name". */
   name: z.string().max(60).optional(),
+  /** Entrance for video export. Optional, so older posters stay valid (no animation). */
+  animation: AnimationSchema.optional(),
 };
 
 export const TextElementSchema = z.object({

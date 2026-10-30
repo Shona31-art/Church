@@ -4,8 +4,17 @@ import { AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowUp, Copy, Lock, Loc
 import type { GroupElement, ImageElement, ImageSource, PosterDesign, PosterElement, ShapeElement, TextElement } from "@/lib/posters/design";
 import { POSTER_FONTS } from "@/lib/posters/fonts";
 import { POSTER_STYLES, type PosterStyleKey } from "@/lib/posters/styles";
+import { ENTRANCE_LABELS, ENTRANCES, MAX_DELAY, type Entrance } from "@/lib/posters/animation";
 
 type Change = (changes: Partial<PosterElement>, key: string) => void;
+
+/** Whole-poster animation actions (shown with the background settings). */
+export interface AnimationControls {
+  playing: boolean;
+  onPreview: () => void;
+  onAnimateAll: () => void;
+  onClear: () => void;
+}
 
 /**
  * Settings for the selected element (or the background when nothing is
@@ -23,6 +32,7 @@ export function PropertiesPanel({
   onDelete,
   onReorder,
   onApplyStyle,
+  animation,
 }: {
   design: PosterDesign;
   element: PosterElement | undefined;
@@ -35,8 +45,15 @@ export function PropertiesPanel({
   onReorder: (where: "forward" | "backward") => void;
   /** Re-themes the whole poster (undoable). */
   onApplyStyle: (key: PosterStyleKey) => void;
+  animation: AnimationControls;
 }) {
-  if (!element) return <BackgroundSettings design={design} onChange={onBackgroundChange} onApplyStyle={onApplyStyle} />;
+  if (!element)
+    return (
+      <div className="space-y-5">
+        <BackgroundSettings design={design} onChange={onBackgroundChange} onApplyStyle={onApplyStyle} />
+        <PosterAnimation design={design} controls={animation} />
+      </div>
+    );
 
   return (
     <div className="space-y-5">
@@ -55,6 +72,7 @@ export function PropertiesPanel({
       {element.type === "shape" && <ShapeSettings element={element} onChange={onChange} />}
       {element.type === "image" && <ImageSettings element={element} onChange={onChange} />}
       {element.type === "group" && <GroupSettings element={element} onChildChange={onChildChange} />}
+      <EntranceSettings element={element} onChange={onChange} onPreview={animation.onPreview} playing={animation.playing} />
       {element.type === "icon" && (
         <ColorField label="Colour" id="prop-icon-fill" value={element.fill} onChange={(fill) => onChange({ fill } as Partial<PosterElement>, `${element.id}:fill`)} />
       )}
@@ -467,4 +485,77 @@ export function labelFor(element: PosterElement): string {
   if (element.type === "group") return element.role === "speaker" ? "Speaker" : "Group";
   if (element.type === "icon") return "Icon";
   return { rect: "Rectangle", ellipse: "Circle", line: "Line", triangle: "Triangle" }[element.shape];
+}
+
+/** Entrance for the selected element, used by "Download → Video". */
+function EntranceSettings({ element, onChange, onPreview, playing }: { element: PosterElement; onChange: Change; onPreview: () => void; playing: boolean }) {
+  const entrance = element.animation?.entrance ?? "none";
+  const delay = element.animation?.delay ?? 0;
+  const set = (next: Entrance, nextDelay: number) =>
+    onChange({ animation: next === "none" ? undefined : { entrance: next, delay: nextDelay } } as Partial<PosterElement>, `${element.id}:animation`);
+  return (
+    <fieldset className="space-y-3 border-t border-line pt-4">
+      <legend className="sr-only">Animation</legend>
+      <p className="font-sans text-sm font-semibold">Animation (video)</p>
+      <div className="grid grid-cols-[1fr_6rem] gap-2">
+        <Field label="Entrance" id="prop-entrance">
+          <select id="prop-entrance" className="input py-2" value={entrance} onChange={(e) => set(e.target.value as Entrance, delay)}>
+            {ENTRANCES.map((key) => (
+              <option key={key} value={key}>
+                {ENTRANCE_LABELS[key]}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Start (sec)" id="prop-entrance-delay">
+          <input
+            id="prop-entrance-delay"
+            type="number"
+            inputMode="decimal"
+            step={0.1}
+            min={0}
+            max={MAX_DELAY}
+            disabled={entrance === "none"}
+            className="input tabular py-2"
+            value={delay}
+            onChange={(e) => set(entrance, Math.min(MAX_DELAY, Math.max(0, Number(e.target.value) || 0)))}
+          />
+        </Field>
+      </div>
+      {entrance !== "none" && (
+        <button type="button" className="btn-secondary btn-sm" onClick={onPreview} disabled={playing}>
+          {playing ? "Playing…" : "Play"}
+        </button>
+      )}
+    </fieldset>
+  );
+}
+
+/** Whole-poster animation: one-click sequence, preview and reset. */
+function PosterAnimation({ design, controls }: { design: PosterDesign; controls: AnimationControls }) {
+  const count = design.elements.filter((e) => e.animation && e.animation.entrance !== "none").length;
+  return (
+    <section className="space-y-3 border-t border-line pt-4" aria-labelledby="poster-animation">
+      <h2 id="poster-animation" className="font-sans text-sm font-semibold">
+        Animation (video)
+      </h2>
+      <p className="hint mt-0">
+        {count ? `${count} element${count === 1 ? "" : "s"} animate in. ` : "Nothing animates yet. "}
+        Download → Video records about 6 seconds, ready for WhatsApp status and Reels.
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        <button type="button" className="btn-secondary btn-sm" onClick={controls.onAnimateAll}>
+          Animate everything
+        </button>
+        <button type="button" className="btn-secondary btn-sm" onClick={controls.onPreview} disabled={controls.playing || !count}>
+          {controls.playing ? "Playing…" : "Play"}
+        </button>
+        {count > 0 && (
+          <button type="button" className="btn-ghost btn-sm" onClick={controls.onClear}>
+            Remove animation
+          </button>
+        )}
+      </div>
+    </section>
+  );
 }

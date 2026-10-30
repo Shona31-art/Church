@@ -68,6 +68,7 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 31 | `paystack_card_giving.sql` | Card giving: `church_card_giving` (each church's Paystack subaccount — readable by its members, written only by the server after an admin check; paused automatically when bank details change), `givings.provider` / `provider_reference` (unique) / `fee_cents`. Plain-language notes at the top of the file |
 | 32 | `church_move.sql` | When the platform admin moves someone to another church: their birthday moves with them, their shared prayers come off the old church's wall (kept privately), upcoming bookings with the old church are cancelled and RSVPs to its upcoming events removed; one audit entry. Gifts, care notes, counselling records and messages stay with the old church. Plan: `docs/plans/church-move-cleanup.md` |
 | 33 | `email_sync.sql` | When a member's sign-in email changes (they confirm it from My account → Email address), copies it to `app_users.email` and audit-logs it with both addresses partly hidden. Plan: `docs/plans/email-change.md` |
+| 34 | `paystack_billing.sql` | Online billing: Paystack customer/subscription codes on `church_subscriptions` (server-written only), `billing_payments` (each subscription payment; readable by the church's admins, written only by the server; each reference recorded once). Plan: `docs/plans/paystack-billing.md` |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so
@@ -149,8 +150,28 @@ Plan: `docs/plans/paystack-card-giving.md`.
    cards (listed in their docs, "Test Payments"). The gift shows as received
    in the member's history and the giving report.
 
-Billing (church subscriptions) is manual for now: plan changes go through
-Super Admin. Stripe was removed (ADR-0004).
+### Online billing (Paystack subscriptions, optional)
+
+Churches can pay for Basic or Premium themselves from **Billing**: a monthly
+card subscription, charged by Paystack to the platform's own account (not a
+church subaccount). Without the settings below, billing stays manual (plan
+changes through Super Admin). Plan: `docs/plans/paystack-billing.md`.
+
+1. Run migration #34 (`paystack_billing.sql`).
+2. In Paystack → Products → Plans, create two **monthly** plans in **ZAR**
+   with exactly the prices of Basic and Premium in the `plans` table. Put
+   their codes in `PAYSTACK_PLAN_BASIC` and `PAYSTACK_PLAN_PREMIUM`.
+3. The webhook URL from card giving (step 2 above) also carries renewals,
+   failed payments and cancellations — no second webhook.
+4. Set `CRON_SECRET`: the nightly job ends cancelled subscriptions once the
+   paid month is over.
+
+What happens: Subscribe → Paystack checkout → the plan activates when Paystack
+confirms (return page or webhook). Each monthly renewal extends the paid-up
+date. A failed renewal gives 7 days' grace while Paystack retries. Cancel
+stops future charges and keeps access until the end of the paid month.
+Churches with a lifetime plan or a price override keep the manual route.
+Stripe was removed (ADR-0004).
 
 ### Notification pop-ups (optional)
 
@@ -190,6 +211,7 @@ pnpm typecheck   # TypeScript strict
 pnpm lint        # ESLint (next/core-web-vitals)
 pnpm test        # unit tests + database/RLS tests
 pnpm build       # production build
+pnpm test:e2e    # browser tests (Playwright; starts the app itself)
 ```
 
 `pnpm test` runs every migration against real Postgres (PGlite — Postgres
@@ -200,7 +222,13 @@ scope, draft visibility, booking cancellation, pastoral-note confidentiality,
 journal privacy, audit-log integrity and member erasure. Unit tests cover
 permissions, feature gating, navigation, timezone conversion, journal
 encryption storage, money parsing, CSV safety, card-gift settlement and Paystack webhook signatures.
-GitHub Actions (`.github/workflows/ci.yml`) runs all four checks on every push.
+`pnpm test:e2e` drives Chromium (desktop and phone sizes): `e2e/public.spec.ts`
+checks the signed-out pages and access rules and needs no database;
+`e2e/roles.spec.ts` signs in as each seeded demo login and walks that role's
+menu and pages — run it against a test Supabase project after `pnpm seed`
+with `E2E_SEEDED=1` (and `E2E_BASE_URL=<preview URL>` to test a deployment).
+GitHub Actions (`.github/workflows/ci.yml`) runs all of these on every push
+(the role walkthrough is skipped there until a test project is configured).
 
 ---
 
@@ -309,7 +337,7 @@ every server action, and is enforced again by Postgres RLS. Menus only hide link
 | "Are you sure?" from code (not a form) | `components/ui/ConfirmDialog.tsx` (`useConfirm`) |
 | Calling a server action from a client component | wrap it in `callAction` (`lib/call-action.ts`) so a failed request shows an error instead of a stuck button |
 | Loading skeletons | `components/ui/Skeleton.tsx`; per-section `loading.tsx` (dashboard, members, chat, posters) |
-| Product logo, photo placeholders, sign-in layout | `components/brand/` (`BrandMark`, `PhotoPlaceholder`, `AuthShell`) |
+| Product logo, hero artwork, sign-in layout | `components/brand/` (`BrandMark`, `Ornament`, `AuthShell`) |
 | Installable app (PWA) | Manifest `app/manifest.ts`; iPhone metadata + viewport `app/layout.tsx`; install button/banner `components/install/` (device rules `lib/install.ts`, tested); service worker `public/sw.js` (registered by `components/ServiceWorker.tsx`); offline page `public/offline.html`. Plan: `docs/plans/installable-app.md` |
 | Forms opening as popups | `components/ui/RouteModal.tsx`; one wrapper per form in `app/dashboard/@modal/(.)<route>/page.tsx`. A new form page needs a matching wrapper, or it opens as a full page |
 | Dates, times, money formatting; timezone | `lib/format.ts` |
@@ -328,7 +356,7 @@ every server action, and is enforced again by Postgres RLS. Menus only hide link
 | Poster editor | Design format + validation: `lib/posters/design.ts`. Editor: `components/posters/editor/Editor.tsx` (canvas `EditorCanvas.tsx`, properties `PropertiesPanel.tsx`, add/layers `SidePanels.tsx`). Undo, element operations, resizing between sizes: `lib/posters/{history,elements,layout}.ts` (tested). Templates: the 42 designs in `lib/posters/templates/catalog.ts` and `catalog-more.ts`, written with the size-independent helpers in `kit.ts` (tests check validity, fit and contrast at every size); gallery `components/posters/TemplateGallery.tsx`. Fonts: list in `lib/posters/fonts.ts`, files + OFL licences in `public/fonts/poster/` (refresh with `node scripts/fetch-poster-fonts.mjs`). Save: `app/dashboard/posters/editor-actions.ts`. Pages: `app/dashboard/posters/editor/`. Why: `docs/adr/0003-poster-editor.md` |
 | Bible games | Rules, levels, points and puzzle generators: `lib/games/` (tested). Starting/finishing/marking: `app/dashboard/games/actions.ts` + `engine.ts`. Shared intro/timer/results frame: `app/dashboard/games/GameShell.tsx`; which board each game uses: `GameScreen.tsx`. Daily challenge, streaks, badges: `lib/games/progression.ts` |
 | Any AI behaviour, model, timeout | `lib/ai.ts`; rate limit `lib/ai-quota.ts` |
-| Billing (plans; manual for now) | `app/dashboard/billing/`, `lib/billing.ts`; plan changes in `app/dashboard/super-admin/` |
+| Billing (plans; online via Paystack or manual) | page + subscribe/cancel actions `app/dashboard/billing/`; rules `lib/billing.ts` (tested); Paystack settlement, renewals, grace and cancellation `lib/subscription-billing.ts`; return `app/api/billing/paystack/return/route.ts`; webhook `app/api/paystack/webhook/route.ts`; database `supabase/paystack_billing.sql`; manual plan changes in `app/dashboard/super-admin/` |
 | Giving, giving report & CSV | Bank transfers (EFT, the default): church bank details `app/dashboard/setup/giving/`; member page + "I've made a transfer" + confirm/delete actions `app/dashboard/giving/`; waiting list `app/dashboard/giving/report/WaitingGifts.tsx`; rules + references `lib/giving.ts`; database rules `supabase/eft_giving.sql` (tests `tests/db/eft-giving.test.ts`). CSV `app/api/giving/export/route.ts`. Card giving (Paystack): client `lib/paystack.ts`, settlement rules `lib/card-giving.ts` (tested), bank list `lib/banks-za.ts`, settings `app/dashboard/setup/giving/CardGivingSection.tsx`, return `app/api/giving/paystack/return/route.ts`, webhook `app/api/paystack/webhook/route.ts`, database `supabase/paystack_card_giving.sql`. Why: `docs/adr/0004-giving-by-bank-transfer.md` |
 | Journal encryption | `lib/encryption.ts` (tested) |
 | Changing sign-in email | `app/dashboard/account/EmailChangeForm.tsx`, `requestEmailChange` in `app/dashboard/account/actions.ts`, password check `lib/supabase/verify-password.ts`, link landing `app/auth/confirm-email/route.ts`, sync `supabase/email_sync.sql` |
@@ -375,8 +403,9 @@ the Aperture default). Conventions every screen follows:
 - **Signed-in flows are not tested in a browser against real Supabase.** No
   Supabase project or Docker was available while building. Verified instead:
   type-check, lint, production build, and the database/RLS suite on real
-  Postgres. **Before real users, walk through every role with the seeded demo
-  logins**, and add Playwright E2E tests once a test Supabase project exists.
+  Postgres. Playwright role walkthroughs are written (`e2e/roles.spec.ts`) but
+  have not run yet: **before real users, seed a test Supabase project and run
+  `E2E_SEEDED=1 pnpm test:e2e`**.
 - **Journal storage fix is reasoned, not observed.** The old code stored the
   JSON text of a Buffer in `bytea` columns; new code writes hex and reads both
   formats (unit-tested). Confirm by saving and reading one entry after deploying.
@@ -386,10 +415,10 @@ the Aperture default). Conventions every screen follows:
   (people use the browser menu instead) and phones use a screenshot as the
   icon. The offline page (`public/offline.html`) also draws the gold-square
   stand-in mark.
-- **Brand assets (placeholders):** the product logo is a gold square drawn in one
-  place (`components/brand/BrandMark.tsx`), and labelled "Awaiting church photo"
-  boxes (`components/brand/PhotoPlaceholder.tsx`) mark the landing hero and the
-  sign-in brand panel. The dashboard sidebar shows the church's initials in place
+- **Brand assets (placeholders):** the product logo is a gold diamond-and-cross
+  mark drawn in one place (`components/brand/BrandMark.tsx`), and gold-line
+  arch artwork (`components/brand/Ornament.tsx`) holds the place of photography
+  on the landing hero and the sign-in panel. The dashboard sidebar shows the church's initials in place
   of a church logo. Supply a real logo (SVG) and photos before launch.
 - **Chat "typing…" uses an open Realtime broadcast** keyed by the chat's random ID.
   It carries only a user ID (never message text), but isn't permission-checked the
@@ -430,14 +459,16 @@ the Aperture default). Conventions every screen follows:
   Preview URL, not `pnpm dev`. Highlights and notes need a connection.
   The web app manifest has **no icons yet** (brand placeholder): add
   192×192 and 512×512 PNGs of the logo before launch.
-- **Poster editor**: built and type-checked, but not yet used on real phones or against real Supabase Storage/Pexels. No PDF export (PNG/JPG only) or landscape/projector size yet. A canvas can't be fully screen-reader friendly; the Layers list and properties panel give keyboard access to every element. Unsaved work is kept on the device that was editing (not synced). Stock photo search needs `PEXELS_API_KEY`; its per-person limit is per server instance.
-- **Error tracking:** only server `console.error` logs. Add a Vercel log drain
-  (or a free Sentry tier) before launch.
-- **Card giving (Paystack) is untested against a real Paystack account** — built from Paystack's official API spec and unit-tested with mocked responses. Test it with a test key before going live; the webhook needs the deployed HTTPS URL. Billing (church subscriptions) is manual until it's needed; Stripe was removed (ADR-0004).
+- **Poster editor**: built and type-checked, but not yet used on real phones or against real Supabase Storage/Pexels. Downloads: PNG, JPG, PDF (a true A4 page for A4 posters) and an animated video (Download → Video: entrances per element or "Animate everything", recorded in the browser — MP4 where supported, otherwise WebM; it plays in real time, so a slow phone gives a lower frame rate rather than a longer video). Video and PDF are verified in headless Chromium, not yet on real phones. A canvas can't be fully screen-reader friendly; the Layers list and properties panel give keyboard access to every element. Unsaved work is kept on the device that was editing (not synced). Stock photo search needs `PEXELS_API_KEY`; its per-person limit is per server instance.
+- **Error tracking:** set `SENTRY_DSN` (Sentry's free plan, or any
+  Sentry-compatible service) and every server `console.error`, unhandled
+  rejection and browser error is sent there (`lib/error-reporting.ts`,
+  `instrumentation.ts`, `/api/errors`), scrubbed of emails and phone numbers
+  and rate-limited. No SDK is installed, so there are no source maps or
+  performance traces; blank DSN = server logs only.
+- **Card giving (Paystack) is untested against a real Paystack account** — built from Paystack's official API spec and unit-tested with mocked responses. Test it with a test key before going live; the webhook needs the deployed HTTPS URL. Online billing (Paystack subscriptions) is likewise built from the spec and tested with mocks: try a test-mode subscription, a cancellation and (with Paystack's failing test card) a failed renewal before going live. Stripe was removed (ADR-0004).
 - **Bank-transfer gifts are confirmed by hand** — the app can't see the church's bank account. The year in the report follows when a gift was recorded, so a transfer made on 31 December and recorded in January counts in January (the paid date is shown and exported).
 - `support_ticket_messages.attachment_url` is unused but kept so no data is lost.
 
 Running costs and when each service would start costing money: see
 [`docs/costs.md`](docs/costs.md).
-#   C h u r c h  
- 

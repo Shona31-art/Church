@@ -18,6 +18,9 @@ import { PropertiesPanel } from "./PropertiesPanel";
 import { InsertPanel, LayersPanel } from "./SidePanels";
 import { PhotosPanel, type PhotoChoice } from "./PhotosPanel";
 import { TextEditOverlay } from "./TextEditOverlay";
+import { playOnStage } from "./animate-stage";
+import { animateAll, clearAnimations, pickVideoType, VIDEO_FPS, videoSize } from "@/lib/posters/animation";
+import { jpegToPdf, pdfPageSize } from "@/lib/posters/pdf";
 
 // Unsaved work is kept on this device so a closed tab, crash or expired
 // session never loses a poster. Keyed by poster (or "new"); a draft is only
@@ -94,6 +97,8 @@ export function Editor({
   const [saving, setSaving] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [fontVersion, setFontVersion] = useState(0);
+  // An animation playing on the canvas: a preview, or a video being recorded.
+  const [animating, setAnimating] = useState<"preview" | "video" | null>(null);
   const saved = useRef({ design: initialDesign, title: initialTitle });
   const [recoverable, setRecoverable] = useState<{ design: PosterDesign; title: string; savedAt: number } | null>(null);
   const lastChange = useRef({ key: "", at: 0 });
@@ -284,33 +289,149 @@ export function Editor({
 
   makeThumbnail.current = updateThumbnail;
 
-  async function download(type: "png" | "jpeg") {
+  /** File name from the poster's title, e.g. "Easter Sunday" → "easter-sunday". */
+  function fileName(): string {
+    return (title.trim() || "poster").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "poster";
+  }
+
+  /** Clears the selection and waits two frames so the handles are gone from the canvas. */
+  async function readyStage(): Promise<Konva.Stage | null> {
     setSelectedId(null);
     setEditingId(null);
-    // Wait two frames so the selection handles are gone from the canvas.
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    const stage = stageRef.current;
-    if (!stage) return;
-    const name = (title.trim() || "poster").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "poster";
+    return stageRef.current;
+  }
+
+  function saveFile(url: string, name: string) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+  }
+
+  /** Full-size image of the poster; very large posters fall back to half size on low-memory devices. */
+  function renderImage(stage: Konva.Stage, type: "png" | "jpeg"): { url: string; ratio: number } | null {
     const render = (ratio: number) => stage.toDataURL({ pixelRatio: ratio, mimeType: `image/${type}`, quality: 0.92 });
-    let url: string;
     try {
-      url = render(1 / scale);
+      return { url: render(1 / scale), ratio: 1 };
     } catch (error) {
       try {
         // Very large posters (A4 at 300 dpi) can exceed a phone's memory: fall back to half resolution.
-        url = render(1 / scale / 2);
+        const url = render(1 / scale / 2);
         showToast("Your device couldn't make the full-size file, so this one is half size (fine for screens).", "info");
+        return { url, ratio: 0.5 };
       } catch {
         console.error("[posters] export failed:", error);
-        return showToast("Couldn't create the image. If the poster uses a photo from another site, remove it and try again.", "error");
+        showToast("Couldn't create the image. If the poster uses a photo from another site, remove it and try again.", "error");
+        return null;
       }
     }
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${name}.${type === "png" ? "png" : "jpg"}`;
-    a.click();
   }
+
+  async function download(type: "png" | "jpeg") {
+    const stage = await readyStage();
+    if (!stage) return;
+    const image = renderImage(stage, type);
+    if (image) saveFile(image.url, `${fileName()}.${type === "png" ? "png" : "jpg"}`);
+  }
+
+  async function downloadPdf() {
+    const stage = await readyStage();
+    if (!stage) return;
+    const image = renderImage(stage, "jpeg");
+    if (!image) return;
+    const jpeg = new Uint8Array(await (await fetch(image.url)).arrayBuffer());
+    const pdf = jpegToPdf(jpeg, pdfPageSize(design.size, design.width, design.height), title.trim() || "Poster");
+    const url = URL.createObjectURL(new Blob([pdf as BlobPart], { type: "application/pdf" }));
+    saveFile(url, `${fileName()}.pdf`);
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
+
+  /** Plays the entrances on the canvas (the editor's preview). */
+  async function previewAnimation() {
+    if (!design.elements.some((e) => e.animation && e.animation.entrance !== "none")) {
+      return showToast("Nothing is animated yet. Choose “Animate everything”, or pick an entrance for an element.", "info");
+    }
+    const stage = await readyStage();
+    if (!stage || animating) return;
+    setAnimating("preview");
+    await playOnStage(stage, design);
+    setAnimating(null);
+  }
+
+  /**
+   * Records the animation to a video in the browser (MediaRecorder): MP4
+   * where supported, otherwise WebM. Nothing is uploaded. If the poster has
+   * no animation yet, "Animate everything" is used for this video only.
+   */
+  async function downloadVideo() {
+    if (animating) return;
+    const type = typeof MediaRecorder === "undefined" ? null : pickVideoType((t) => MediaRecorder.isTypeSupported(t));
+    const probe = document.createElement("canvas");
+    if (!type || typeof probe.captureStream !== "function") {
+      return showToast("This browser can't record video. Try Chrome, Edge or Safari, or download a PNG instead.", "error");
+    }
+    const animated = design.elements.some((e) => e.animation && e.animation.entrance !== "none")
+      ? design
+      : { ...design, elements: animateAll(design.elements, design.height) };
+    const stage = await readyStage();
+    if (!stage) return;
+    setAnimating("video");
+    try {
+      const blob = await recordVideo(stage, animated, type.mimeType, false).catch((error) => {
+        // Low-memory phones: try again at 720p.
+        console.error("[posters] full-size video failed, retrying smaller:", error);
+        return recordVideo(stage, animated, type.mimeType, true);
+      });
+      const url = URL.createObjectURL(blob);
+      saveFile(url, `${fileName()}.${type.extension}`);
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      showToast(type.extension === "mp4" ? "Video saved (MP4)." : "Video saved (WebM). WhatsApp on Android and most sites accept it.", "success");
+    } catch (error) {
+      console.error("[posters] video export failed:", error);
+      showToast("Couldn't record the video on this device. If the poster uses a photo from another site, remove it and try again.", "error");
+    } finally {
+      setAnimating(null);
+    }
+  }
+
+  async function recordVideo(stage: Konva.Stage, animated: PosterDesign, mimeType: string, lowMemory: boolean): Promise<Blob> {
+    const size = videoSize(animated.width, animated.height, lowMemory);
+    const canvas = document.createElement("canvas");
+    canvas.width = size.width;
+    canvas.height = size.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("No 2D canvas");
+    const ratio = size.width / (animated.width * scale);
+    const draw = () => {
+      const frame = stage.toCanvas({ pixelRatio: ratio });
+      ctx.drawImage(frame, 0, 0, size.width, size.height);
+    };
+    draw();
+    const recorder = new MediaRecorder(canvas.captureStream(VIDEO_FPS), { mimeType, videoBitsPerSecond: lowMemory ? 4_000_000 : 8_000_000 });
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    const stopped = new Promise<void>((resolve, reject) => {
+      recorder.onstop = () => resolve();
+      recorder.onerror = (e) => reject((e as unknown as { error?: Error }).error ?? new Error("Recording failed"));
+    });
+    recorder.start(250);
+    await playOnStage(stage, animated, { onFrame: draw });
+    recorder.stop();
+    await stopped;
+    if (!chunks.length) throw new Error("Empty recording");
+    return new Blob(chunks, { type: mimeType.split(";")[0] });
+  }
+
+  const animationControls = {
+    playing: Boolean(animating),
+    onPreview: previewAnimation,
+    onAnimateAll: () => {
+      change((d) => ({ ...d, elements: animateAll(d.elements, d.height) }));
+      showToast("Everything now animates in, top to bottom. Press Play to watch.", "info");
+    },
+    onClear: () => change((d) => ({ ...d, elements: clearAnimations(d.elements) })),
+  };
 
   // Keyboard shortcuts (not while typing in a field).
   useEffect(() => {
@@ -395,7 +516,7 @@ export function Editor({
 
         <div className="ml-auto flex items-center gap-2">
           <span className="sr-only text-xs text-ink/60 md:not-sr-only md:inline" role="status">
-            {saving ? "Saving…" : dirty ? "Unsaved changes" : posterId ? "All changes saved" : ""}
+            {animating === "video" ? "Recording video…" : saving ? "Saving…" : dirty ? "Unsaved changes" : posterId ? "All changes saved" : ""}
           </span>
           {conflict && (
             <button type="button" className="btn-secondary btn-sm" onClick={() => save(true)}>
@@ -415,6 +536,14 @@ export function Editor({
               <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-raised" onClick={(e) => { (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; download("jpeg"); }}>
                 <span className="block font-semibold">JPG</span>
                 <span className="block text-xs text-ink/60">Smaller file, for WhatsApp</span>
+              </button>
+              <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-raised" onClick={(e) => { (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; downloadPdf(); }}>
+                <span className="block font-semibold">PDF</span>
+                <span className="block text-xs text-ink/60">{design.size === "a4" ? "A4 page, ready to print" : "One page, for email and printing"}</span>
+              </button>
+              <button type="button" disabled={Boolean(animating)} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-raised disabled:opacity-50" onClick={(e) => { (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; downloadVideo(); }}>
+                <span className="block font-semibold">Video</span>
+                <span className="block text-xs text-ink/60">Animated, about 6 seconds, for status and Reels</span>
               </button>
             </div>
           </details>
@@ -536,6 +665,7 @@ export function Editor({
               change((d) => applyStyle(d, key));
               showToast(`${posterStyle(key)?.name} style applied. Undo (Ctrl+Z) to go back.`, "info");
             }}
+            animation={animationControls}
           />
         </aside>
 
@@ -590,6 +720,7 @@ export function Editor({
                   change((d) => applyStyle(d, key));
                   showToast(`${posterStyle(key)?.name} style applied. Undo (Ctrl+Z) to go back.`, "info");
                 }}
+                animation={animationControls}
               />
             )}
           </div>

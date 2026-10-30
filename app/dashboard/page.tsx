@@ -184,12 +184,12 @@ export default async function DashboardHomePage() {
   const canAddEvent = has("calendar") && can(me.role, "createEvents");
 
   const verse = (
-    <section aria-labelledby="verse-heading" className="flex flex-col rounded-2xl bg-panel p-6 text-on-panel shadow-card sm:p-8">
-      <h2 id="verse-heading" className="text-eyebrow font-semibold uppercase tracking-[0.08em] text-gold">
+    <section aria-labelledby="verse-heading" className="scope-dark panel-luxe hairline-gold flex flex-col rounded-[24px] p-7 text-on-panel shadow-card sm:p-10">
+      <h2 id="verse-heading" className="text-eyebrow font-semibold uppercase tracking-[0.24em] text-gold">
         Verse of the day
       </h2>
       {verseText ? (
-        <blockquote className="mt-4 max-w-3xl flex-1 font-display text-xl leading-relaxed sm:text-title-sm sm:leading-relaxed">“{verseText}”</blockquote>
+        <blockquote className="mt-5 max-w-3xl flex-1 font-display text-2xl font-medium italic leading-snug sm:text-[30px] sm:leading-snug">“{verseText}”</blockquote>
       ) : (
         <p className="mt-4 flex-1 text-on-panel/75">We couldn&apos;t load today&apos;s verse text right now — open it in the Bible reader instead.</p>
       )}
@@ -220,10 +220,10 @@ export default async function DashboardHomePage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="eyebrow">{formatDate(now, { weekday: "long", month: "long", year: undefined })}</p>
-          <h1 className="mt-2 text-title font-semibold leading-tight sm:text-title-lg">
-            {greeting(now)}, {firstName}
+          <h1 className="mt-3 text-title font-medium leading-tight sm:text-[48px] sm:leading-[1.05]">
+            {greeting(now)}, <em className="italic text-gold-deep">{firstName}</em>
           </h1>
-          <div className="rule-gold mt-3" />
+          <div className="rule-gold mt-5" />
         </div>
         {(canPost || canAddEvent) && (
           <div className="flex flex-wrap gap-2">
@@ -468,9 +468,10 @@ function DateTile({ value }: { value: string }) {
 
 function Stat({ label, value, hint, href }: { label: string; value: string; hint?: string; href: string }) {
   return (
-    <Link href={href} className="card-interactive group block rounded-2xl p-4 sm:p-5">
-      <p className="text-xs font-medium text-ink/60">{label}</p>
-      <p className="tabular mt-2 truncate text-title-sm font-semibold leading-none tracking-[-0.01em] sm:text-title sm:leading-none">{value}</p>
+    <Link href={href} className="card-interactive group relative block overflow-hidden rounded-2xl p-5 sm:p-6">
+      <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold/70 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+      <p className="text-eyebrow font-semibold uppercase tracking-[0.16em] text-ink/60">{label}</p>
+      <p className="tabular mt-3 truncate font-display text-[34px] font-medium leading-none sm:text-[42px]">{value}</p>
       {hint && <p className="mt-1.5 text-xs text-ink/60">{hint}</p>}
     </Link>
   );

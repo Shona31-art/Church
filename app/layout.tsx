@@ -1,13 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Manrope, Playfair_Display } from "next/font/google";
+import { Cormorant_Garamond, Manrope } from "next/font/google";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
 import "./globals.css";
 import { ServiceWorker } from "@/components/ServiceWorker";
+import { ErrorReporter } from "@/components/ErrorReporter";
 
 // Self-hosted by next/font: no request to Google at runtime and no layout
 // shift while the font loads.
 const sans = Manrope({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
-const display = Playfair_Display({ subsets: ["latin"], weight: ["600", "700"], variable: "--font-display", display: "swap" });
+// Cormorant Garamond: a high-contrast engraved serif for headings — the
+// letterhead of a private bank rather than a web app.
+const display = Cormorant_Garamond({ subsets: ["latin"], weight: ["500", "600", "700"], style: ["normal", "italic"], variable: "--font-display", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Grace-bound",
@@ -30,8 +33,8 @@ export const viewport: Viewport = {
   // and landscape notch with env(safe-area-inset-*).
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F8F7F4" },
-    { media: "(prefers-color-scheme: dark)", color: "#0D0F15" },
+    { media: "(prefers-color-scheme: light)", color: "#F6F3EC" },
+    { media: "(prefers-color-scheme: dark)", color: "#0B0B0C" },
   ],
 };
 
@@ -52,6 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* On every page (not just the dashboard), so an installed app opened
             offline on the sign-in screen still gets the offline page. */}
         <ServiceWorker />
+        <ErrorReporter />
       </body>
     </html>
   );

@@ -23,3 +23,6 @@ yarn.lock
 *.log
 coverage/
 .vercel
+# Playwright
+/test-results/
+/playwright-report/

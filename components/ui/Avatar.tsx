@@ -29,7 +29,7 @@ export function Avatar({
   label?: string;
   className?: string;
 }) {
-  const base = `relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-line bg-surface-raised font-semibold text-ink/75 ${SIZES[size]} ${className}`;
+  const base = `relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-gold/35 bg-surface-raised font-display font-semibold text-ink/80 ${SIZES[size]} ${className}`;
   if (src) {
     return (
       <span className={base} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}>

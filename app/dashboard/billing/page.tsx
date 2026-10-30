@@ -4,7 +4,10 @@ import { getCurrentAppUser } from "@/lib/current-user";
 import { getChurchAccess } from "@/lib/paywall";
 import { can } from "@/lib/permissions";
 import { MODULE_LABELS, PLAN_LABELS, type ModuleKey } from "@/lib/subscription";
-import { SELF_SERVE_PLANS } from "@/lib/billing";
+import { onlineBillingState, planCodesFromEnv, SELF_SERVE_PLANS } from "@/lib/billing";
+import { onlineBillingConfigured } from "@/lib/subscription-billing";
+import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
+import { cancelSubscription, startSubscription } from "./actions";
 import { formatDate, formatMoney } from "@/lib/format";
 import { PageHeader, Section, DetailList } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
@@ -22,20 +25,33 @@ const STATUS: Record<string, { tone: BadgeTone; label: string }> = {
   error: { tone: "danger", label: "Couldn't verify access" },
 };
 
-export default async function BillingPage() {
+const PAYMENT_RESULT: Record<string, { tone: "success" | "error" | "info" | "warning"; title: string; body: string }> = {
+  paid: { tone: "success", title: "Payment received", body: "Thank you — your plan is active. Paystack will charge the same card monthly; you can cancel any time here." },
+  failed: { tone: "error", title: "The payment didn't go through", body: "You haven't been charged. Try again, or use a different card." },
+  pending: { tone: "info", title: "Payment still processing", body: "Paystack is still confirming it. This page updates automatically once it's done — usually within a few minutes." },
+  unconfirmed: { tone: "warning", title: "We couldn't confirm the payment yet", body: "If you were charged, your plan will update as soon as Paystack tells us. Refresh in a few minutes, or open a support ticket." },
+};
+
+export default async function BillingPage({ searchParams }: { searchParams: { payment?: string } }) {
   const me = await getCurrentAppUser();
   if (!me || !can(me.role, "manageBilling")) {
     return <PermissionDenied message="Only church admins can manage billing." />;
   }
 
   const supabase = createClient();
-  const [access, { data: sub }, { data: plans }, { data: planModules }, { count: activeMembers }] = await Promise.all([
+  const [access, { data: sub }, { data: plans }, { data: planModules }, { count: activeMembers }, { data: payments }] = await Promise.all([
     getChurchAccess(),
     supabase.from("church_subscriptions").select("*").eq("church_id", me.church_id).maybeSingle(),
     supabase.from("plans").select("key, name, monthly_price, member_limit, description").in("key", [...SELF_SERVE_PLANS]),
     supabase.from("plan_modules").select("plan_key, module_key").in("plan_key", [...SELF_SERVE_PLANS]),
     supabase.from("app_users").select("id", { count: "exact", head: true }).eq("church_id", me.church_id).neq("status", "disabled"),
+    // Empty until paystack_billing.sql (#34) has been run.
+    supabase.from("billing_payments").select("id, plan_key, amount_cents, status, kind, paid_at, period_end, created_at").eq("church_id", me.church_id).neq("status", "pending").order("created_at", { ascending: false }).limit(12),
   ]);
+  const online = onlineBillingConfigured();
+  const planCodes = planCodesFromEnv();
+  const billingState = onlineBillingState(sub);
+  const result = searchParams.payment ? PAYMENT_RESULT[searchParams.payment] : undefined;
 
   const status = access?.status ?? "none";
   const sorted = [...(plans ?? [])].sort((a, b) => Number(a.monthly_price) - Number(b.monthly_price));
@@ -44,12 +60,20 @@ export default async function BillingPage() {
     <div className="max-w-4xl space-y-6">
       <PageHeader title="Billing" description="Your church's plan and what it includes." />
 
-      {/* Plan payments are arranged with the Grace-bound team for now; online
-          subscriptions (Paystack) come when they're needed — ADR-0004. */}
-      <Alert tone="info" title="Changing your plan">
-        The Grace-bound team sets up plan changes and invoices for you. <Link href="/dashboard/support/new" className="underline">Open a support ticket</Link> or use
-        &ldquo;Ask to switch&rdquo; below.
-      </Alert>
+      {result && (
+        <Alert tone={result.tone} title={result.title}>
+          {result.body}
+        </Alert>
+      )}
+
+      {/* Online billing (Paystack subscriptions) when it's configured;
+          otherwise plan changes are arranged with the Grace-bound team. */}
+      {!online || billingState === "arranged" ? (
+        <Alert tone="info" title="Changing your plan">
+          The Grace-bound team sets up plan changes and invoices for you. <Link href="/dashboard/support/new" className="underline">Open a support ticket</Link> or use
+          &ldquo;Ask to switch&rdquo; below.
+        </Alert>
+      ) : null}
 
       <Section title="Current plan">
         <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -62,9 +86,32 @@ export default async function BillingPage() {
             { label: "Active members", value: String(activeMembers ?? 0) },
             ...(status === "trial" && sub?.trial_expires_at ? [{ label: "Trial ends", value: `${formatDate(sub.trial_expires_at)} (${access?.trialDaysLeft ?? 0} days left)` }] : []),
             ...(status === "grace" && sub?.grace_period_end ? [{ label: "Access until", value: formatDate(sub.grace_period_end) }] : []),
+            ...(billingState === "subscribed" && sub?.billing_date ? [{ label: "Next payment", value: `${formatDate(sub.billing_date)} · card, via Paystack` }] : []),
+            ...(billingState === "cancelled" && sub?.billing_date && status !== "suspended" ? [{ label: "Cancelled", value: `Active until ${formatDate(sub.billing_date)}` }] : []),
           ]}
         />
-        {status === "grace" && <Alert tone="warning" className="mt-4">Your last payment hasn&apos;t been received. Access continues for now — open a support ticket to settle it and avoid interruption.</Alert>}
+        {billingState === "subscribed" && (
+          <form action={cancelSubscription} className="mt-5">
+            <ConfirmSubmitButton
+              title="Cancel your subscription?"
+              message={`You won't be charged again. Your plan stays active until ${sub?.billing_date ? formatDate(sub.billing_date) : "the end of the month you've paid for"}, then most features pause. Your church's data is kept, and you can subscribe again any time.`}
+              confirmLabel="Cancel subscription"
+              className="btn-danger-outline btn-sm"
+              pendingLabel="Cancelling…"
+            >
+              Cancel subscription
+            </ConfirmSubmitButton>
+          </form>
+        )}
+        {status === "grace" &&
+          (billingState === "subscribed" ? (
+            <Alert tone="warning" className="mt-4">
+              Paystack couldn&apos;t charge your card and will try again over the next few days. Access continues meanwhile. To use a different card,
+              cancel the subscription and subscribe again.
+            </Alert>
+          ) : (
+            <Alert tone="warning" className="mt-4">Your last payment hasn&apos;t been received. Access continues for now — open a support ticket to settle it and avoid interruption.</Alert>
+          ))}
         {status === "suspended" && <Alert tone="error" className="mt-4">Your subscription has ended, so most features are paused. Your data is kept safe. Ask to switch to a plan below, or open a support ticket, to restore access.</Alert>}
       </Section>
 
@@ -95,7 +142,17 @@ export default async function BillingPage() {
                   ))}
                 </ul>
                 <div className="mt-5">
-                  {current ? (
+                  {current && billingState !== "available" && billingState !== "cancelled" ? (
+                    <p className="text-sm text-ink/60">You&apos;re on this plan.</p>
+                  ) : online && billingState !== "arranged" && billingState !== "subscribed" && planCodes[plan.key as keyof typeof planCodes] ? (
+                    <form action={startSubscription}>
+                      <input type="hidden" name="plan" value={plan.key} />
+                      <PendingButton className={current ? "btn-secondary w-full" : "btn-primary w-full"} pendingLabel="Opening secure checkout…">
+                        {current ? `Pay online — ${price}` : `Subscribe — ${price}`}
+                      </PendingButton>
+                      <p className="mt-2 text-center text-xs text-ink/60">Card payment by Paystack. Cancel any time.</p>
+                    </form>
+                  ) : current ? (
                     <p className="text-sm text-ink/60">You&apos;re on this plan.</p>
                   ) : (
                     <Link href="/dashboard/support/new" className="btn-secondary w-full">
@@ -111,6 +168,30 @@ export default async function BillingPage() {
           Need more than one campus or custom terms? <Link href="/dashboard/support/new" className="link">Contact us about Enterprise</Link>.
         </p>
       </section>
+
+      {payments && payments.length > 0 && (
+        <Section title="Payments">
+          <ul className="divide-y divide-line text-sm">
+            {payments.map((p) => (
+              <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0 last:pb-0">
+                <div>
+                  <p className="font-medium">
+                    {PLAN_LABELS[p.plan_key] ?? p.plan_key} · {p.kind === "renewal" ? "Monthly renewal" : "Subscription"}
+                  </p>
+                  <p className="text-xs text-ink/60">
+                    {formatDate(p.paid_at ?? p.created_at)}
+                    {p.period_end ? ` · paid until ${formatDate(p.period_end)}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="tabular font-semibold">{formatMoney(p.amount_cents)}</span>
+                  <StatusBadge tone={p.status === "succeeded" ? "success" : "danger"}>{p.status === "succeeded" ? "Paid" : "Failed"}</StatusBadge>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
     </div>
   );
 }

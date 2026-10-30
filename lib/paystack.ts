@@ -81,13 +81,24 @@ export interface VerifiedTransaction {
   currency: string;
   reference: string;
   metadata: Record<string, unknown>;
+  /** CUS_… — set for every transaction; used to find the church for subscription renewals. */
+  customerCode?: string;
+  /** PLN_… — only for subscription payments. */
+  planCode?: string;
 }
 
 /** Asks Paystack what happened to a payment. The only source we trust for "paid". */
 export async function verifyTransaction(reference: string): Promise<VerifiedTransaction> {
-  const data = await call<{ status: string; amount: number; currency: string; reference: string; metadata: unknown }>(
-    `/transaction/verify/${encodeURIComponent(reference)}`
-  );
+  const data = await call<{
+    status: string;
+    amount: number;
+    currency: string;
+    reference: string;
+    metadata: unknown;
+    customer?: { customer_code?: string } | null;
+    plan?: { plan_code?: string } | string | null;
+    plan_object?: { plan_code?: string } | null;
+  }>(`/transaction/verify/${encodeURIComponent(reference)}`);
   let metadata: Record<string, unknown> = {};
   if (data.metadata && typeof data.metadata === "object") metadata = data.metadata as Record<string, unknown>;
   else if (typeof data.metadata === "string") {
@@ -97,7 +108,85 @@ export async function verifyTransaction(reference: string): Promise<VerifiedTran
       metadata = {};
     }
   }
-  return { status: data.status, amountCents: data.amount, currency: data.currency, reference: data.reference, metadata };
+  const planCode = typeof data.plan === "string" ? data.plan : data.plan?.plan_code ?? data.plan_object?.plan_code;
+  return {
+    status: data.status,
+    amountCents: data.amount,
+    currency: data.currency,
+    reference: data.reference,
+    metadata,
+    customerCode: data.customer?.customer_code || undefined,
+    planCode: planCode && planCode.startsWith("PLN_") ? planCode : undefined,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Church subscriptions (online billing — docs/plans/paystack-billing.md).
+// Paid to the platform's own Paystack balance, not a church subaccount.
+// ---------------------------------------------------------------------------
+
+/**
+ * Starts a subscription checkout: the first month is charged now and Paystack
+ * creates the subscription on the plan (PLN_…), then charges it monthly.
+ * Paystack uses the plan's amount; we send the same amount so a mismatch
+ * between the plan and our catalogue shows up as a verification mismatch.
+ */
+export async function initializeSubscriptionCheckout(input: {
+  email: string;
+  amountCents: number;
+  reference: string;
+  callbackUrl: string;
+  planCode: string;
+  metadata: Record<string, string>;
+}): Promise<{ authorizationUrl: string; reference: string }> {
+  const data = await call<{ authorization_url: string; reference: string }>("/transaction/initialize", {
+    method: "POST",
+    body: {
+      email: input.email,
+      amount: input.amountCents,
+      currency: "ZAR",
+      reference: input.reference,
+      callback_url: input.callbackUrl,
+      plan: input.planCode,
+      channels: ["card"],
+      metadata: input.metadata,
+    },
+  });
+  return { authorizationUrl: data.authorization_url, reference: data.reference };
+}
+
+export interface PaystackSubscription {
+  subscriptionCode: string;
+  status: string; // "active" | "non-renewing" | "attention" | "completed" | "cancelled"
+  emailToken: string;
+  customerCode: string;
+  planCode: string;
+  nextPaymentDate: string | null;
+}
+
+/** Reads a subscription from Paystack (webhook bodies are checked against this). */
+export async function fetchSubscription(code: string): Promise<PaystackSubscription> {
+  const data = await call<{
+    subscription_code: string;
+    status: string;
+    email_token: string;
+    next_payment_date: string | null;
+    customer: { customer_code: string } | null;
+    plan: { plan_code: string } | null;
+  }>(`/subscription/${encodeURIComponent(code)}`);
+  return {
+    subscriptionCode: data.subscription_code,
+    status: data.status,
+    emailToken: data.email_token,
+    customerCode: data.customer?.customer_code ?? "",
+    planCode: data.plan?.plan_code ?? "",
+    nextPaymentDate: data.next_payment_date,
+  };
+}
+
+/** Stops future charges. The church keeps access until the period it paid for ends. */
+export async function disableSubscription(code: string, emailToken: string): Promise<void> {
+  await call("/subscription/disable", { method: "POST", body: { code, token: emailToken } });
 }
 
 interface SubaccountInput {

@@ -83,8 +83,10 @@ export function DashboardChrome({
           Skip to content
         </a>
 
-        {/* Desktop: a fixed sidebar holds navigation, identity and account. */}
-        <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col md:sticky md:top-0 md:h-screen border-r border-line bg-surface">
+        {/* Desktop: a fixed obsidian sidebar holds navigation, identity and
+            account. scope-dark switches every token inside it to the dark
+            palette, in light mode too. */}
+        <aside className="scope-dark panel-luxe hidden md:flex md:w-[17rem] md:shrink-0 md:flex-col md:sticky md:top-0 md:h-screen border-r border-line">
           {sidebar}
         </aside>
 
@@ -103,7 +105,7 @@ export function DashboardChrome({
           </button>
           <Link href="/dashboard" className="flex min-w-0 items-center gap-2">
             <Monogram text={initials(churchName)} small />
-            <span className="truncate font-display text-base font-semibold">{churchName}</span>
+            <span className="truncate font-display text-lg font-semibold">{churchName}</span>
           </Link>
           <div className="flex shrink-0 items-center gap-1">
             <NotificationBell />
@@ -116,7 +118,7 @@ export function DashboardChrome({
         {mobileOpen && (
           <div className="fixed inset-0 z-30 md:hidden">
             <div className="absolute inset-0 bg-ink/40 backdrop-blur-[2px] motion-safe:animate-fade-in" onClick={() => setMobileOpen(false)} aria-hidden />
-            <aside id="mobile-nav" className="absolute bottom-0 left-0 top-0 flex w-72 max-w-[85vw] flex-col bg-surface pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] shadow-pop motion-safe:animate-modal-in">
+            <aside id="mobile-nav" className="scope-dark panel-luxe absolute bottom-0 left-0 top-0 flex w-72 max-w-[85vw] flex-col pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] shadow-pop motion-safe:animate-modal-in">
               <button type="button" onClick={() => setMobileOpen(false)} className="btn-ghost btn-icon absolute right-2 top-3 z-10" aria-label="Close menu">
                 <X aria-hidden className="h-5 w-5" />
               </button>
@@ -172,22 +174,22 @@ function Sidebar({
     <>
       {/* Church identity. The monogram stands in until the church uploads a
           logo — flagged in the README's placeholder list. */}
-      <div className="flex items-center gap-1 pb-4 pl-5 pr-2 pt-5">
+      <div className="flex items-center gap-1 border-b border-line pb-5 pl-5 pr-2 pt-6">
         <Link href="/dashboard" className="flex min-w-0 flex-1 items-center gap-3">
           <Monogram text={initials(churchName)} />
           <div className="min-w-0">
-            <p className="truncate font-display text-lg font-semibold leading-tight">{churchName}</p>
-            <p className="eyebrow mt-0.5">Grace-bound</p>
+            <p className="truncate font-display text-xl font-semibold leading-tight">{churchName}</p>
+            <p className="eyebrow mt-1 text-micro">Grace-bound</p>
           </div>
         </Link>
         {/* Desktop only: on phones the bell lives in the top bar, not the menu drawer. */}
         <NotificationBell className="hidden shrink-0 md:inline-flex" />
       </div>
 
-      <nav aria-label="Main" className="flex-1 space-y-6 overflow-y-auto px-3 py-3">
+      <nav aria-label="Main" className="flex-1 space-y-7 overflow-y-auto px-3 py-5">
         {groups.map((group) => (
           <div key={group.label}>
-            <p className="eyebrow mb-1.5 px-3">{group.label}</p>
+            <p className="eyebrow mb-2 px-3 text-micro text-gold/80">{group.label}</p>
             <ul className="flex flex-col gap-0.5">
               {group.items.map((item) => {
                 const active = item.href === current;
@@ -196,12 +198,14 @@ function Sidebar({
                     <Link
                       href={item.href}
                       aria-current={active ? "page" : undefined}
-                      className={`group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm ${
-                        active ? "bg-surface-raised font-semibold text-ink" : "text-ink/65 hover:bg-ink/[0.04] hover:text-ink"
+                      className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${
+                        active
+                          ? "bg-gradient-to-r from-gold/[0.16] to-transparent font-semibold text-ink"
+                          : "text-ink/70 hover:bg-ink/[0.05] hover:text-ink"
                       }`}
                     >
                       {active && <span aria-hidden className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-gold" />}
-                      <NavIcon name={item.icon} className={`h-[18px] w-[18px] shrink-0 ${active ? "text-gold" : "text-ink/60 group-hover:text-ink/70"}`} />
+                      <NavIcon name={item.icon} className={`h-[18px] w-[18px] shrink-0 ${active ? "text-gold" : "text-ink/55 group-hover:text-gold"}`} />
                       {item.label}
                     </Link>
                   </li>
@@ -213,7 +217,7 @@ function Sidebar({
       </nav>
 
       <div className="space-y-3 border-t border-line p-3">
-        <Link href="/dashboard/account" className="flex items-center gap-3 rounded-xl p-2 hover:bg-ink/[0.04]" title="My account">
+        <Link href="/dashboard/account" className="flex items-center gap-3 rounded-lg p-2 hover:bg-ink/[0.05]" title="My account">
           <Avatar name={userName} src={userPhotoUrl} />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold leading-tight">{userName}</p>
@@ -233,12 +237,11 @@ function Monogram({ text, small = false }: { text: string; small?: boolean }) {
   return (
     <span
       aria-hidden
-      className={`relative flex shrink-0 items-center justify-center rounded-xl bg-ember font-display font-semibold text-on-ember shadow-[inset_0_1px_0_rgb(255_255_255/0.15)] ${
-        small ? "h-7 w-7 text-xs" : "h-10 w-10 text-lede"
+      className={`relative flex shrink-0 items-center justify-center rounded-full bg-ember font-display font-semibold tracking-wide text-on-ember shadow-[inset_0_0_0_1px_rgb(var(--gold)/0.5),0_0_0_3px_rgb(var(--gold)/0.12)] ${
+        small ? "h-8 w-8 text-sm" : "h-11 w-11 text-lg"
       }`}
     >
       {text}
-      {!small && <span className="absolute bottom-1.5 left-1/2 h-px w-3 -translate-x-1/2 bg-gold" />}
     </span>
   );
 }

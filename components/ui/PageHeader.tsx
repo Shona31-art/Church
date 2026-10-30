@@ -21,12 +21,12 @@ export function PageHeader({
   meta?: React.ReactNode;
 }) {
   return (
-    <header className="mb-8">
+    <header className="mb-10">
       {back && <BackLink href={back.href} label={back.label} />}
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <h1 className="text-title font-semibold leading-tight break-words sm:text-title-lg">{title}</h1>
-          <div className="rule-gold mt-3" />
+          <h1 className="text-title font-medium leading-tight break-words sm:text-title-lg">{title}</h1>
+          <div className="rule-gold mt-4" />
           {meta && <div className="mt-3 flex flex-wrap items-center gap-2">{meta}</div>}
           {description && <p className="mt-3 max-w-2xl text-lede text-ink/60">{description}</p>}
         </div>
@@ -65,10 +65,10 @@ export function Section({
 }) {
   const id = `section-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   return (
-    <section aria-labelledby={id} className={`card-elevated rounded-2xl p-5 sm:p-6 ${className}`}>
+    <section aria-labelledby={id} className={`card-elevated rounded-2xl p-5 sm:p-7 ${className}`}>
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
-          <h2 id={id} className="text-xl font-semibold">{title}</h2>
+          <h2 id={id} className="text-2xl font-semibold">{title}</h2>
           {description && <p className="text-sm text-ink/60 mt-1">{description}</p>}
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}

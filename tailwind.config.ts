@@ -9,7 +9,7 @@ import type { Config } from "tailwindcss";
 // active, and opacity modifiers keep working.
 //
 // Neutrals (ink, parchment, surface, line) carry most of every screen.
-// ember is for primary actions (deep navy in light, champagne in dark), with
+// ember is for primary actions (obsidian in light, champagne in dark), with
 // on-ember as the text that sits on it; gold is a small accent only.
 // success / warning / danger / info are reserved for state and always paired
 // with an icon or words, never colour alone. Each foreground colour passes
@@ -29,8 +29,8 @@ const config: Config = {
         "line-strong": token("line-strong"), // input borders
         ember: token("ember"), // primary actions, links
         "on-ember": token("on-ember"), // text/icons on an ember background
-        gold: { DEFAULT: token("gold"), deep: token("gold-deep") }, // restrained brass — hairlines, icons, small accents; `gold-deep` for text
-        panel: token("panel"), // deep navy brand panel (auth screens, landing band) in both themes
+        gold: { DEFAULT: token("gold"), deep: token("gold-deep"), soft: token("gold-soft") }, // champagne — hairlines, icons, small accents; `gold-deep` for text, `gold-soft` for tints
+        panel: token("panel"), // obsidian brand panel (sidebar, auth screens, landing hero) in both themes
         "on-panel": token("on-panel"), // text on the brand panel
         success: { DEFAULT: token("success"), tint: token("success-tint"), line: token("success-line") },
         warning: { DEFAULT: token("warning"), tint: token("warning-tint"), line: token("warning-line") },
@@ -46,11 +46,11 @@ const config: Config = {
         micro: ["10px", { lineHeight: "14px" }], // counter badges, date-tile months
         eyebrow: ["11px", { lineHeight: "16px" }], // uppercase labels (.eyebrow), timestamps
         lede: ["15px", { lineHeight: "1.55" }], // page descriptions, intro lines
-        "title-sm": ["22px", { lineHeight: "1.35" }],
-        title: ["28px", { lineHeight: "1.2" }], // page titles on phones
-        "title-lg": ["32px", { lineHeight: "1.2" }], // page titles from sm up
-        display: ["40px", { lineHeight: "1.1" }], // landing hero on phones
-        "display-lg": ["56px", { lineHeight: "1.08" }], // landing hero on desktop
+        "title-sm": ["24px", { lineHeight: "1.3" }],
+        title: ["32px", { lineHeight: "1.15" }], // page titles on phones
+        "title-lg": ["40px", { lineHeight: "1.1" }], // page titles from sm up
+        display: ["46px", { lineHeight: "1.05" }], // landing hero on phones
+        "display-lg": ["72px", { lineHeight: "1.0" }], // landing hero on desktop
       },
       fontFamily: {
         // Loaded with next/font in app/layout.tsx (self-hosted, no layout shift).

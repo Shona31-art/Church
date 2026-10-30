@@ -47,6 +47,8 @@ vi.mock("@/lib/supabase/admin", () => ({
   },
 }));
 
+vi.mock("@/lib/subscription-billing", () => ({ endCancelledSubscriptions: async () => 0 }));
+
 const { GET } = await import("@/app/api/cron/expire-chat-media/route");
 const call = (auth?: string) => GET(new Request("http://localhost/api/cron/expire-chat-media", { headers: auth ? { authorization: auth } : {} }));
 
@@ -81,7 +83,7 @@ describe("expire-chat-media cron", () => {
   test("deletes due files, then marks those messages expired", async () => {
     const response = await call("Bearer s3cret");
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ expired: 2, notificationsDeleted: 3 });
+    expect(await response.json()).toEqual({ expired: 2, notificationsDeleted: 3, subscriptionsEnded: 0 });
     expect(calls.removed).toEqual([["church/chan/user/a.m4a", "church/chan/user/b.webm"]]);
     expect(calls.updatedIds).toEqual([["m1", "m2"]]);
   });

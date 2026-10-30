@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CHAT_MEDIA_BUCKET, mediaExpiryCutoff } from "@/lib/chat";
+import { endCancelledSubscriptions } from "@/lib/subscription-billing";
 
 /**
  * GET /api/cron/expire-chat-media — nightly clean-up, called by Vercel Cron
@@ -12,12 +13,14 @@ import { CHAT_MEDIA_BUCKET, mediaExpiryCutoff } from "@/lib/chat";
  * Keeps storage — and cost — flat as a church's chat history grows.
  *
  * Also deletes bell notifications older than 90 days
- * (the notifications page promises 90). Kept in this one job because Vercel's
+ * (the notifications page promises 90), and ends church subscriptions that
+ * were cancelled once the month they paid for is over (online billing).
+ * Kept in this one job because Vercel's
  * free plan allows only daily cron jobs; a failure there is logged and never
  * blocks the media clean-up.
  *
  * Request:  header `Authorization: Bearer <CRON_SECRET>` (Vercel adds it).
- * Response: 200 { expired: number, notificationsDeleted: number } · 401 bad/missing secret ·
+ * Response: 200 { expired: number, notificationsDeleted: number, subscriptionsEnded: number } · 401 bad/missing secret ·
  *           500 { error } (files that couldn't be deleted are left as they
  *           are and retried the next night).
  */
@@ -88,5 +91,12 @@ export async function GET(request: Request) {
   if (notifyError) console.error("[cron] delete old notifications failed (retries tomorrow):", notifyError.message);
   else notificationsDeleted = count ?? 0;
 
-  return NextResponse.json({ expired, notificationsDeleted });
+  let subscriptionsEnded = 0;
+  try {
+    subscriptionsEnded = await endCancelledSubscriptions();
+  } catch (error) {
+    console.error("[cron] end cancelled subscriptions failed (retries tomorrow):", (error as Error).message);
+  }
+
+  return NextResponse.json({ expired, notificationsDeleted, subscriptionsEnded });
 }

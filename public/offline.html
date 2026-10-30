@@ -9,29 +9,29 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#F8F7F4" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0D0F15" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#F6F3EC" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0B0B0C" media="(prefers-color-scheme: dark)" />
     <title>You're offline · Grace-bound</title>
     <style>
       :root {
         color-scheme: light dark;
-        --ink: 20 22 31;
-        --parchment: 248 247 244;
-        --surface: 255 255 255;
-        --line: 232 230 224;
-        --ember: 27 42 74;
-        --on-ember: 255 255 255;
-        --gold: 168 138 74;
+        --ink: 22 20 17;
+        --parchment: 246 243 236;
+        --surface: 255 254 250;
+        --line: 230 224 211;
+        --ember: 23 21 18;
+        --on-ember: 246 240 226;
+        --gold: 176 141 87;
       }
       @media (prefers-color-scheme: dark) {
         :root {
-          --ink: 237 234 227;
-          --parchment: 13 15 21;
-          --surface: 21 24 32;
-          --line: 39 43 54;
-          --ember: 226 205 160;
-          --on-ember: 18 20 28;
-          --gold: 201 170 106;
+          --ink: 239 233 220;
+          --parchment: 11 11 12;
+          --surface: 20 19 18;
+          --line: 42 40 37;
+          --ember: 214 182 124;
+          --on-ember: 18 16 13;
+          --gold: 205 170 108;
         }
       }
       * { box-sizing: border-box; }
@@ -47,8 +47,8 @@
         -webkit-font-smoothing: antialiased;
         padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
       }
-      .brand { display: inline-flex; align-items: center; gap: 10px; font-family: Georgia, serif; font-weight: 600; font-size: 18px; }
-      .mark { width: 14px; height: 14px; border-radius: 4px; background: rgb(var(--gold)); }
+      .brand { display: inline-flex; align-items: center; gap: 12px; font-family: Georgia, serif; font-weight: 600; font-size: 16px; letter-spacing: 0.2em; text-transform: uppercase; }
+      .mark { width: 12px; height: 12px; border: 1.5px solid rgb(var(--gold)); transform: rotate(45deg); }
       main { flex: 1; display: flex; align-items: center; justify-content: center; }
       .card {
         width: 100%;
@@ -60,12 +60,12 @@
         box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px -4px rgb(0 0 0 / 0.06);
       }
       h1 { margin: 0; font-family: Georgia, serif; font-size: 28px; line-height: 1.2; letter-spacing: -0.015em; }
-      .rule { width: 32px; height: 2px; border-radius: 1px; background: rgb(var(--gold)); margin: 12px 0 16px; }
+      .rule { width: 56px; height: 1px; background: linear-gradient(90deg, rgb(var(--gold)), rgb(var(--gold) / 0)); margin: 14px 0 16px; }
       p { margin: 0 0 12px; font-size: 15px; line-height: 1.55; color: rgb(var(--ink) / 0.75); }
       .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
       .btn {
         display: inline-flex; align-items: center; justify-content: center;
-        min-height: 44px; padding: 0 18px; border-radius: 12px;
+        min-height: 44px; padding: 0 18px; border-radius: 8px;
         font: 600 14px/1 inherit; font-family: inherit; text-decoration: none; cursor: pointer;
         touch-action: manipulation;
       }

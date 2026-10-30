@@ -1,6 +1,6 @@
 # Plan: Poster Studio v2: landscape, style variations, animated video
 
-Status: **approved 2026-10-17**, in progress. Builds on
+Status: **BUILT** (2026-10-30): landscape, styles and animated video export (plus PDF export). Video awaiting real-phone testing. Builds on
 [`poster-editor.md`](poster-editor.md) and ADR 0003. Choices made with the
 product owner: all three features; animation = simple video export; styles =
 Minimal, Midnight, Neon, Vintage, Pastel.

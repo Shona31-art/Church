@@ -3,13 +3,15 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { TriangleAlert } from "lucide-react";
+import { reportClientError } from "@/lib/report-client-error";
 
 // Catches any unexpected error while rendering a dashboard page, so people
 // get a way forward instead of a stack trace. The real error is logged
-// server-side (and to your log drain in production), never shown.
+// server-side and, when SENTRY_DSN is set, sent to error tracking — never shown.
 export default function DashboardError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error("[dashboard] render error:", error);
+    reportClientError(error, error.digest);
   }, [error]);
 
   const offline = typeof navigator !== "undefined" && !navigator.onLine;

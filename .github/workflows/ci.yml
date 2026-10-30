@@ -33,3 +33,19 @@ jobs:
         run: pnpm test
       - name: Build
         run: pnpm build
+      # Browser tests for signed-out pages and access rules (e2e/public.spec.ts).
+      # The signed-in role walkthroughs (e2e/roles.spec.ts) need a seeded test
+      # Supabase project and are skipped here unless E2E_SEEDED is set.
+      - name: Install browser for E2E
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Browser tests (E2E)
+        run: pnpm test:e2e
+        env:
+          CI: "true"
+      - name: Upload E2E report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

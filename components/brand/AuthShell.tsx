@@ -1,23 +1,19 @@
 import { BrandMark } from "./BrandMark";
-import { PhotoPlaceholder } from "./PhotoPlaceholder";
+import { Ornament } from "./Ornament";
 
 /**
  * Frame for the signed-out screens (sign in, register, password reset).
- * Desktop: a deep-navy brand panel on the left, the form on the right.
+ * Desktop: an obsidian brand panel on the left, the form on the right.
  * Phones and tablets: just the logo above the form, so the form is reachable
  * without scrolling past decoration.
  */
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
     <main className="min-h-screen min-h-dvh lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-      <aside className="hidden bg-panel text-on-panel lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:gap-10 lg:p-12 xl:p-16">
-        <BrandMark onPanel />
-        <PhotoPlaceholder onPanel label="Awaiting church photo — 1200×900" className="flex-1" />
-        <figure>
-          <blockquote className="max-w-md font-display text-title leading-snug">“Let all that you do be done in love.”</blockquote>
-          <div className="rule-gold mt-4" />
-          <figcaption className="mt-3 text-sm text-on-panel/65">1 Corinthians 16:14 (WEB)</figcaption>
-        </figure>
+      <aside className="scope-dark panel-luxe hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:gap-10 lg:p-12 xl:p-16">
+        <BrandMark />
+        <Ornament verse="Let all that you do be done in love." reference="1 Corinthians 16:14" framed={false} className="flex-1" />
+        <p className="text-eyebrow uppercase tracking-[0.24em] text-ink/50">Private · Secure · For your whole church</p>
       </aside>
 
       <div className="flex min-h-screen min-h-dvh flex-col px-4 py-6 sm:px-8">
@@ -32,10 +28,10 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
 export function AuthHeading({ eyebrow, title, children }: { eyebrow?: string; title: string; children?: React.ReactNode }) {
   return (
     <div>
-      {eyebrow && <p className="eyebrow mb-2">{eyebrow}</p>}
-      <h1 className="text-title font-semibold leading-tight">{title}</h1>
-      <div className="rule-gold mt-3" />
-      {children && <p className="mt-3 text-sm text-ink/60">{children}</p>}
+      {eyebrow && <p className="eyebrow mb-3">{eyebrow}</p>}
+      <h1 className="text-title-lg font-medium leading-tight">{title}</h1>
+      <div className="rule-gold mt-4" />
+      {children && <p className="mt-4 text-sm text-ink/60">{children}</p>}
     </div>
   );
 }

@@ -12,34 +12,35 @@
    ------------------------------------------------------------------------- */
 :root {
   color-scheme: light;
-  --ink: 20 22 31;
-  --parchment: 248 247 244;
-  --surface: 255 255 255;
-  --surface-raised: 243 242 238;
-  --line: 232 230 224;
-  --line-strong: 214 211 203;
-  --ember: 27 42 74;
-  --on-ember: 255 255 255;
-  --gold: 168 138 74;
+  --ink: 22 20 17;
+  --parchment: 246 243 236;
+  --surface: 255 254 250;
+  --surface-raised: 240 236 227;
+  --line: 230 224 211;
+  --line-strong: 209 201 185;
+  --ember: 23 21 18;
+  --on-ember: 246 240 226;
+  --gold: 176 141 87;
   /* Gold for small text on light surfaces: --gold is only ~3:1 there. */
-  --gold-deep: 130 102 46;
-  --shadow: 20 22 31;
-  /* Brand panel (auth screens, landing band): deep navy in both themes. */
-  --panel: 22 32 56;
-  --on-panel: 244 240 230;
+  --gold-deep: 122 93 47;
+  --gold-soft: 233 214 178;
+  --shadow: 28 22 12;
+  /* Brand panel (sidebar, auth screens, landing hero): obsidian in both themes. */
+  --panel: 14 13 12;
+  --on-panel: 242 236 222;
 
   --success: 23 113 79;
-  --success-tint: 231 244 238;
+  --success-tint: 233 244 236;
   --success-line: 183 222 203;
   --warning: 138 79 6;
-  --warning-tint: 251 241 225;
+  --warning-tint: 251 242 226;
   --warning-line: 235 203 149;
-  --danger: 180 35 24;
-  --danger-tint: 253 236 234;
-  --danger-line: 242 184 178;
-  --info: 36 80 143;
-  --info-tint: 234 240 250;
-  --info-line: 188 205 234;
+  --danger: 172 38 30;
+  --danger-tint: 252 237 233;
+  --danger-line: 242 186 178;
+  --info: 40 78 132;
+  --info-tint: 235 240 248;
+  --info-line: 190 205 230;
 
   /* Bible verse highlights (member-chosen, so pastel in light mode and
      deep in dark mode; text stays ink on all of them, AA contrast). */
@@ -50,36 +51,41 @@
   --hl-purple: 224 216 252;
 }
 
-/* Dark: deep navy-black surfaces, warm off-white text, champagne actions.
+/* Dark: obsidian surfaces, warm ivory text, champagne actions.
    CSS can't share a block between a selector and a media query, so the dark
-   values appear twice — keep the two blocks below identical. */
-:root[data-theme="dark"] {
+   values appear three times — keep the blocks below identical.
+   `.scope-dark` applies them to one region in either theme (the obsidian
+   sidebar and hero), so everything inside — buttons, menus, badges — reads
+   correctly on the dark panel without per-component variants. */
+:root[data-theme="dark"],
+.scope-dark {
   color-scheme: dark;
-  --ink: 237 234 227;
-  --parchment: 13 15 21;
-  --surface: 21 24 32;
-  --surface-raised: 30 34 44;
-  --line: 39 43 54;
-  --line-strong: 58 63 77;
-  --ember: 226 205 160;
-  --on-ember: 18 20 28;
-  --gold: 201 170 106;
-  --gold-deep: 201 170 106;
+  --ink: 239 233 220;
+  --parchment: 11 11 12;
+  --surface: 20 19 18;
+  --surface-raised: 30 29 27;
+  --line: 42 40 37;
+  --line-strong: 64 60 54;
+  --ember: 214 182 124;
+  --on-ember: 18 16 13;
+  --gold: 205 170 108;
+  --gold-deep: 205 170 108;
+  --gold-soft: 84 68 40;
   --shadow: 0 0 0;
-  --panel: 24 31 48;
-  --on-panel: 237 234 227;
+  --panel: 8 8 9;
+  --on-panel: 239 233 220;
 
   --success: 94 201 152;
-  --success-tint: 17 44 34;
+  --success-tint: 17 40 31;
   --success-line: 32 84 63;
   --warning: 232 177 92;
-  --warning-tint: 48 35 15;
+  --warning-tint: 46 34 16;
   --warning-line: 99 72 30;
   --danger: 248 123 113;
-  --danger-tint: 56 22 22;
+  --danger-tint: 52 22 20;
   --danger-line: 110 42 40;
   --info: 138 176 240;
-  --info-tint: 21 33 56;
+  --info-tint: 20 30 50;
   --info-line: 45 70 112;
 
   --hl-yellow: 92 76 22;
@@ -92,31 +98,32 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --ink: 237 234 227;
-    --parchment: 13 15 21;
-    --surface: 21 24 32;
-    --surface-raised: 30 34 44;
-    --line: 39 43 54;
-    --line-strong: 58 63 77;
-    --ember: 226 205 160;
-    --on-ember: 18 20 28;
-    --gold: 201 170 106;
-    --gold-deep: 201 170 106;
+    --ink: 239 233 220;
+    --parchment: 11 11 12;
+    --surface: 20 19 18;
+    --surface-raised: 30 29 27;
+    --line: 42 40 37;
+    --line-strong: 64 60 54;
+    --ember: 214 182 124;
+    --on-ember: 18 16 13;
+    --gold: 205 170 108;
+    --gold-deep: 205 170 108;
+    --gold-soft: 84 68 40;
     --shadow: 0 0 0;
-    --panel: 24 31 48;
-    --on-panel: 237 234 227;
+    --panel: 8 8 9;
+    --on-panel: 239 233 220;
 
     --success: 94 201 152;
-    --success-tint: 17 44 34;
+    --success-tint: 17 40 31;
     --success-line: 32 84 63;
     --warning: 232 177 92;
-    --warning-tint: 48 35 15;
+    --warning-tint: 46 34 16;
     --warning-line: 99 72 30;
     --danger: 248 123 113;
-    --danger-tint: 56 22 22;
+    --danger-tint: 52 22 20;
     --danger-line: 110 42 40;
     --info: 138 176 240;
-    --info-tint: 21 33 56;
+    --info-tint: 20 30 50;
     --info-line: 45 70 112;
 
     --hl-yellow: 92 76 22;
@@ -127,11 +134,17 @@
   }
 }
 
+.scope-dark {
+  color: rgb(var(--ink));
+}
+
 body {
   background-color: rgb(var(--parchment));
   color: rgb(var(--ink));
   @apply font-sans antialiased;
   text-rendering: optimizeLegibility;
+  /* Cormorant's default old-style figures read as "4I2" in counts and dates. */
+  font-variant-numeric: lining-nums;
   /* Edge-to-edge (viewport-fit=cover): keep content clear of a phone's notch
      in landscape. Bottom (home indicator) is handled per fixed element. */
   padding-left: env(safe-area-inset-left);
@@ -139,9 +152,13 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Display serif for headings: medium weight and tight tracking read as
+   engraved rather than shouted. */
 h1, h2, h3 {
   @apply font-display;
-  letter-spacing: -0.015em;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  font-feature-settings: "lnum", "kern", "liga";
 }
 
 ::selection {
@@ -187,10 +204,40 @@ dialog {
 /* The one signature motif: a restrained brass hairline under page titles and
    the brand mark — letterhead, not liturgy. */
 .rule-gold {
-  width: 32px;
-  height: 2px;
-  border-radius: 1px;
+  width: 56px;
+  height: 1px;
+  background: linear-gradient(90deg, rgb(var(--gold)), rgb(var(--gold) / 0));
+  position: relative;
+}
+.rule-gold::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: -2px;
+  width: 5px;
+  height: 5px;
   background-color: rgb(var(--gold));
+  transform: rotate(45deg);
+}
+.text-center .rule-gold,
+.rule-gold.mx-auto {
+  background: linear-gradient(90deg, rgb(var(--gold) / 0), rgb(var(--gold)), rgb(var(--gold) / 0));
+}
+.text-center .rule-gold::before,
+.rule-gold.mx-auto::before {
+  left: calc(50% - 2.5px);
+}
+
+/* Fine champagne sheen for obsidian panels: a soft glow from the top corner
+   and a hairline gold edge, like foil on a dark card. */
+.panel-luxe {
+  background-color: rgb(var(--panel));
+  background-image:
+    radial-gradient(120% 80% at 100% 0%, rgb(var(--gold) / 0.14), transparent 55%),
+    radial-gradient(90% 60% at 0% 100%, rgb(var(--gold) / 0.07), transparent 60%);
+}
+.hairline-gold {
+  box-shadow: inset 0 0 0 1px rgb(var(--gold) / 0.28);
 }
 
 @layer components {
@@ -198,39 +245,48 @@ dialog {
   .card-elevated {
     @apply bg-surface border border-line shadow-card;
   }
-  /* Whole-card links (list rows, tiles): lift slightly on hover. */
+  /* Whole-card links (list rows, tiles): lift slightly on hover, with a
+     champagne edge. */
   .card-interactive {
-    @apply card-elevated hover:border-line-strong hover:shadow-card-hover hover:-translate-y-px;
+    @apply card-elevated hover:border-gold/50 hover:shadow-card-hover hover:-translate-y-0.5;
   }
 
   /* Buttons. One primary action per screen; secondary for cancel/back/view;
      danger only for destructive actions. Min height 40px (44px on touch
      screens) so they're easy to tap. */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 min-h-[40px] text-sm font-semibold whitespace-nowrap
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 min-h-[40px] text-sm font-semibold tracking-[0.01em] whitespace-nowrap
       active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
   }
   @media (pointer: coarse) {
     .btn { min-height: 44px; }
   }
-  /* The inset highlight gives the primary button a subtle, tactile top edge. */
+  /* Obsidian (champagne in dark) with a fine gold inner edge and a soft
+     sheen on top — the look of a foil-stamped card rather than a flat fill. */
   .btn-primary {
-    @apply btn bg-ember text-on-ember shadow-[inset_0_1px_0_rgb(255_255_255/0.12),0_1px_2px_rgb(var(--shadow)/0.2)] hover:bg-ember/90;
+    @apply btn bg-ember text-on-ember hover:bg-ember/90
+      shadow-[inset_0_0_0_1px_rgb(var(--gold)/0.35),inset_0_1px_0_rgb(255_255_255/0.10),0_1px_2px_rgb(var(--shadow)/0.25),0_8px_20px_-8px_rgb(var(--shadow)/0.35)];
+  }
+  /* Champagne call to action for obsidian panels (landing hero). */
+  .btn-gold {
+    @apply btn text-[rgb(18_16_13)] hover:brightness-105
+      bg-[linear-gradient(180deg,rgb(226_198_146),rgb(196_160_100))]
+      shadow-[inset_0_1px_0_rgb(255_255_255/0.35),0_8px_24px_-8px_rgb(196_160_100/0.55)];
   }
   .btn-secondary { @apply btn border border-line-strong bg-surface text-ink shadow-xs hover:bg-surface-raised; }
   .btn-danger { @apply btn bg-danger text-surface hover:bg-danger/90; }
   .btn-danger-outline { @apply btn border border-danger-line text-danger bg-surface hover:bg-danger-tint; }
   .btn-ghost { @apply btn font-medium text-ink/70 hover:bg-ink/5 hover:text-ink; }
-  .btn-sm { @apply px-3 min-h-[32px] rounded-lg text-xs; }
+  .btn-sm { @apply px-3 min-h-[32px] rounded-md text-xs; }
   /* Hero / landing calls to action only. */
-  .btn-lg { @apply px-6 min-h-[48px] text-lede; }
+  .btn-lg { @apply px-7 min-h-[52px] text-sm uppercase tracking-[0.14em]; }
   .btn-icon { @apply btn h-10 w-10 p-0; }
 
   /* Form controls: the ring replaces the global outline so focus reads as part
      of the field, but it's strong enough to see (gold border + soft halo). */
   .input {
     /* text-base (16px) on phones: iPhone Safari zooms into any smaller field on focus. */
-    @apply w-full rounded-xl border border-line-strong bg-surface px-3.5 py-2.5 text-base sm:text-sm text-ink shadow-xs placeholder:text-ink/60
+    @apply w-full rounded-lg border border-line-strong bg-surface px-3.5 py-2.5 text-base sm:text-sm text-ink shadow-xs placeholder:text-ink/60
       transition-[border-color,box-shadow] duration-150
       hover:border-ink/25
       focus-visible:outline-none focus-visible:border-gold focus-visible:ring-4 focus-visible:ring-gold/20
@@ -242,8 +298,8 @@ dialog {
   .link { @apply text-ember font-medium underline-offset-4 hover:underline; }
 
   /* Small uppercase label above a group or a figure ("THIS MONTH"). */
-  .eyebrow { @apply text-eyebrow font-semibold uppercase tracking-[0.08em] text-ink/60; }
+  .eyebrow { @apply text-eyebrow font-semibold uppercase tracking-[0.2em] text-gold-deep; }
 
   /* Figures that change (counts, money, times) keep their width. */
-  .tabular { font-variant-numeric: tabular-nums; }
+  .tabular { font-variant-numeric: tabular-nums lining-nums; }
 }

@@ -231,3 +231,39 @@ export async function saveCounselingSettings(_prev: FormState, formData: FormDat
   flash("Counseling settings saved.");
   return { ok: true };
 }
+
+/**
+ * Form fields: conversation_id. The member deletes their own conversation and
+ * all its messages. Blocked while a safety flag waits for a pastor's follow-up
+ * (supabase/counseling_delete.sql enforces both).
+ */
+export async function deleteConversation(formData: FormData): Promise<void> {
+  const me = await getCurrentAppUser();
+  if (!me) return flash(SESSION_EXPIRED, "error");
+  const id = z.string().uuid().safeParse(formData.get("conversation_id"));
+  if (!id.success) return flash("That conversation couldn't be found.", "error");
+
+  const supabase = createClient();
+  const { data: convo } = await supabase.from("counseling_conversations").select("id, member_id, flagged").eq("id", id.data).maybeSingle();
+  if (!convo || convo.member_id !== me.id) return flash("You can only delete your own conversations.", "error");
+
+  const { data: deleted, error } = await supabase.from("counseling_conversations").delete().eq("id", id.data).eq("member_id", me.id).select("id");
+  if (error) {
+    console.error("[counseling] delete failed:", error.code, error.message);
+    return flash(
+      /policy|permission/i.test(error.message) ? "This needs a database update: a church admin should run supabase/counseling_delete.sql." : "Couldn't delete the conversation — please try again.",
+      "error"
+    );
+  }
+  if (!deleted?.length) {
+    return flash(
+      convo.flagged
+        ? "This conversation can be deleted once a pastor has followed up on it. They were told because it mentioned your safety."
+        : "Couldn't delete the conversation. If this keeps happening, a church admin should run supabase/counseling_delete.sql.",
+      "error"
+    );
+  }
+  revalidatePath("/dashboard/counseling");
+  flash("Conversation deleted.");
+  redirect("/dashboard/counseling");
+}

@@ -3,10 +3,13 @@
 import { haptic } from "@/lib/haptics";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Award, CalendarCheck, CheckCircle2, ChevronLeft, LoaderCircle, Smile, Timer, Trophy, XCircle } from "lucide-react";
+import { Award, CalendarCheck, CheckCircle2, ChevronLeft, LoaderCircle, Smile, Star, Timer, Trophy } from "lucide-react";
 import { GAMES, LEVELS, LEVEL_LABELS, type GameKey, type Level } from "@/lib/games/catalog";
 import { formatDuration } from "@/lib/chat";
 import { Alert } from "@/components/ui/Alert";
+import { ReviewList } from "./ReviewList";
+import { LevelMap } from "./LevelMap";
+import { STAGE_COUNT } from "@/lib/games/stages";
 import { finishGame, startGame, type FinishResult, type GameMode } from "./actions";
 import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
 
@@ -22,9 +25,9 @@ export interface BoardProps<View> {
 type Phase =
   | { kind: "intro"; error?: string }
   | { kind: "starting" }
-  | { kind: "playing"; sessionId: string; view: unknown; level: Level; timed: boolean; parSeconds: number; startedAt: number }
-  | { kind: "finishing"; sessionId: string; view: unknown; level: Level; timed: boolean; parSeconds: number; startedAt: number }
-  | { kind: "result"; result: FinishResult; level: Level; timed: boolean };
+  | { kind: "playing"; sessionId: string; view: unknown; level: Level; timed: boolean; parSeconds: number; startedAt: number; stage: number | null }
+  | { kind: "finishing"; sessionId: string; view: unknown; level: Level; timed: boolean; parSeconds: number; startedAt: number; stage: number | null }
+  | { kind: "result"; result: FinishResult; level: Level; timed: boolean; stage: number | null };
 
 /**
  * The frame around every game: choose a level (and timed mode) → play →
@@ -37,7 +40,10 @@ export function GameShell<View>({
   mode = "practice",
   rules,
   Board,
+  stageStars = null,
 }: {
+  /** Best stars per numbered level (null: levels not available yet). */
+  stageStars?: Record<number, number> | null;
   game: GameKey;
   initialLevel?: Level;
   /** "daily": today's challenge (Medium, timed, one try). "kids": Easy, untimed, larger text. */
@@ -54,12 +60,14 @@ export function GameShell<View>({
   const [finishError, setFinishError] = useState<string | null>(null);
   // Quitting a game in progress asks first, so a stray tap doesn't throw a game away.
   const [confirmQuit, setConfirmQuit] = useState(false);
+  const [stars, setStars] = useState<Record<number, number> | null>(mode === "practice" ? stageStars : null);
 
-  async function start() {
+  /** `stage`: a numbered level (always the same puzzle); null: free play at the chosen difficulty. */
+  async function start(stage: number | null = null) {
     setPhase({ kind: "starting" });
-    const result = await callAction(() => startGame(game, level, timed, mode), { error: CONNECTION_FAILED });
+    const result = await callAction(() => startGame(game, level, stage === null ? timed : false, mode, stage), { error: CONNECTION_FAILED });
     if ("error" in result) return setPhase({ kind: "intro", error: result.error });
-    setPhase({ kind: "playing", sessionId: result.sessionId, view: result.view, level: result.level, timed: result.timed, parSeconds: result.parSeconds, startedAt: Date.now() });
+    setPhase({ kind: "playing", sessionId: result.sessionId, view: result.view, level: result.level, timed: result.timed, parSeconds: result.parSeconds, startedAt: Date.now(), stage: result.stage ?? null });
   }
 
   async function finish(answers: unknown) {
@@ -73,7 +81,11 @@ export function GameShell<View>({
       setFinishError(result.error);
       return;
     }
-    setPhase({ kind: "result", result, level: phase.level, timed: phase.timed });
+    if (phase.stage !== null && typeof result.stars === "number") {
+      const stage = phase.stage;
+      setStars((all) => (all ? { ...all, [stage]: Math.max(all[stage] ?? 0, result.stars!) } : all));
+    }
+    setPhase({ kind: "result", result, level: phase.level, timed: phase.timed, stage: phase.stage });
   }
 
   return (
@@ -102,6 +114,14 @@ export function GameShell<View>({
             </Alert>
           )}
 
+          {stars && <LevelMap stars={stars} onPick={(stage) => start(stage)} busy={phase.kind === "starting"} />}
+
+          {stars ? (
+            <details className="rounded-xl border border-line p-4 [&_summary::-webkit-details-marker]:hidden">
+              <summary className="cursor-pointer list-none font-semibold">
+                Free play <span className="font-normal text-ink/60">· a new random puzzle at Easy, Medium or Hard</span>
+              </summary>
+              <div className="mt-4 space-y-6">
           {!fixedLevel && (
           <fieldset>
             <legend className="label">Level</legend>
@@ -134,10 +154,52 @@ export function GameShell<View>({
           </label>
           )}
 
-          <button type="button" className="btn-primary" onClick={start} disabled={phase.kind === "starting"}>
+          <button type="button" className="btn-primary" onClick={() => start()} disabled={phase.kind === "starting"}>
             {phase.kind === "starting" ? <LoaderCircle aria-hidden className="h-4 w-4 animate-spin" /> : null}
             {phase.kind === "starting" ? "Getting ready…" : "Start"}
           </button>
+              </div>
+            </details>
+          ) : (
+            <>
+          {!fixedLevel && (
+          <fieldset>
+            <legend className="label">Level</legend>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              {LEVELS.map((l) => (
+                <label
+                  key={l}
+                  className={`cursor-pointer rounded-xl border p-3 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-gold ${
+                    level === l ? "border-gold bg-gold/10" : "border-line hover:border-line-strong"
+                  }`}
+                >
+                  <input type="radio" name="level" value={l} checked={level === l} onChange={() => setLevel(l)} className="sr-only" />
+                  <span className="block font-semibold">{LEVEL_LABELS[l]}</span>
+                  <span className="mt-0.5 block text-xs text-ink/60">{info.levels[l]}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          )}
+
+          {mode === "practice" && (
+          <label className="flex items-start gap-3 text-sm">
+            <input type="checkbox" checked={timed} onChange={(e) => setTimed(e.target.checked)} className="mt-0.5 accent-[rgb(var(--ember))]" />
+            <span>
+              <span className="font-medium">Timed mode</span>
+              <span className="block text-xs text-ink/60">
+                Finish a perfect game in under {formatDuration(info.parSeconds[level] * 1000)} for up to 50% bonus points. Without it, take as long as you like.
+              </span>
+            </span>
+          </label>
+          )}
+
+          <button type="button" className="btn-primary" onClick={() => start()} disabled={phase.kind === "starting"}>
+            {phase.kind === "starting" ? <LoaderCircle aria-hidden className="h-4 w-4 animate-spin" /> : null}
+            {phase.kind === "starting" ? "Getting ready…" : "Start"}
+          </button>
+            </>
+          )}
         </div>
       )}
 
@@ -146,7 +208,8 @@ export function GameShell<View>({
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm">
               <span className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-xs font-medium">{LEVEL_LABELS[phase.level]}</span>
-              <Clock startedAt={phase.startedAt} parSeconds={phase.timed ? phase.parSeconds : null} />
+              {/* The clock only shows in a timed game; untimed games are relaxed. */}
+              {phase.timed && <Clock startedAt={phase.startedAt} parSeconds={phase.parSeconds} />}
             </div>
             {confirmQuit ? (
               <div role="alertdialog" aria-label="Leave this game?" className="flex flex-wrap items-center gap-2 rounded-xl border border-warning-line bg-warning-tint px-3 py-2 text-sm text-warning">
@@ -177,7 +240,16 @@ export function GameShell<View>({
       )}
 
       {phase.kind === "result" && (
-        <ResultCard result={phase.result} level={phase.level} timed={phase.timed} mode={mode} onReplay={start} onChangeLevel={() => setPhase({ kind: "intro" })} />
+        <ResultCard
+          result={phase.result}
+          level={phase.level}
+          timed={phase.timed}
+          mode={mode}
+          stage={phase.stage}
+          onReplay={() => start(phase.stage)}
+          onNext={phase.stage !== null && phase.stage < STAGE_COUNT ? () => start(phase.stage! + 1) : undefined}
+          onChangeLevel={() => setPhase({ kind: "intro" })}
+        />
       )}
     </div>
   );
@@ -206,9 +278,13 @@ function ResultCard({
   level,
   timed,
   mode,
+  stage,
   onReplay,
+  onNext,
   onChangeLevel,
 }: {
+  stage: number | null;
+  onNext?: () => void;
   result: FinishResult;
   level: Level;
   timed: boolean;
@@ -225,21 +301,35 @@ function ResultCard({
       <span aria-hidden className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-line bg-parchment text-gold">
         <Trophy className="h-6 w-6" strokeWidth={1.75} />
       </span>
+      {stage !== null && (
+        <p className="mt-4 font-semibold text-gold-deep">
+          Level {stage} · {(result.stars ?? 0) > 0 ? "Passed!" : "Not passed yet — 70% unlocks the next level"}
+        </p>
+      )}
+      {stage !== null && (result.stars ?? 0) > 0 && (
+        <p className="mt-1 flex justify-center gap-1" aria-label={`${result.stars} of 3 stars`}>
+          {[1, 2, 3].map((n) => (
+            <Star key={n} aria-hidden className={`h-7 w-7 ${n <= (result.stars ?? 0) ? "fill-gold text-gold" : "text-ink/20"}`} />
+          ))}
+        </p>
+      )}
       <p className="tabular mt-4 font-display text-4xl font-semibold">
         {correct} / {maxCorrect}
       </p>
       <p className="mt-2 text-ink/60">
         {perfect ? "Perfect!" : correct >= maxCorrect * 0.7 ? "Well done!" : "Good effort — try again to climb the scoreboard."}
       </p>
-      <dl className="mx-auto mt-6 grid max-w-sm grid-cols-3 gap-3 text-sm">
+      <dl className={`mx-auto mt-6 grid max-w-sm gap-3 text-sm ${timed ? "grid-cols-3" : "grid-cols-2"}`}>
         <div className="rounded-xl border border-line p-3">
           <dt className="eyebrow">Points</dt>
           <dd className="tabular mt-1 text-lg font-semibold">{points}</dd>
         </div>
-        <div className="rounded-xl border border-line p-3">
-          <dt className="eyebrow">Time</dt>
-          <dd className="tabular mt-1 text-lg font-semibold">{formatDuration(durationMs)}</dd>
-        </div>
+        {timed && (
+          <div className="rounded-xl border border-line p-3">
+            <dt className="eyebrow">Time</dt>
+            <dd className="tabular mt-1 text-lg font-semibold">{formatDuration(durationMs)}</dd>
+          </div>
+        )}
         <div className="rounded-xl border border-line p-3">
           <dt className="eyebrow">Level</dt>
           <dd className="mt-1 text-lg font-semibold">{LEVEL_LABELS[level]}</dd>
@@ -265,38 +355,21 @@ function ResultCard({
           ))}
         </div>
       )}
-      {result.review && result.review.length > 0 && (
-        <section className="mt-8 text-left" aria-labelledby="review-heading">
-          <h2 id="review-heading" className="eyebrow mb-2">
-            Answers
-          </h2>
-          <ul className="divide-y divide-line rounded-xl border border-line">
-            {result.review.map((item, i) => (
-              <li key={i} className="flex items-start gap-3 px-4 py-2.5 text-sm">
-                {item.correct ? (
-                  <CheckCircle2 aria-label="Correct" className="mt-0.5 h-4 w-4 shrink-0 text-success" />
-                ) : (
-                  <XCircle aria-label="Not correct" className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
-                )}
-                <span className="flex-1">
-                  <span className="font-semibold">{item.label}</span> · {item.prompt}
-                  {item.reference && <span className="block text-xs text-ink/60">{item.reference}</span>}
-                </span>
-                <span className="font-semibold tracking-wide">{item.answer}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      {result.review && result.review.length > 0 && <ReviewList items={result.review} />}
       <div className="mt-7 flex flex-wrap justify-center gap-2">
+        {onNext && (result.stars ?? 0) > 0 && (
+          <button type="button" className="btn-primary" onClick={onNext}>
+            Next level ({(stage ?? 0) + 1})
+          </button>
+        )}
         {mode !== "daily" && (
-          <button type="button" className="btn-primary" onClick={onReplay}>
-            Play again
+          <button type="button" className={onNext && (result.stars ?? 0) > 0 ? "btn-secondary" : "btn-primary"} onClick={onReplay}>
+            {stage !== null ? (((result.stars ?? 0) > 0 ? "Replay level" : "Try again")) : "Play again"}
           </button>
         )}
         {mode === "practice" && (
           <button type="button" className="btn-secondary" onClick={onChangeLevel}>
-            Change level
+            {stage !== null ? "All levels" : "Change level"}
           </button>
         )}
         <Link href={mode === "kids" ? "/dashboard/games?kids=1" : "/dashboard/games"} className={mode === "daily" ? "btn-primary" : "btn-ghost"}>

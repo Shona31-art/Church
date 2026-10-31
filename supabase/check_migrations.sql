@@ -21,6 +21,8 @@ from (values
   (33, 'email_sync.sql',           exists (select 1 from pg_trigger where tgname = 'trg_sync_app_user_email')),
   (34, 'paystack_billing.sql',     to_regclass('public.billing_payments') is not null),
   (35, 'church_logo.sql',          exists (select 1 from storage.buckets where id = 'church-logos')),
-  (36, 'songs.sql',                to_regclass('public.songs') is not null)
+  (36, 'songs.sql',                to_regclass('public.songs') is not null),
+  (37, 'counseling_delete.sql',    exists (select 1 from pg_policies where tablename = 'counseling_conversations' and policyname = 'counseling_conversations_delete_own')),
+  (38, 'games_jigsaw.sql',         exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'game_sessions' and column_name = 'answers'))
 ) as t(n, file, ok)
 order by n;

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DeleteConversation } from "./DeleteConversation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
@@ -113,11 +114,12 @@ export default async function CounselingHome() {
           ) : (
             <ul className="divide-y divide-line">
               {mine.map((c) => (
-                <li key={c.id}>
-                  <Link href={`/dashboard/counseling/${c.id}`} className="flex flex-wrap items-center justify-between gap-2 py-3 hover:bg-ink/[0.02] -mx-2 px-2 rounded-lg">
+                <li key={c.id} className="flex items-center gap-1">
+                  <Link href={`/dashboard/counseling/${c.id}`} className="-mx-2 flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-3 hover:bg-ink/[0.02]">
                     <span className="text-sm">Started {formatDateTime(c.started_at)}</span>
                     <span className="flex gap-2">{c.shared_with_pastor && <StatusBadge tone="info">Shared with pastors</StatusBadge>}</span>
                   </Link>
+                  <DeleteConversation id={c.id} compact />
                 </li>
               ))}
             </ul>

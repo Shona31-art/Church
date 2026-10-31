@@ -203,3 +203,14 @@ export function checkCrossword(puzzle: CrosswordPuzzle, grid: readonly string[])
     entryCells(e, e.answer.length).every(([r, c], i) => (grid[r]?.[c] ?? "").toUpperCase() === e.answer[i])
   ).length;
 }
+
+export { CROSSWORD_HINTS } from "./crossword-hints";
+
+/** The correct letter at a square, or null if the square isn't part of the puzzle. */
+export function crosswordLetterAt(puzzle: CrosswordPuzzle, row: number, col: number): string | null {
+  for (const e of puzzle.entries) {
+    const i = entryCells(e, e.answer.length).findIndex(([r, c]) => r === row && c === col);
+    if (i >= 0) return e.answer[i].toUpperCase();
+  }
+  return null;
+}

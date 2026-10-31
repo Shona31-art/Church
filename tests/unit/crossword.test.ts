@@ -71,3 +71,15 @@ describe("checkCrossword", () => {
     expect(checkCrossword(p, broken.map((r) => r.join("")))).toBeLessThan(p.entries.length);
   });
 });
+
+describe("crossword hints", () => {
+  test("give the right letter for a square, and nothing outside the puzzle", async () => {
+    const { buildCrossword, crosswordLetterAt, entryCells, CROSSWORD_HINTS } = await import("@/lib/games/crossword");
+    const puzzle = buildCrossword("easy", 3);
+    const e = puzzle.entries[0];
+    const cells = entryCells(e, e.answer.length);
+    cells.forEach(([r, c], i) => expect(crosswordLetterAt(puzzle, r, c)).toBe(e.answer[i].toUpperCase()));
+    expect(crosswordLetterAt(puzzle, -1, -1)).toBeNull();
+    expect(CROSSWORD_HINTS.easy).toBeGreaterThan(CROSSWORD_HINTS.hard);
+  });
+});

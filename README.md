@@ -71,6 +71,8 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 34 | `paystack_billing.sql` | Online billing: Paystack customer/subscription codes on `church_subscriptions` (server-written only), `billing_payments` (each subscription payment; readable by the church's admins, written only by the server; each reference recorded once). Plan: `docs/plans/paystack-billing.md` |
 | 35 | `church_logo.sql` | Church logo uploads: a public `church-logos` bucket; only a church admin can add or remove files in their church's folder. The logo shows in the app header (instead of the initials) and on posters; its link is saved in `churches.logo_url` |
 | 36 | `songs.sql` | Songs: each church's song list (title, writer, key, lyrics) readable by the whole church; pastors, church admins and the chosen worship-team department can add, edit and delete; one song per title per church |
+| 37 | `counseling_delete.sql` | Members can delete their own counseling conversations (with all messages); not while a safety flag is still waiting for a pastor's follow-up |
+| 38 | `games_jigsaw.sql` | Lets the scoreboard record the Bible jigsaw game; keeps each finished game's answers so a past game can be opened again |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so

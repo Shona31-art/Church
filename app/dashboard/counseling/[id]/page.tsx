@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { DeleteConversation } from "../DeleteConversation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
@@ -52,7 +53,14 @@ export default async function CounselingConversationPage({ params }: { params: {
             {conversation.shared_with_pastor && <StatusBadge tone="info">Shared with pastors</StatusBadge>}
           </>
         }
-        actions={isOwner ? <ShareToggle conversationId={conversation.id} shared={conversation.shared_with_pastor} /> : null}
+        actions={
+          isOwner ? (
+            <>
+              <ShareToggle conversationId={conversation.id} shared={conversation.shared_with_pastor} />
+              <DeleteConversation id={conversation.id} />
+            </>
+          ) : null
+        }
       />
 
       {isOwner && conversation.flagged && (

@@ -22,6 +22,7 @@ import {
   type SetQuestion,
 } from "@/lib/games/word-games";
 import { MAZE_POINTS, MAZE_THEMES, buildMaze, checkMaze, type Maze } from "@/lib/games/maze";
+import { JIGSAW_SCENES, buildJigsaw, checkJigsaw, type JigsawPuzzle, type JigsawSceneKey } from "@/lib/games/jigsaw";
 
 // One entry per game: how to build a puzzle (the full answer key, kept in
 // the server-only game_sessions row, plus the "view" the player is sent),
@@ -246,7 +247,30 @@ const maze: GameEngine = {
   check: (puzzle: Maze, _progress, route) => checkMaze(puzzle, route),
 };
 
+// --- Jigsaw ------------------------------------------------------------------
+
+export interface JigsawView {
+  scene: JigsawSceneKey;
+  title: string;
+  reference: string;
+  size: number;
+  order: number[];
+}
+
+const jigsaw: GameEngine = {
+  async build(level, seed) {
+    const puzzle = buildJigsaw(level, createRng(seed));
+    const info = JIGSAW_SCENES.find((s) => s.key === puzzle.scene)!;
+    const view: JigsawView = { scene: puzzle.scene, title: info.title, reference: info.reference, size: puzzle.size, order: puzzle.order };
+    return { puzzle, view, maxCorrect: puzzle.size * puzzle.size };
+  },
+  // The final arrangement: arrangement[slot] = piece.
+  answers: z.array(z.number().int().min(0).max(99)).max(100),
+  check: (puzzle: JigsawPuzzle, _progress, arrangement) => checkJigsaw(puzzle, arrangement),
+};
+
 export const ENGINES: Record<GameKey, GameEngine> = {
+  jigsaw,
   quiz,
   crossword,
   emoji: questionSet(buildEmojiSet),

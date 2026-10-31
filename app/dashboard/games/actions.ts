@@ -12,7 +12,9 @@ import { isSetAnswerCorrect } from "@/lib/games/word-games";
 import { localInputToUtcIso, todayInAppZone } from "@/lib/format";
 import type { QuizKey, QuizProgress } from "@/lib/games/quiz";
 import { VERSE_TRIES, isCorrectOrder, tokenize, type PuzzleVerse, type VerseProgress } from "@/lib/verse-puzzle";
+import { bestStars, isStage, stageLevel, stageSeed, starsFor } from "@/lib/games/stages";
 import { ENGINES, type ReviewItem, type SetProgress, type SetPuzzle } from "./engine";
+import { CROSSWORD_HINTS, crosswordLetterAt, type CrosswordPuzzle } from "@/lib/games/crossword";
 
 // Starting and finishing games. Server actions are public endpoints, so each
 // one re-checks the session and plan, and every score is worked out here
@@ -30,7 +32,7 @@ export type GameMode = "practice" | "daily" | "kids";
 
 export type StartResult =
   | { error: string }
-  | { sessionId: string; game: GameKey; level: Level; timed: boolean; mode: GameMode; parSeconds: number; view: unknown };
+  | { sessionId: string; game: GameKey; level: Level; timed: boolean; mode: GameMode; parSeconds: number; view: unknown; stage: number | null };
 
 export interface FinishResult {
   error?: string;
@@ -38,6 +40,9 @@ export interface FinishResult {
   maxCorrect?: number;
   points?: number;
   durationMs?: number;
+  /** Numbered level played, and stars earned (0 = not passed). */
+  stage?: number | null;
+  stars?: number;
   /** Answers to show after the game, for games that have them. */
   review?: ReviewItem[];
   /** Badges earned by this game. */
@@ -63,7 +68,7 @@ function startOfToday(): string {
  *   daily    — today's game at Medium, timed, the same puzzle for everyone
  *              in the church, once per person per day.
  */
-export async function startGame(game: string, level: string, timed: boolean, mode: GameMode = "practice"): Promise<StartResult> {
+export async function startGame(game: string, level: string, timed: boolean, mode: GameMode = "practice", stage: number | null = null): Promise<StartResult> {
   const me = await requirePlayer();
   if (!me) return { error: "Your session has expired — sign in again to play." };
   if (!isGameKey(game) || !isLevel(level) || typeof timed !== "boolean" || !["practice", "daily", "kids"].includes(mode)) {
@@ -73,6 +78,7 @@ export async function startGame(game: string, level: string, timed: boolean, mod
     level = "easy";
     timed = false;
   }
+  if (stage !== null && (mode !== "practice" || !isStage(stage))) return { error: "That level doesn't exist." };
 
   const admin = createAdminClient();
   const { count } = await admin
@@ -100,26 +106,44 @@ export async function startGame(game: string, level: string, timed: boolean, mod
     if ((played ?? 0) > 0) return { error: "You've already taken today's challenge. Come back tomorrow for a new one!" };
   }
 
+  if (stage !== null) {
+    // Numbered level: always the same puzzle; open once the level before it is passed.
+    if (stage > 1) {
+      const { data: prev } = await createClient()
+        .from("bible_quiz_attempts")
+        .select("stage, score, total_questions")
+        .eq("user_id", me.id)
+        .eq("game_type", game)
+        .eq("stage", stage - 1);
+      if (!(bestStars(prev ?? [])[stage - 1] > 0)) return { error: `Pass level ${stage - 1} first to unlock level ${stage}.` };
+    }
+    level = stageLevel(stage);
+    seed = stageSeed(game, stage);
+  }
+
   const built = await ENGINES[game].build(level as Level, seed, { supabase: createClient(), churchId: me.church_id!, kids: mode === "kids" });
   if ("error" in built) return { error: built.error };
 
-  const { data, error } = await admin
+  const row: Record<string, unknown> = { church_id: me.church_id, user_id: me.id, game_type: game, level, timed, mode, seed, puzzle: built.puzzle, max_correct: built.maxCorrect };
+  let { data, error } = await admin
     .from("game_sessions")
-    .insert({ church_id: me.church_id, user_id: me.id, game_type: game, level, timed, mode, seed, puzzle: built.puzzle, max_correct: built.maxCorrect })
+    .insert(stage !== null ? { ...row, stage } : row)
     .select("id")
     .single();
+  // Before games_jigsaw.sql (#38) adds the column, numbered levels can't be saved.
+  if (error && stage !== null && /stage/.test(error.message)) return { error: "Numbered levels need a database update: a church admin should run supabase/games_jigsaw.sql." };
   if (error || !data) {
     console.error("[games] start failed:", error?.message);
     return { error: error?.code === "42P01" ? "Games need a database update first — ask your church admin to contact support." : "Couldn't start the game — please try again." };
   }
-  return { sessionId: data.id, game, level: level as Level, timed, mode, parSeconds: GAMES[game].parSeconds[level as Level], view: built.view };
+  return { sessionId: data!.id, game, level: level as Level, timed, mode, parSeconds: GAMES[game].parSeconds[level as Level], view: built.view, stage };
 }
 
 async function loadOwnSession(sessionId: string, userId: string) {
   if (!z.string().uuid().safeParse(sessionId).success) return null;
   const { data } = await createAdminClient()
     .from("game_sessions")
-    .select("id, church_id, user_id, game_type, level, mode, timed, puzzle, progress, started_at, finished_at, max_correct")
+    .select("*")
     .eq("id", sessionId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -226,6 +250,33 @@ export async function revealVerse(sessionId: string, verseIndex: number): Promis
   return { text: verses[verseIndex].text };
 }
 
+/**
+ * Crossword hint: the correct letter for one square. Limited per game by
+ * level (CROSSWORD_HINTS); asking again for a square already hinted is free.
+ */
+export async function crosswordHint(sessionId: string, row: number, col: number): Promise<{ error?: string; letter?: string; hintsLeft?: number }> {
+  const me = await requirePlayer();
+  if (!me) return { error: "Your session has expired — sign in again." };
+  const session = await loadOwnSession(sessionId, me.id);
+  if (!session || session.game_type !== "crossword" || session.finished_at) return { error: "This game has ended — start a new one." };
+  if (!Number.isInteger(row) || !Number.isInteger(col)) return { error: "Choose a square first." };
+
+  const letter = crosswordLetterAt(session.puzzle as CrosswordPuzzle, row, col);
+  if (!letter) return { error: "Choose a square in the puzzle first." };
+
+  const limit = CROSSWORD_HINTS[session.level as Level] ?? 3;
+  const progress = (session.progress ?? {}) as { hints?: string[] };
+  const used = progress.hints ?? [];
+  const key = `${row},${col}`;
+  if (!used.includes(key)) {
+    if (used.length >= limit) return { error: `You've used all ${limit} hints for this game.`, hintsLeft: 0 };
+    const { error } = await createAdminClient().from("game_sessions").update({ progress: { ...progress, hints: [...used, key] } }).eq("id", session.id).is("finished_at", null);
+    if (error) return { error: "Couldn't get a hint — check your connection." };
+    used.push(key);
+  }
+  return { letter, hintsLeft: Math.max(0, limit - used.length) };
+}
+
 /** Input: session id and the game's answers. Marks them, saves the score, returns the result. */
 export async function finishGame(sessionId: string, answers: unknown): Promise<FinishResult> {
   const me = await requirePlayer();
@@ -254,18 +305,19 @@ export async function finishGame(sessionId: string, answers: unknown): Promise<F
 
   const admin = createAdminClient();
   // `finished_at is null` makes a double-submit (two tabs, a retry) count once.
-  const { data: closed, error } = await admin
-    .from("game_sessions")
-    .update({ finished_at: new Date().toISOString(), correct, points, duration_ms: durationMs })
-    .eq("id", session.id)
-    .is("finished_at", null)
-    .select("id");
+  const closeSession = (fields: Record<string, unknown>) =>
+    admin.from("game_sessions").update(fields).eq("id", session.id).is("finished_at", null).select("id");
+  const fields = { finished_at: new Date().toISOString(), correct, points, duration_ms: durationMs };
+  // Answers are kept for "open a past game" (games_jigsaw.sql adds the column);
+  // before that update runs, finish without them rather than fail.
+  let { data: closed, error } = await closeSession({ ...fields, answers: parsed.data });
+  if (error && /answers/.test(error.message)) ({ data: closed, error } = await closeSession(fields));
   if (error || !closed?.length) {
     if (error) console.error("[games] finish failed:", error.message);
     return { error: error ? "Couldn't save your score — please try again." : "This game was already finished." };
   }
 
-  const { error: attemptError } = await admin.from("bible_quiz_attempts").insert({
+  const attemptRow: Record<string, unknown> = {
     church_id: session.church_id,
     user_id: me.id,
     game_type: session.game_type,
@@ -276,7 +328,10 @@ export async function finishGame(sessionId: string, answers: unknown): Promise<F
     mode: session.mode,
     duration_ms: durationMs,
     session_id: session.id,
-  });
+  };
+  const stage = isStage(session.stage) ? session.stage : null;
+  let { error: attemptError } = await admin.from("bible_quiz_attempts").insert(stage !== null ? { ...attemptRow, stage } : attemptRow);
+  if (attemptError && stage !== null && /stage/.test(attemptError.message)) ({ error: attemptError } = await admin.from("bible_quiz_attempts").insert(attemptRow));
   if (attemptError) console.error("[games] scoreboard insert failed:", attemptError.message);
 
   const newBadges = await awardBadges(me.id, session.church_id, {
@@ -288,7 +343,7 @@ export async function finishGame(sessionId: string, answers: unknown): Promise<F
     parSeconds: GAMES[session.game_type as GameKey].parSeconds[level],
   });
 
-  return { correct, maxCorrect: session.max_correct, points, durationMs, review: engine.review?.(session.puzzle, session.progress, parsed.data), newBadges };
+  return { correct, maxCorrect: session.max_correct, points, durationMs, stage, stars: stage !== null ? starsFor(correct, session.max_correct) : undefined, review: engine.review?.(session.puzzle, session.progress, parsed.data), newBadges };
 }
 
 /**

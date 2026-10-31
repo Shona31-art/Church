@@ -109,3 +109,34 @@ export function lettersBetween(grid: string[][], start: [number, number], end: [
   for (let i = 0; i <= steps; i++) out += grid[start[0] + dr * i]?.[start[1] + dc * i] ?? "";
   return out;
 }
+
+/**
+ * While dragging: turns wherever the finger is into the nearest straight line
+ * from the start (across, down or diagonal), kept inside the grid.
+ */
+export function snapToLine(start: [number, number], point: [number, number], size: number): [number, number] {
+  const dr = point[0] - start[0];
+  const dc = point[1] - start[1];
+  if (dr === 0 && dc === 0) return start;
+  // Nearest of the 8 directions, by angle.
+  const angle = Math.round(Math.atan2(dr, dc) / (Math.PI / 4)) * (Math.PI / 4);
+  const stepR = Math.round(Math.sin(angle));
+  const stepC = Math.round(Math.cos(angle));
+  let length = Math.max(Math.abs(dr), Math.abs(dc));
+  // Shorten until the end is on the grid.
+  while (length > 0) {
+    const r = start[0] + stepR * length;
+    const c = start[1] + stepC * length;
+    if (r >= 0 && r < size && c >= 0 && c < size) return [r, c];
+    length--;
+  }
+  return start;
+}
+
+/** The squares from start to end along a straight line (both included). */
+export function cellsBetween(start: [number, number], end: [number, number]): [number, number][] {
+  const dr = Math.sign(end[0] - start[0]);
+  const dc = Math.sign(end[1] - start[1]);
+  const steps = Math.max(Math.abs(end[0] - start[0]), Math.abs(end[1] - start[1]));
+  return Array.from({ length: steps + 1 }, (_, i) => [start[0] + dr * i, start[1] + dc * i] as [number, number]);
+}

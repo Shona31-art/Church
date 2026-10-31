@@ -1,22 +1,5 @@
 import Link from "next/link";
-import {
-  Award,
-  BookOpenText,
-  CalendarCheck,
-  Flame,
-  Grid3x3,
-  Library,
-  ListOrdered,
-  Medal,
-  MessageSquareQuote,
-  Route,
-  Shuffle,
-  Smile,
-  SmilePlus,
-  SquarePen,
-  TextCursorInput,
-  type LucideIcon,
-} from "lucide-react";
+import { Award, BookOpenText, CalendarCheck, Flame, Grid3x3, Library, ListOrdered, Medal, MessageSquareQuote, Route, Shuffle, Smile, SmilePlus, SquarePen, TextCursorInput, type LucideIcon, Puzzle, ChevronDown, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
@@ -41,6 +24,7 @@ const ICONS: Record<GameKey, LucideIcon> = {
   who_said: MessageSquareQuote,
   books_order: Library,
   maze: Route,
+  jigsaw: Puzzle,
 };
 
 // Scoreboard window: the last 90 days keeps the query bounded as a church's
@@ -63,7 +47,7 @@ export default async function GamesHubPage({ searchParams }: { searchParams: { k
   const [{ data: attempts, error }, { data: badgeRows }] = await Promise.all([
     supabase
       .from("bible_quiz_attempts")
-      .select("user_id, score, total_questions, points, level, mode, duration_ms, game_type, created_at, app_users(name)")
+      .select("id, user_id, score, total_questions, points, level, mode, duration_ms, game_type, created_at, app_users(name)")
       .eq("church_id", me.church_id)
       .gte("created_at", since)
       .order("created_at", { ascending: false })
@@ -243,31 +227,38 @@ export default async function GamesHubPage({ searchParams }: { searchParams: { k
           )}
         </section>
 
-        <section className="card-elevated rounded-2xl p-5 sm:p-6" aria-labelledby="mine-heading">
-          <h2 id="mine-heading" className="mb-4 text-xl font-semibold">
-            Your recent games
-          </h2>
+        {/* Opens and closes; tap a game to see its results and answers again. */}
+        <details className="card-elevated group rounded-2xl p-5 sm:p-6 [&_summary::-webkit-details-marker]:hidden">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+            <h2 className="text-xl font-semibold">
+              Your recent games{mine.length ? <span className="ml-1 text-base font-normal text-ink/60">({Math.min(mine.length, 20)})</span> : null}
+            </h2>
+            <ChevronDown aria-hidden className="h-5 w-5 shrink-0 text-ink/60 transition-transform group-open:rotate-180" />
+          </summary>
           {mine.length === 0 ? (
-            <p className="text-sm text-ink/60">You haven&apos;t played yet. Pick a game and a level above.</p>
+            <p className="mt-4 text-sm text-ink/60">You haven&apos;t played yet. Pick a game and a level above.</p>
           ) : (
-            <ul className="divide-y divide-line">
-              {mine.slice(0, 6).map((a: any, i: number) => (
-                <li key={i} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                  <span>
-                    {GAMES[a.game_type as GameKey]?.title ?? a.game_type}
-                    {a.level && <span className="text-ink/60"> · {LEVEL_LABELS[a.level as Level] ?? a.level}</span>}
-                    {a.mode === "daily" && <span className="text-gold-deep"> · daily</span>}
-                    {a.mode === "kids" && <span className="text-ink/60"> · kids</span>}
-                  </span>
-                  <span className="tabular text-ink/60">
-                    {a.score}/{a.total_questions}
-                    {a.points != null && ` · ${a.points} pts`} · {formatDate(a.created_at, { weekday: undefined, year: undefined })}
-                  </span>
+            <ul className="mt-3 divide-y divide-line">
+              {mine.slice(0, 20).map((a: any) => (
+                <li key={a.id}>
+                  <Link href={`/dashboard/games/attempts/${a.id}`} className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 text-sm hover:bg-ink/[0.03]">
+                    <span>
+                      {GAMES[a.game_type as GameKey]?.title ?? a.game_type}
+                      {a.level && <span className="text-ink/60"> · {LEVEL_LABELS[a.level as Level] ?? a.level}</span>}
+                      {a.mode === "daily" && <span className="text-gold-deep"> · daily</span>}
+                      {a.mode === "kids" && <span className="text-ink/60"> · kids</span>}
+                    </span>
+                    <span className="tabular flex items-center gap-1 text-ink/60">
+                      {a.score}/{a.total_questions}
+                      {a.points != null && ` · ${a.points} pts`} · {formatDate(a.created_at, { weekday: undefined, year: undefined })}
+                      <ChevronRight aria-hidden className="h-4 w-4" />
+                    </span>
+                  </Link>
                 </li>
               ))}
             </ul>
           )}
-        </section>
+        </details>
       </div>
     </div>
   );

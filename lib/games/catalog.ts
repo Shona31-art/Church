@@ -1,6 +1,6 @@
 // The games, their levels and how they score (pure — unit-tested).
 
-export const GAME_KEYS = ["quiz", "crossword", "word_search", "emoji", "scramble", "verse_puzzle", "verse_fill", "who_said", "books_order", "maze"] as const;
+export const GAME_KEYS = ["quiz", "crossword", "word_search", "emoji", "scramble", "verse_puzzle", "verse_fill", "who_said", "books_order", "maze", "jigsaw"] as const;
 export type GameKey = (typeof GAME_KEYS)[number];
 
 export const LEVELS = ["easy", "medium", "hard"] as const;
@@ -100,6 +100,14 @@ export const GAMES: Record<GameKey, GameInfo> = {
     summary: "Put the words of well-known verses back in order.",
     path: "verse-puzzle",
     levels: { easy: "Three short verses", medium: "Five verses", hard: "Five longer verses" },
+    parSeconds: { easy: 90, medium: 180, hard: 300 },
+  },
+  jigsaw: {
+    key: "jigsaw",
+    title: "Bible jigsaw",
+    summary: "Put a Bible picture back together, piece by piece.",
+    path: "jigsaw",
+    levels: { easy: "9 pieces", medium: "16 pieces", hard: "25 pieces" },
     parSeconds: { easy: 90, medium: 180, hard: 300 },
   },
 };

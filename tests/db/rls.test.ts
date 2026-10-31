@@ -400,3 +400,26 @@ describe("songs (songs.sql)", () => {
     await expect(asUser(db, PASTOR_A, () => rows(`insert into songs (church_id, title) values ($1, ' way maker ')`, [CHURCH_A]))).rejects.toThrow();
   });
 });
+
+describe("deleting counseling conversations (counseling_delete.sql)", () => {
+  const newConvo = async () =>
+    (await rows(`insert into counseling_conversations (church_id, member_id) values ($1, $2) returning id`, [CHURCH_A, MEMBER_A]))[0].id as string;
+
+  test("the member can delete their own conversation and its messages; nobody else can", async () => {
+    const convo = await newConvo();
+    await rows(`insert into counseling_messages (conversation_id, sender, content) values ($1, 'member', 'hello')`, [convo]);
+    expect(await asUser(db, PASTOR_A, () => rows(`delete from counseling_conversations where id = $1 returning id`, [convo]))).toHaveLength(0);
+    expect(await asUser(db, MEMBER2_A, () => rows(`delete from counseling_conversations where id = $1 returning id`, [convo]))).toHaveLength(0);
+    expect(await asUser(db, MEMBER_A, () => rows(`delete from counseling_conversations where id = $1 returning id`, [convo]))).toHaveLength(1);
+    expect(await rows(`select id from counseling_messages where conversation_id = $1`, [convo])).toHaveLength(0);
+  });
+
+  test("a flagged conversation can't be deleted until a pastor has followed it up", async () => {
+    const convo = await newConvo();
+    await db.exec(`update counseling_conversations set flagged = true, flagged_at = now() where id = '${convo}'`);
+    const [{ id: esc }] = await rows(`insert into counseling_escalations (conversation_id, notified_user_id) values ($1, $2) returning id`, [convo, PASTOR_A]);
+    expect(await asUser(db, MEMBER_A, () => rows(`delete from counseling_conversations where id = $1 returning id`, [convo]))).toHaveLength(0);
+    await db.exec(`update counseling_escalations set acknowledged_at = now() where id = '${esc}'`);
+    expect(await asUser(db, MEMBER_A, () => rows(`delete from counseling_conversations where id = $1 returning id`, [convo]))).toHaveLength(1);
+  });
+});

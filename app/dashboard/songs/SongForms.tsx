@@ -80,6 +80,25 @@ export function ImportForm() {
           <li>Songs already in your list are skipped, so it’s safe to import twice.</li>
         </ul>
       </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="btn-secondary cursor-pointer">
+          <input
+            type="file"
+            accept=".txt,text/plain"
+            className="sr-only"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file) return;
+              if (file.size > 2 * 1024 * 1024) return showToast("That file is too big — 2 MB at most.", "error");
+              setText(await file.text());
+              showToast(`Loaded ${file.name}. Check the songs below, then import.`);
+            }}
+          />
+          Choose a .txt file
+        </label>
+        <span className="text-sm text-ink/60">or paste the songs below</span>
+      </div>
       <FormField label="Songs" htmlFor="songs">
         <textarea id="songs" name="songs" rows={18} value={text} onChange={(e) => setText(e.target.value)} placeholder={IMPORT_EXAMPLE} className="input font-mono text-sm" />
       </FormField>

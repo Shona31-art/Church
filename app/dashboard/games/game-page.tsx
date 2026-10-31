@@ -1,11 +1,28 @@
 import { moduleGate } from "@/lib/gate";
 import { isLevel, type GameKey } from "@/lib/games/catalog";
+import { bestStars } from "@/lib/games/stages";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentAppUser } from "@/lib/current-user";
 import { GameScreen } from "./GameScreen";
 
-/** Shared body of every game's page: plan check, then ?level= and ?mode= (daily | kids). */
+/** Shared body of every game's page: plan check, your level progress, then ?level= and ?mode= (daily | kids). */
 export async function renderGamePage(game: GameKey, searchParams: { level?: string; mode?: string }) {
   const gate = await moduleGate("bible_games");
   if (gate) return gate;
   const mode = searchParams.mode === "daily" || searchParams.mode === "kids" ? searchParams.mode : "practice";
-  return <GameScreen game={game} initialLevel={isLevel(searchParams.level) ? searchParams.level : undefined} mode={mode} />;
+
+  // Your best stars on each numbered level. Before games_jigsaw.sql adds the
+  // column, this errors and the level map is simply not shown.
+  let stageStars: Record<number, number> | null = null;
+  if (mode === "practice") {
+    const me = (await getCurrentAppUser())!;
+    const { data, error } = await createClient()
+      .from("bible_quiz_attempts")
+      .select("stage, score, total_questions")
+      .eq("user_id", me.id)
+      .eq("game_type", game)
+      .not("stage", "is", null);
+    if (!error) stageStars = bestStars(data ?? []);
+  }
+  return <GameScreen game={game} initialLevel={isLevel(searchParams.level) ? searchParams.level : undefined} mode={mode} stageStars={stageStars} />;
 }

@@ -6,7 +6,7 @@ import type { GameKey } from "./catalog";
 // Daily challenge: one game a day, the same puzzle for the whole church.
 // ---------------------------------------------------------------------------
 
-export const DAILY_ROTATION: GameKey[] = ["crossword", "quiz", "word_search", "emoji", "verse_puzzle", "maze", "who_said", "scramble", "books_order", "verse_fill"];
+export const DAILY_ROTATION: GameKey[] = ["crossword", "quiz", "word_search", "emoji", "verse_puzzle", "maze", "who_said", "scramble", "books_order", "verse_fill", "jigsaw"];
 
 /** Today's game for a calendar day (YYYY-MM-DD). */
 export function dailyGame(day: string): GameKey {

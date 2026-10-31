@@ -40,7 +40,7 @@ export async function startSubscription(formData: FormData) {
   ]);
   const state = onlineBillingState(sub);
   if (state === "arranged") {
-    flash("Your plan is arranged with the Grace-bound team. Open a support ticket to change it.", "info");
+    flash("Your plan is arranged with the Grace-bound Ventures team. Open a support ticket to change it.", "info");
     redirect("/dashboard/billing");
   }
   if (state === "subscribed") {

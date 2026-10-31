@@ -1,19 +1,23 @@
 import { BrandMark } from "./BrandMark";
 import { Ornament } from "./Ornament";
+import { LightField } from "@/components/entry/LightField";
+import { COMPANY_NAME } from "@/lib/brand";
 
 /**
  * Frame for the signed-out screens (sign in, register, password reset).
- * Desktop: an obsidian brand panel on the left, the form on the right.
+ * Desktop: an aubergine brand panel (with the living field of light) on the
+ * left, the form on the right.
  * Phones and tablets: just the logo above the form, so the form is reachable
  * without scrolling past decoration.
  */
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
     <main className="min-h-screen min-h-dvh lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-      <aside className="scope-dark panel-luxe hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:gap-10 lg:p-12 xl:p-16">
-        <BrandMark />
+      <aside className="scope-dark panel-luxe relative isolate hidden overflow-hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:gap-10 lg:p-12 xl:p-16">
+        <LightField crosses={2} motes={35} className="-z-10" />
+        <BrandMark onPanel byline />
         <Ornament verse="Let all that you do be done in love." reference="1 Corinthians 16:14" framed={false} className="flex-1" />
-        <p className="text-eyebrow uppercase tracking-[0.24em] text-ink/50">Private · Secure · For your whole church</p>
+        <p className="text-eyebrow uppercase tracking-[0.24em] text-ink/60">Private · Secure · By {COMPANY_NAME}</p>
       </aside>
 
       <div className="flex min-h-screen min-h-dvh flex-col px-4 py-6 sm:px-8">

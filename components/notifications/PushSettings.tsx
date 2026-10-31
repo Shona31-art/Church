@@ -3,34 +3,11 @@
 import { useEffect, useState } from "react";
 import { BellRing } from "lucide-react";
 import { showToast } from "@/components/ui/Toaster";
-import { removePushSubscription, savePushSubscription, sendTestPush, setPushPreference } from "@/app/dashboard/account/notification-actions";
+import { removePushSubscription, sendTestPush, setPushPreference } from "@/app/dashboard/account/notification-actions";
+import { devicePushState, enablePushOnDevice, workerRegistration, type DevicePushState } from "@/lib/push-client";
 import { CATEGORIES, CATEGORY_LABELS, type NotificationCategory } from "@/lib/notifications";
 
-type DeviceState =
-  | "checking"
-  | "unsupported" // browser has no Web Push
-  | "ios-install" // iPhone/iPad Safari: only works from the Home Screen
-  | "not-configured" // server has no VAPID key
-  | "no-worker" // development build: the service worker isn't registered
-  | "blocked" // permission denied in the browser
-  | "off"
-  | "on";
-
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-
-/** The VAPID public key as the bytes PushManager.subscribe() wants. */
-function keyBytes(base64url: string): Uint8Array<ArrayBuffer> {
-  const base64 = (base64url + "=".repeat((4 - (base64url.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = atob(base64);
-  const bytes = new Uint8Array(new ArrayBuffer(raw.length));
-  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-  return bytes;
-}
-
-async function workerRegistration(): Promise<ServiceWorkerRegistration | null> {
-  // getRegistration() resolves immediately (ready would wait forever in development).
-  return (await navigator.serviceWorker.getRegistration("/")) ?? null;
-}
+type DeviceState = DevicePushState;
 
 /**
  * My Account → Notifications. Turn phone pop-ups on/off for THIS device, send
@@ -43,38 +20,15 @@ export function PushSettings({ initialPreferences }: { initialPreferences: Recor
   const [prefs, setPrefs] = useState(initialPreferences);
 
   useEffect(() => {
-    (async () => {
-      const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-      const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
-      if (ios && !standalone) return setDevice("ios-install");
-      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return setDevice("unsupported");
-      if (!VAPID_PUBLIC_KEY) return setDevice("not-configured");
-      if (Notification.permission === "denied") return setDevice("blocked");
-      const registration = await workerRegistration();
-      if (!registration) return setDevice("no-worker");
-      setDevice((await registration.pushManager.getSubscription()) ? "on" : "off");
-    })().catch(() => setDevice("unsupported"));
+    devicePushState().then(setDevice);
   }, []);
 
   async function turnOn() {
     setBusy(true);
     try {
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        setDevice(permission === "denied" ? "blocked" : "off");
-        return;
-      }
-      const registration = await workerRegistration();
-      if (!registration) return setDevice("no-worker");
-      const subscription =
-        (await registration.pushManager.getSubscription()) ??
-        (await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(VAPID_PUBLIC_KEY!) }));
-      const res = await savePushSubscription(subscription.toJSON(), navigator.userAgent);
-      if (!res.ok) {
-        await subscription.unsubscribe().catch(() => undefined);
-        showToast(res.error, "error");
-        return;
-      }
+      const result = await enablePushOnDevice();
+      if (result.error) showToast(result.error, "error");
+      if (result.state !== "on") return setDevice(result.state);
       setDevice("on");
       showToast("Pop-ups are on for this device.");
     } catch (error) {

@@ -2,9 +2,28 @@ import { expect, test } from "@playwright/test";
 
 // Signed-out pages and the access rules around them. No database needed.
 
-test("landing page introduces the product and leads to sign-up", async ({ page }) => {
+test("the opening intro presents Grace and can be skipped, once per visit", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("A church operating system");
+  const intro = page.getByRole("dialog", { name: "Welcome to Grace" });
+  await expect(intro).toBeVisible();
+  await expect(intro.getByAltText("Grace-bound Ventures")).toBeVisible();
+  await intro.getByRole("button", { name: "Skip intro" }).click();
+  await expect(intro).toBeHidden();
+  await page.reload();
+  await expect(page.getByRole("dialog", { name: "Welcome to Grace" })).toHaveCount(0);
+});
+
+test("the intro ends with Enter", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Enter" }).click({ timeout: 15_000 });
+  await expect(page.getByRole("dialog", { name: "Welcome to Grace" })).toBeHidden();
+});
+
+test("landing page introduces the product and leads to sign-up", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("intro-seen", "1"));
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Run your church with confidence");
+  await expect(page.getByText("Grace-bound Ventures presents")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Everything your church does through the week" })).toBeVisible();
   await page.getByRole("link", { name: /Begin your 30-day trial/i }).click();
   await expect(page).toHaveURL(/\/register$/);
@@ -41,6 +60,7 @@ test("the browser error endpoint only accepts this site's own pages", async ({ r
 });
 
 test("no horizontal scrolling on the landing page", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("intro-seen", "1"));
   await page.goto("/");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);

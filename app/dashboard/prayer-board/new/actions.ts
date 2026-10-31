@@ -4,11 +4,12 @@ import { planIncludes } from "@/lib/features";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
+import { checkModuleAccess } from "@/lib/paywall";
 import { generateJson, isAiConfigured } from "@/lib/ai";
 import { consumeAiQuota } from "@/lib/ai-quota";
 
 // Suggests 1-3 scripture references for a prayer. Uses the Anthropic API if
-// ANTHROPIC_API_KEY is configured; otherwise falls back to simple keyword
+// an AI key (ANTHROPIC_API_KEY or GEMINI_API_KEY) is configured; otherwise falls back to simple keyword
 // matching so the app still works out of the box with zero API keys set.
 //
 // NOTE ON TRANSLATIONS: only reference verses (e.g. "Jeremiah 29:11"), don't
@@ -59,6 +60,7 @@ export async function createPrayer(
 ): Promise<{ error?: string } | null> {
   const me = await getCurrentAppUser();
   if (!me) return { error: "Not signed in." };
+  if (!(await checkModuleAccess("prayer_board")).allowed) return { error: "The prayer board isn't available on your church's plan." };
 
   const prayerText = String(formData.get("prayer_text") || "").trim();
   const category = String(formData.get("category") || "").slice(0, 40);
@@ -83,5 +85,6 @@ export async function createPrayer(
     return { error: "Couldn't save your prayer — try again." };
   }
 
-  redirect("/dashboard/prayer-board");
+  // ?shared=1 lets the board offer notifications ("know when people pray for you").
+  redirect(shareOnWall ? "/dashboard/prayer-board?shared=1" : "/dashboard/prayer-board");
 }

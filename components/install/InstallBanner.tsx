@@ -54,7 +54,7 @@ export function InstallBanner() {
         <Smartphone className="h-5 w-5" strokeWidth={1.75} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold">Install Grace-bound on your phone</p>
+        <p className="text-sm font-semibold">Install Grace on your phone</p>
         <p className="mt-0.5 text-xs text-ink/60">Opens from your home screen, full screen, like any other app.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {mode === "prompt" ? (
@@ -82,7 +82,7 @@ export function InstallBanner() {
       >
         <div className="p-6">
           <h2 id="ios-install-title" className="text-xl font-semibold">
-            Add Grace-bound to your home screen
+            Add Grace to your home screen
           </h2>
           <div className="rule-gold mb-5 mt-3" />
           <IosSteps />

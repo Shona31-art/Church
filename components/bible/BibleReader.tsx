@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ChevronDown, ChevronLeft, ChevronRight, Search, Type } from "lucide-react";
+import { useSwipe } from "@/lib/use-swipe";
+import { haptic } from "@/lib/haptics";
 import { Alert } from "@/components/ui/Alert";
 import { BackLink } from "@/components/ui/PageHeader";
 import { showToast } from "@/components/ui/Toaster";
@@ -145,6 +147,20 @@ export function BibleReader() {
     return () => window.removeEventListener("keydown", onKey);
   }, [previous, next, go, pickerOpen, noteEditor]);
 
+  // Phones: swipe left for the next chapter, right for the previous one (like turning a page).
+  const swipe = useSwipe({
+    onLeft: () => {
+      if (!next || pickerOpen || noteEditor) return;
+      haptic("tap");
+      go(next);
+    },
+    onRight: () => {
+      if (!previous || pickerOpen || noteEditor) return;
+      haptic("tap");
+      go(previous);
+    },
+  });
+
   const title = formatReference({ bookIndex, chapter });
   const verses = load.status === "ready" ? load.book.chapters[chapter - 1] ?? [] : [];
   const a = annotations.state.status === "ready" ? annotations.state.data : null;
@@ -260,7 +276,7 @@ export function BibleReader() {
         <ChapterButton target={next} direction="next" onGo={go} />
       </div>
 
-      <article aria-labelledby="chapter-title" aria-busy={load.status === "loading"}>
+      <article aria-labelledby="chapter-title" aria-busy={load.status === "loading"} {...swipe}>
         <h1 id="chapter-title" className="text-title font-semibold leading-tight sm:text-title-lg">
           {title}
         </h1>

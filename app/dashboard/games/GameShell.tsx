@@ -51,6 +51,8 @@ export function GameShell<View>({
   const [timed, setTimed] = useState(mode === "daily");
   const [phase, setPhase] = useState<Phase>({ kind: "intro" });
   const [finishError, setFinishError] = useState<string | null>(null);
+  // Quitting a game in progress asks first, so a stray tap doesn't throw a game away.
+  const [confirmQuit, setConfirmQuit] = useState(false);
 
   async function start() {
     setPhase({ kind: "starting" });
@@ -145,9 +147,28 @@ export function GameShell<View>({
               <span className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-xs font-medium">{LEVEL_LABELS[phase.level]}</span>
               <Clock startedAt={phase.startedAt} parSeconds={phase.timed ? phase.parSeconds : null} />
             </div>
-            <button type="button" className="btn-ghost btn-sm" onClick={() => setPhase({ kind: "intro" })} disabled={phase.kind === "finishing"}>
-              Quit
-            </button>
+            {confirmQuit ? (
+              <div role="alertdialog" aria-label="Leave this game?" className="flex flex-wrap items-center gap-2 rounded-xl border border-warning-line bg-warning-tint px-3 py-2 text-sm text-warning">
+                <span>Leave this game? It won&apos;t count.</span>
+                <button type="button" className="btn-secondary btn-sm" onClick={() => setConfirmQuit(false)} autoFocus>
+                  Keep playing
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost btn-sm"
+                  onClick={() => {
+                    setConfirmQuit(false);
+                    setPhase({ kind: "intro" });
+                  }}
+                >
+                  Leave game
+                </button>
+              </div>
+            ) : (
+              <button type="button" className="btn-ghost btn-sm" onClick={() => setConfirmQuit(true)} disabled={phase.kind === "finishing"}>
+                Quit
+              </button>
+            )}
           </div>
           {finishError && <Alert tone="error" className="mb-4">{finishError}</Alert>}
           <Board sessionId={phase.sessionId} view={phase.view as View} level={phase.level} finish={finish} finishing={phase.kind === "finishing"} />
@@ -222,7 +243,10 @@ function ResultCard({
         </div>
       </dl>
       {timed && !perfect && <p className="mt-3 text-xs text-ink/60">Time bonus is for perfect games.</p>}
-      {mode === "kids" && <p className="mt-3 text-xs text-ink/60">Kids mode games don&apos;t go on the church scoreboard.</p>}
+      <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-success">
+        <CheckCircle2 aria-hidden className="h-3.5 w-3.5" />
+        {mode === "kids" ? "Saved to your game history. Kids mode games don't go on the church scoreboard." : "Saved to your game history and the church scoreboard."}
+      </p>
 
       {result.newBadges && result.newBadges.length > 0 && (
         <div className="mx-auto mt-6 max-w-sm space-y-2">

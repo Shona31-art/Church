@@ -49,6 +49,38 @@ export async function createJournalEntry(_prev: FormState, formData: FormData): 
   redirect("/dashboard/journal");
 }
 
+/** Form fields: entry_id, content. Re-encrypts the edited text; only the author's own entry can change (RLS + user_id). */
+export async function updateJournalEntry(_prev: FormState, formData: FormData): Promise<FormState> {
+  const me = await getCurrentAppUser();
+  if (!me) return { error: SESSION_EXPIRED, values: formValues(formData) };
+  if (!(await checkModuleAccess("journal")).allowed) return { error: "The journal isn't available on your church's plan." };
+  if (!isJournalEncryptionConfigured()) return { error: "The journal isn't set up yet (missing encryption key).", values: formValues(formData) };
+  const id = z.string().uuid().safeParse(formData.get("entry_id"));
+  if (!id.success) return { error: "That entry couldn't be found." };
+  const parsed = z
+    .string()
+    .trim()
+    .min(1, "Write something before saving — or delete the entry instead.")
+    .max(20_000, "That entry is very long — split it into two (20,000 characters max).")
+    .safeParse(formData.get("content"));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message, values: formValues(formData) };
+
+  const { encrypted_content, iv, auth_tag } = encryptJournalContent(parsed.data);
+  const { data: updated, error } = await createClient()
+    .from("journal_entries")
+    .update({ encrypted_content: toBytea(encrypted_content), iv: toBytea(iv), auth_tag: toBytea(auth_tag) })
+    .eq("id", id.data)
+    .eq("user_id", me.id)
+    .select("id");
+  if (error || !updated?.length) {
+    if (error) console.error("[journal] update failed:", error.message);
+    return { error: "Couldn't save your changes — please try again. Your words are still here.", values: formValues(formData) };
+  }
+  revalidatePath("/dashboard/journal");
+  flash("Journal entry updated.");
+  redirect("/dashboard/journal");
+}
+
 /** Form fields: entry_id */
 export async function deleteJournalEntry(_prev: FormState, formData: FormData): Promise<FormState> {
   const me = await getCurrentAppUser();

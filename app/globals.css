@@ -12,22 +12,33 @@
    ------------------------------------------------------------------------- */
 :root {
   color-scheme: light;
-  --ink: 22 20 17;
-  --parchment: 246 243 236;
-  --surface: 255 254 250;
-  --surface-raised: 240 236 227;
-  --line: 230 224 211;
-  --line-strong: 209 201 185;
-  --ember: 23 21 18;
-  --on-ember: 246 240 226;
-  --gold: 176 141 87;
-  /* Gold for small text on light surfaces: --gold is only ~3:1 there. */
-  --gold-deep: 122 93 47;
-  --gold-soft: 233 214 178;
-  --shadow: 28 22 12;
-  /* Brand panel (sidebar, auth screens, landing hero): obsidian in both themes. */
-  --panel: 14 13 12;
-  --on-panel: 242 236 222;
+  /* Blush ivory pages, deep plum ink and buttons, teal as the accent and
+     rose kept for small highlights — balanced, warm and professional. */
+  --ink: 31 16 37;
+  --parchment: 253 247 248;
+  --surface: 255 255 255;
+  --surface-raised: 250 242 245;
+  --line: 240 225 231;
+  --line-strong: 222 199 209;
+  --ember: 76 26 87;
+  --on-ember: 255 246 250;
+  /* "gold" is the brand accent — now teal (hairlines, icons, focus rings). */
+  --gold: 31 148 160;
+  /* Accent for small text on light surfaces: --gold is only ~3.6:1 there. */
+  --gold-deep: 18 112 124;
+  --gold-soft: 207 239 241;
+  /* Rose: highlights only (a name, one emphasised word, the cross's jewel). */
+  --rose: 184 46 110;
+  /* The "Grace" wordmark gradient: deep teal into rose on light, pale on dark. */
+  --wm-1: 18 122 136;
+  --wm-2: 47 163 176;
+  --wm-3: 194 56 122;
+  --teal: 18 122 136;
+  --teal-soft: 159 223 228;
+  --shadow: 60 20 60;
+  /* Brand panel (sidebar, auth screens, landing hero): deep aubergine in both themes. */
+  --panel: 30 12 38;
+  --on-panel: 253 240 246;
 
   --success: 23 113 79;
   --success-tint: 233 244 236;
@@ -51,29 +62,35 @@
   --hl-purple: 224 216 252;
 }
 
-/* Dark: obsidian surfaces, warm ivory text, champagne actions.
+/* Dark: aubergine night surfaces, blush text, teal actions.
    CSS can't share a block between a selector and a media query, so the dark
    values appear three times — keep the blocks below identical.
-   `.scope-dark` applies them to one region in either theme (the obsidian
+   `.scope-dark` applies them to one region in either theme (the aubergine
    sidebar and hero), so everything inside — buttons, menus, badges — reads
    correctly on the dark panel without per-component variants. */
 :root[data-theme="dark"],
 .scope-dark {
   color-scheme: dark;
-  --ink: 239 233 220;
-  --parchment: 11 11 12;
-  --surface: 20 19 18;
-  --surface-raised: 30 29 27;
-  --line: 42 40 37;
-  --line-strong: 64 60 54;
-  --ember: 214 182 124;
-  --on-ember: 18 16 13;
-  --gold: 205 170 108;
-  --gold-deep: 205 170 108;
-  --gold-soft: 84 68 40;
+  --ink: 250 238 244;
+  --parchment: 20 10 25;
+  --surface: 31 17 38;
+  --surface-raised: 44 26 52;
+  --line: 60 40 70;
+  --line-strong: 88 62 100;
+  --ember: 112 214 220;
+  --on-ember: 10 34 38;
+  --gold: 112 214 220;
+  --gold-deep: 140 222 228;
+  --gold-soft: 20 60 66;
+  --rose: 244 166 196;
+  --wm-1: 159 227 231;
+  --wm-2: 230 248 249;
+  --wm-3: 247 168 200;
+  --teal: 112 214 220;
+  --teal-soft: 159 223 228;
   --shadow: 0 0 0;
-  --panel: 8 8 9;
-  --on-panel: 239 233 220;
+  --panel: 16 7 20;
+  --on-panel: 250 238 244;
 
   --success: 94 201 152;
   --success-tint: 17 40 31;
@@ -98,20 +115,26 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --ink: 239 233 220;
-    --parchment: 11 11 12;
-    --surface: 20 19 18;
-    --surface-raised: 30 29 27;
-    --line: 42 40 37;
-    --line-strong: 64 60 54;
-    --ember: 214 182 124;
-    --on-ember: 18 16 13;
-    --gold: 205 170 108;
-    --gold-deep: 205 170 108;
-    --gold-soft: 84 68 40;
+    --ink: 250 238 244;
+    --parchment: 20 10 25;
+    --surface: 31 17 38;
+    --surface-raised: 44 26 52;
+    --line: 60 40 70;
+    --line-strong: 88 62 100;
+    --ember: 112 214 220;
+    --on-ember: 10 34 38;
+    --gold: 112 214 220;
+    --gold-deep: 140 222 228;
+    --gold-soft: 20 60 66;
+    --rose: 244 166 196;
+    --wm-1: 159 227 231;
+    --wm-2: 230 248 249;
+    --wm-3: 247 168 200;
+    --teal: 112 214 220;
+    --teal-soft: 159 223 228;
     --shadow: 0 0 0;
-    --panel: 8 8 9;
-    --on-panel: 239 233 220;
+    --panel: 16 7 20;
+    --on-panel: 250 238 244;
 
     --success: 94 201 152;
     --success-tint: 17 40 31;
@@ -140,6 +163,11 @@
 
 body {
   background-color: rgb(var(--parchment));
+  /* A whisper of teal (and a little rose) at the page corners. */
+  background-image:
+    radial-gradient(60rem 40rem at 100% -10%, rgb(var(--teal) / 0.08), transparent 60%),
+    radial-gradient(50rem 40rem at -10% 110%, rgb(var(--rose) / 0.05), transparent 60%);
+  background-attachment: fixed;
   color: rgb(var(--ink));
   @apply font-sans antialiased;
   text-rendering: optimizeLegibility;
@@ -162,7 +190,7 @@ h1, h2, h3 {
 }
 
 ::selection {
-  background-color: rgb(var(--gold) / 0.28);
+  background-color: rgb(var(--gold) / 0.3);
 }
 
 /* Accessibility: visible focus ring on every interactive element, set once
@@ -194,6 +222,193 @@ button, a {
     animation-duration: 0.01ms !important;
   }
 }
+
+/* Reading comfort (My account → Display; lib/display-prefs.ts). Text sizes
+   are in rem, so scaling the root enlarges the whole app. */
+html[data-text-size="large"] {
+  font-size: 112.5%;
+}
+html[data-text-size="larger"] {
+  font-size: 125%;
+}
+/* High contrast: near-black text, stronger lines, and faded secondary text
+   brought up to a much higher contrast — in both themes. */
+html[data-contrast="high"] {
+  --line: 170 140 155;
+  --line-strong: 120 90 110;
+  --gold-deep: 10 84 94;
+  --rose: 150 25 85;
+}
+html[data-contrast="high"][data-theme="dark"],
+html[data-contrast="high"] .scope-dark {
+  --line: 110 84 120;
+  --line-strong: 150 120 160;
+  --gold-deep: 190 240 244;
+  --rose: 252 200 222;
+}
+@media (prefers-color-scheme: dark) {
+  html[data-contrast="high"]:not([data-theme="light"]) {
+    --line: 110 84 120;
+    --line-strong: 150 120 160;
+    --gold-deep: 190 240 244;
+    --rose: 252 200 222;
+  }
+}
+html[data-contrast="high"] :is(.text-ink\/50, .text-ink\/55, .text-ink\/60, .text-ink\/65, .text-ink\/70, .text-ink\/75, .text-ink\/80, .placeholder\:text-ink\/60::placeholder) {
+  color: rgb(var(--ink) / 0.9);
+}
+html[data-contrast="high"] .eyebrow {
+  color: rgb(var(--ink));
+}
+
+/* Phones: the bottom tab bar steps aside while the keyboard is open, and
+   toasts sit above it rather than behind it. */
+html[data-keyboard="open"] [data-tab-bar] {
+  display: none;
+}
+@media (max-width: 767px) {
+  body:has([data-tab-bar]) [data-toaster] {
+    bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* Chat threads fill the screen below the page header; while the keyboard is
+   open they fill exactly the visible part above it (iPhone included). */
+.chat-thread {
+  height: calc(100dvh - 15rem);
+}
+html[data-keyboard="open"] .chat-thread {
+  height: calc(var(--vvh, 100dvh) - 1rem);
+  min-height: 0;
+}
+
+/* The opening intro (components/entry/EntryIntro.tsx). Hidden before paint
+   for visitors who've seen it this session, and for reduced motion. */
+html[data-intro-seen] [data-entry-intro] {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-entry-intro] {
+    display: none;
+  }
+}
+@keyframes intro-rise {
+  from { opacity: 0; transform: translateY(18px) scale(0.96); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes intro-write {
+  from { clip-path: inset(0 100% 0 0); opacity: 0.4; }
+  to { clip-path: inset(0 -10% 0 0); opacity: 1; }
+}
+@keyframes intro-arrive {
+  0% { opacity: 0; transform: translateY(40px) scale(0.6); filter: blur(8px); }
+  100% { opacity: 1; transform: none; filter: none; }
+}
+@keyframes breathe {
+  0%, 100% { transform: translateY(0); filter: drop-shadow(0 0 0 rgb(63 182 194 / 0)); }
+  50% { transform: translateY(-6px); filter: drop-shadow(0 0 18px rgb(63 182 194 / 0.55)); }
+}
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.45), 0 10px 30px -8px rgb(63 182 194 / 0.6); }
+  50% { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.45), 0 10px 50px -4px rgb(63 182 194 / 0.9); }
+}
+.intro-rise { animation: intro-rise 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.intro-rise-late { animation: intro-rise 1.2s 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.intro-write { animation: intro-write 1.8s 0.5s cubic-bezier(0.6, 0, 0.2, 1) both; }
+.intro-mark { animation: intro-arrive 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.intro-mark > svg { animation: breathe 3.2s 1.4s ease-in-out infinite; }
+.intro-glow { animation: glow-pulse 2.4s ease-in-out infinite; }
+/* The hero cross on the landing page breathes gently. */
+.float-slow { animation: breathe 4s ease-in-out infinite; }
+
+
+/* ---------------------------------------------------------------------------
+   The landing hero scene (components/entry/HeavenScene.tsx): a golden Bible
+   opens above the clouds, its pages turn, and a radiant cross rises from its
+   light. Timings: float 0–3.6s, turn 3.6–5.8s, cover opens 4.2–6.2s, six
+   pages flip 6.0–8.7s, light 7.4s, cross 9.0s, ribbons (canvas) 9.8s,
+   Replay 12s. --cx/--cy place the scene; --hv-scale sizes the book and cross
+   (set from the screen width on phones). data-skip shows the finished scene.
+   ------------------------------------------------------------------------- */
+/* --cx, --cy and --hv-scale are set by the page (defaults in the var() fallbacks). */
+.hv { position: absolute; inset: 0; overflow: hidden; isolation: isolate;
+  background: radial-gradient(60% 50% at var(--cx, 50%) 62%, #3a2a3a 0%, #142049 45%, #0a1230 70%, #050a1c 100%); }
+.hv canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hv-back { z-index: 0; }
+.hv-front { z-index: 6; pointer-events: none; }
+.hv-stage { position: absolute; left: var(--cx, 50%); top: var(--cy, 58%); width: 0; height: 0; z-index: 3; transform: scale(var(--hv-scale, 1)); }
+.hv-burst { position: absolute; left: 0; top: 0; width: 900px; height: 900px; transform: translate(-50%, -62%); opacity: 0;
+  background:
+    radial-gradient(circle at 50% 62%, rgba(255, 250, 225, 1) 0%, rgba(255, 214, 120, 0.85) 8%, rgba(255, 170, 60, 0.35) 22%, transparent 45%),
+    repeating-conic-gradient(from -60deg at 50% 62%, rgba(255, 230, 160, 0.5) 0deg 2deg, transparent 2deg 7deg);
+  -webkit-mask: radial-gradient(circle at 50% 62%, #000 0%, rgba(0, 0, 0, 0.7) 25%, transparent 55%);
+  mask: radial-gradient(circle at 50% 62%, #000 0%, rgba(0, 0, 0, 0.7) 25%, transparent 55%);
+  mix-blend-mode: screen; animation: hv-burst 2.4s 7.4s ease-out forwards, hv-pulse 4s 10s ease-in-out infinite; }
+@keyframes hv-burst { from { opacity: 0; transform: translate(-50%, -62%) scale(0.4); } to { opacity: 1; transform: translate(-50%, -62%) scale(1); } }
+@keyframes hv-pulse { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.25); } }
+.hv-cross { position: absolute; left: 0; top: 0; width: 190px; height: 300px; transform: translate(-50%, -112%); opacity: 0;
+  filter: drop-shadow(0 0 18px rgba(255, 236, 170, 1)) drop-shadow(0 0 60px rgba(255, 190, 80, 0.9));
+  animation: hv-rise 2.6s 9s cubic-bezier(0.2, 0.8, 0.2, 1) forwards, hv-glow 3.5s 11.6s ease-in-out infinite; }
+@keyframes hv-rise { from { opacity: 0; transform: translate(-50%, -70%) scale(0.6); } to { opacity: 1; transform: translate(-50%, -112%) scale(1); } }
+@keyframes hv-glow { 0%, 100% { filter: drop-shadow(0 0 18px rgba(255, 236, 170, 1)) drop-shadow(0 0 60px rgba(255, 190, 80, 0.9)); } 50% { filter: drop-shadow(0 0 26px rgba(255, 246, 200, 1)) drop-shadow(0 0 90px rgba(255, 200, 90, 1)); } }
+.hv-persp { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); perspective: 1300px; animation: hv-settle 2.2s 3.6s cubic-bezier(0.5, 0, 0.2, 1) forwards; }
+/* Opening moves the spine to the centre, so the spread is centred and the cross rises from the middle. */
+@keyframes hv-settle { to { transform: translate(0%, -20%) scale(1.15); } }
+.hv-float { animation: hv-float 5s ease-in-out infinite; }
+@keyframes hv-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+.hv-book { --w: 220px; --h: 300px; --d: 56px; position: relative; width: var(--w); height: var(--h); transform-style: preserve-3d;
+  transform: rotateX(28deg) rotateY(-24deg) rotateZ(-12deg); animation: hv-turn 2.2s 3.6s cubic-bezier(0.5, 0, 0.2, 1) forwards; }
+@keyframes hv-turn { to { transform: rotateX(62deg) rotateY(0deg) rotateZ(0deg); } }
+.hv-f { position: absolute; inset: 0; backface-visibility: hidden; }
+.hv-pages { transform: translateZ(calc(var(--d) / 2 - 2px)); inset: 4px 6px 4px 2px; border-radius: 2px 8px 8px 2px;
+  background: linear-gradient(90deg, rgba(120, 70, 10, 0.45), rgba(255, 255, 255, 0.35) 10%, transparent 30%, rgba(120, 70, 10, 0.12) 100%), linear-gradient(180deg, #fffaea, #f3e2b6);
+  box-shadow: inset 0 0 30px rgba(180, 120, 40, 0.35); }
+.hv-pages::before, .hv-cover-in::before { content: ""; position: absolute; inset: 16% 14%; background: repeating-linear-gradient(180deg, rgba(90, 60, 20, 0.35) 0 1.5px, transparent 1.5px 7px); }
+.hv-edge-r { width: calc(var(--d) - 4px); left: auto; right: calc((var(--d) - 4px) / -2 + 6px); top: 6px; bottom: 6px; height: auto; transform: rotateY(90deg);
+  background: repeating-linear-gradient(90deg, #fff6d8 0 1.5px, #d9a648 1.5px 3px); }
+.hv-edge-b { height: calc(var(--d) - 4px); top: auto; bottom: calc((var(--d) - 4px) / -2 + 6px); left: 6px; right: 6px; transform: rotateX(-90deg);
+  background: repeating-linear-gradient(0deg, #fff6d8 0 1.5px, #d9a648 1.5px 3px); box-shadow: 0 0 30px rgba(255, 210, 120, 0.8); }
+.hv-spine { width: var(--d); left: calc(var(--d) / -2); transform: rotateY(-90deg); border-radius: 10px;
+  background: linear-gradient(90deg, #2a1206, #7a4414 45%, #c58a32 52%, #2a1206); box-shadow: inset 0 0 0 2px #e3b45a; }
+.hv-backc { transform: translateZ(calc(var(--d) / -2)) rotateY(180deg); border-radius: 10px 3px 3px 10px; background: #3a1a08; backface-visibility: visible; }
+.hv-cover { position: absolute; inset: 0; transform-style: preserve-3d; transform-origin: 0 50%; transform: translateZ(calc(var(--d) / 2));
+  animation: hv-open 2s 4.2s cubic-bezier(0.6, 0, 0.2, 1) forwards; }
+@keyframes hv-open { to { transform: translateZ(calc(var(--d) / 2)) rotateY(-178deg); } }
+.hv-cover-out { border-radius: 3px 10px 10px 3px; overflow: hidden;
+  background: radial-gradient(90% 60% at 45% 30%, rgba(255, 220, 150, 0.22), transparent 65%), linear-gradient(150deg, #6a3510, #4a2208 50%, #2e1404);
+  box-shadow: inset 0 0 0 3px #e9bb5c, inset 0 0 0 9px rgba(46, 20, 4, 0.9), inset 0 0 0 10.5px #f3cf7a, inset 0 0 40px rgba(0, 0, 0, 0.6), 0 0 40px rgba(255, 190, 90, 0.55); }
+.hv-cover-out svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hv-cover-in { transform: rotateY(180deg); border-radius: 8px 2px 2px 8px;
+  background: linear-gradient(270deg, rgba(120, 70, 10, 0.45), rgba(255, 255, 255, 0.35) 10%, transparent 30%, rgba(120, 70, 10, 0.12) 100%), linear-gradient(180deg, #fffaea, #f3e2b6); }
+/* Pages that turn one after another once the cover is open: each is a
+   two-sided leaf (lines of text on both faces) hinged at the spine. */
+.hv-leaf { position: absolute; inset: 4px 6px 4px 2px; transform-style: preserve-3d; transform-origin: 0 50%;
+  transform: translateZ(calc(var(--d) / 2 - 1.5px + var(--zr, 0px)));
+  animation: hv-flip 0.9s cubic-bezier(0.45, 0, 0.25, 1) var(--delay, 6s) forwards; }
+.hv-leaf-a, .hv-leaf-b { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 2px 8px 8px 2px;
+  background: linear-gradient(90deg, rgba(120, 70, 10, 0.35), rgba(255, 255, 255, 0.4) 10%, transparent 35%, rgba(150, 100, 30, 0.18)), linear-gradient(180deg, #fffaea, #f4e4bb);
+  box-shadow: 0 0 10px rgba(255, 225, 150, 0.55); }
+.hv-leaf-b { transform: rotateY(180deg); border-radius: 8px 2px 2px 8px;
+  background: linear-gradient(270deg, rgba(120, 70, 10, 0.35), rgba(255, 255, 255, 0.4) 10%, transparent 35%, rgba(150, 100, 30, 0.18)), linear-gradient(180deg, #fffaea, #f4e4bb); }
+.hv-leaf-a::before, .hv-leaf-b::before { content: ""; position: absolute; inset: 14% 14%; background: repeating-linear-gradient(180deg, rgba(90, 60, 20, 0.35) 0 1.5px, transparent 1.5px 7px); }
+/* Each page lifts as it turns and lands a fraction higher than the one
+   before (--to), so the turned pages stack in order above the cover. */
+@keyframes hv-flip {
+  0% { transform: translateZ(calc(var(--d) / 2 - 1.5px + var(--zr, 0px))) rotateY(0deg); }
+  50% { transform: translateZ(calc(var(--d) / 2 + 14px)) rotateY(-90deg); }
+  100% { transform: translateZ(calc(var(--d) / 2 - 1.5px)) rotateY(var(--to, -176deg)); }
+}
+.hv-replay { opacity: 0; animation: hv-in 0.6s 12s forwards; }
+/* data-skip: show the finished scene at once (after the intro has played it). */
+.hv[data-skip] * { animation-delay: -30s !important; }
+@keyframes hv-in { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .hv * { animation-duration: 0.01s !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
+}
+/* Gold call to action on the midnight hero. */
+.btn-amber { color: #2a1400; background: linear-gradient(135deg, #ffe7a6, #f2b44a 55%, #d48a22);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 10px 30px -8px rgb(242 180 74 / 0.75); }
+.btn-amber:hover { filter: brightness(1.05); }
 
 /* Native <dialog> defaults to a white "Canvas" background — use the theme. */
 dialog {
@@ -228,13 +443,14 @@ dialog {
   left: calc(50% - 2.5px);
 }
 
-/* Fine champagne sheen for obsidian panels: a soft glow from the top corner
-   and a hairline gold edge, like foil on a dark card. */
+/* Brand panels: deep aubergine lit mostly by teal, with a touch of rose,
+   and a fine accent hairline edge. */
 .panel-luxe {
   background-color: rgb(var(--panel));
   background-image:
-    radial-gradient(120% 80% at 100% 0%, rgb(var(--gold) / 0.14), transparent 55%),
-    radial-gradient(90% 60% at 0% 100%, rgb(var(--gold) / 0.07), transparent 60%);
+    radial-gradient(90% 70% at 100% 0%, rgb(63 182 194 / 0.24), transparent 60%),
+    radial-gradient(70% 55% at 0% 100%, rgb(232 103 155 / 0.12), transparent 60%),
+    radial-gradient(60% 50% at 50% 50%, rgb(124 58 140 / 0.28), transparent 70%);
 }
 .hairline-gold {
   box-shadow: inset 0 0 0 1px rgb(var(--gold) / 0.28);
@@ -267,11 +483,11 @@ dialog {
     @apply btn bg-ember text-on-ember hover:bg-ember/90
       shadow-[inset_0_0_0_1px_rgb(var(--gold)/0.35),inset_0_1px_0_rgb(255_255_255/0.10),0_1px_2px_rgb(var(--shadow)/0.25),0_8px_20px_-8px_rgb(var(--shadow)/0.35)];
   }
-  /* Champagne call to action for obsidian panels (landing hero). */
+  /* Teal call to action for the aubergine panels (landing hero, intro). */
   .btn-gold {
-    @apply btn text-[rgb(18_16_13)] hover:brightness-105
-      bg-[linear-gradient(180deg,rgb(226_198_146),rgb(196_160_100))]
-      shadow-[inset_0_1px_0_rgb(255_255_255/0.35),0_8px_24px_-8px_rgb(196_160_100/0.55)];
+    @apply btn text-[rgb(8_32_36)] hover:brightness-105
+      bg-[linear-gradient(135deg,rgb(160_226_231),rgb(63_182_194)_55%,rgb(45_160_172))]
+      shadow-[inset_0_1px_0_rgb(255_255_255/0.45),0_10px_30px_-8px_rgb(63_182_194/0.6)];
   }
   .btn-secondary { @apply btn border border-line-strong bg-surface text-ink shadow-xs hover:bg-surface-raised; }
   .btn-danger { @apply btn bg-danger text-surface hover:bg-danger/90; }
@@ -302,4 +518,23 @@ dialog {
 
   /* Figures that change (counts, money, times) keep their width. */
   .tabular { font-variant-numeric: tabular-nums lining-nums; }
+}
+
+/* Prayer wall artwork (components/prayer/PrayerArt.tsx): slow, gentle motion. */
+@keyframes pw-twinkle { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+@keyframes pw-glow { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+@keyframes pw-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes pw-spin { to { transform: rotate(360deg); } }
+@keyframes pw-flame { 0%, 100% { transform: scale(1, 1) rotate(-2deg); } 50% { transform: scale(0.92, 1.08) rotate(2deg); } }
+@keyframes pw-sway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+@keyframes pw-pop { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
+.pw-twinkle { animation: pw-twinkle 3.2s ease-in-out infinite; }
+.pw-glow { animation: pw-glow 4s ease-in-out infinite; }
+.pw-float { animation: pw-float 5s ease-in-out infinite; }
+.pw-rays { animation: pw-spin 90s linear infinite; }
+.pw-flame { animation: pw-flame 1.6s ease-in-out infinite; }
+.pw-sway { animation: pw-sway 5s ease-in-out infinite; transform-origin: 0 0; }
+.pw-prayed { animation: pw-pop 0.5s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .pw-twinkle, .pw-glow, .pw-float, .pw-rays, .pw-flame, .pw-sway, .pw-prayed { animation: none; }
 }

@@ -11,7 +11,7 @@ import { Check } from "lucide-react";
 export function RsvpButtons({ eventId, mine }: { eventId: string; mine: RsvpStatus | null }) {
   const [state, action] = useFormState(rsvp, null);
   return (
-    <form action={action}>
+    <form action={action} data-haptic="success">
       <input type="hidden" name="event_id" value={eventId} />
       <fieldset>
         <legend className="text-sm font-medium mb-2">{mine ? "Your response" : "Will you be there?"}</legend>

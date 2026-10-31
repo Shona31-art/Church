@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { ShareButton } from "@/components/ShareButton";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
@@ -33,6 +34,11 @@ export default async function AnnouncementDetailPage({ params }: { params: { id:
       <PageHeader
         back={{ href: "/dashboard/announcements", label: "Announcements" }}
         title={a.title}
+        actions={
+          a.status === "published" ? (
+            <ShareButton content={{ title: a.title, text: `${a.title}\n\n${a.body.length > 600 ? `${a.body.slice(0, 600)}…` : a.body}`, url: `/dashboard/announcements/${a.id}` }} />
+          ) : undefined
+        }
         meta={
           <>
             {a.status === "draft" && <StatusBadge tone="warning">Draft</StatusBadge>}

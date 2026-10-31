@@ -127,6 +127,18 @@ export function ChatThread({
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [messages.length]);
 
+  // Phones: when the message box gets focus, the keyboard slides up. Once it
+  // has, keep the whole thread in view with the newest message showing.
+  const threadRef = useRef<HTMLDivElement>(null);
+  const logRef = useRef<HTMLDivElement>(null);
+  const onComposerFocus = useCallback((e: React.FocusEvent) => {
+    if (!(e.target instanceof HTMLTextAreaElement)) return;
+    setTimeout(() => {
+      threadRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+      logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
+    }, 300);
+  }, []);
+
   useEffect(() => {
     if (deleting) deleteDialogRef.current?.showModal();
     else deleteDialogRef.current?.close();
@@ -473,8 +485,12 @@ export function ChatThread({
   const deletingOthers = deleting && deleting.sender_id !== currentUserId;
 
   return (
-    <div className="card-elevated flex h-[calc(100dvh-15rem)] min-h-[26rem] flex-col overflow-hidden rounded-2xl">
-      <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-5" role="log" aria-live="polite" aria-label="Messages">
+    <div
+      ref={threadRef}
+      onFocus={onComposerFocus}
+      className="chat-thread card-elevated flex min-h-[26rem] flex-col overflow-hidden rounded-2xl"
+    >
+      <div ref={logRef} className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5" role="log" aria-live="polite" aria-label="Messages">
         {truncated && <p className="mb-2 text-center text-xs text-ink/60">Showing the most recent messages.</p>}
 
         {messages.map((m, i) => {

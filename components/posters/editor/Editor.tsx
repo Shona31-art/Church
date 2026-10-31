@@ -21,6 +21,7 @@ import { TextEditOverlay } from "./TextEditOverlay";
 import { playOnStage } from "./animate-stage";
 import { animateAll, clearAnimations, pickVideoType, VIDEO_FPS, videoSize } from "@/lib/posters/animation";
 import { jpegToPdf, pdfPageSize } from "@/lib/posters/pdf";
+import { shareContent } from "@/lib/share";
 
 // Unsaved work is kept on this device so a closed tab, crash or expired
 // session never loses a poster. Keyed by poster (or "new"); a draft is only
@@ -347,6 +348,22 @@ export function Editor({
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   }
 
+  /** Sends the poster image to the phone's share sheet (WhatsApp, etc.); downloads it where sharing files isn't supported. */
+  async function sharePoster() {
+    const stage = await readyStage();
+    if (!stage) return;
+    const image = renderImage(stage, "jpeg");
+    if (!image) return;
+    const blob = await (await fetch(image.url)).blob();
+    const file = new File([blob], `${fileName()}.jpg`, { type: "image/jpeg" });
+    if (!navigator.canShare?.({ files: [file] })) {
+      saveFile(image.url, file.name);
+      return showToast("Sharing images isn't supported in this browser, so it was downloaded instead.", "info");
+    }
+    const result = await shareContent({ title: title.trim() || "Poster", file });
+    if (result === "failed") showToast("Couldn't share on this device. Use Download instead.", "error");
+  }
+
   /** Plays the entrances on the canvas (the editor's preview). */
   async function previewAnimation() {
     if (!design.elements.some((e) => e.animation && e.animation.entrance !== "none")) {
@@ -529,6 +546,10 @@ export function Editor({
               Download
             </summary>
             <div className="absolute right-0 z-20 mt-1 w-56 rounded-xl border border-line bg-surface p-1 shadow-pop">
+              <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-raised" onClick={(e) => { (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; sharePoster(); }}>
+                <span className="block font-semibold">Share…</span>
+                <span className="block text-xs text-ink/60">Send the image to WhatsApp and other apps</span>
+              </button>
               <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-raised" onClick={(e) => { (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; download("png"); }}>
                 <span className="block font-semibold">PNG</span>
                 <span className="block text-xs text-ink/60">Best quality, for print and sharing</span>

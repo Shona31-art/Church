@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { QueuedNotice } from "@/components/OfflineQueue";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
@@ -47,6 +48,8 @@ export default async function JournalPage({ searchParams }: { searchParams: { pa
         actions={configured ? newButton : null}
       />
 
+      <QueuedNotice kind="journal" />
+
       {!configured && (
         <Alert tone="warning" title="The journal isn't set up yet" className="mb-4">
           The app is missing its journal encryption key, so entries can&apos;t be written or read. Your church admin should contact support.
@@ -62,7 +65,14 @@ export default async function JournalPage({ searchParams }: { searchParams: { pa
             <li key={entry.id} className="card-elevated rounded-2xl p-5">
               <div className="flex items-center justify-between gap-3 mb-2">
                 <p className="text-xs font-semibold text-ink/60">{formatDate(entry.date)}</p>
-                <DeleteEntry id={entry.id} />
+                <div className="flex items-center gap-1">
+                  {entry.content !== null && (
+                    <Link href={`/dashboard/journal/${entry.id}/edit`} className="btn-ghost btn-sm">
+                      Edit
+                    </Link>
+                  )}
+                  <DeleteEntry id={entry.id} />
+                </div>
               </div>
               {entry.content !== null ? (
                 <p className="whitespace-pre-wrap leading-relaxed">{entry.content}</p>

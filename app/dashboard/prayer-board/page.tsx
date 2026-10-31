@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { QueuedNotice } from "@/components/OfflineQueue";
+import { PushPrompt } from "@/components/notifications/PushPrompt";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
@@ -12,7 +14,7 @@ import { toggleSharing, reopenPrayer, deletePrayer } from "./actions";
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
 import { NAV_ICONS } from "@/components/ui/NavIcon";
 
-export default async function PrayerBoardPage() {
+export default async function PrayerBoardPage({ searchParams }: { searchParams: { shared?: string } }) {
   const gate = await moduleGate("prayer_board");
   if (gate) return gate;
 
@@ -46,6 +48,14 @@ export default async function PrayerBoardPage() {
           </>
         }
       />
+
+      <QueuedNotice kind="prayer" />
+
+      {searchParams.shared === "1" && (
+        <div className="mb-6">
+          <PushPrompt title="Know when your church prays for you" body="Get a notification on this phone when someone prays for your request or sends you a message." />
+        </div>
+      )}
 
       {error && <Alert tone="error" className="mb-6">Couldn&apos;t load your prayers — refresh the page to try again.</Alert>}
 
@@ -113,6 +123,9 @@ function PrayerCard({ item }: { item: any }) {
             <PendingButton className="btn-secondary btn-sm">Still praying</PendingButton>
           </form>
         )}
+        <Link href={`/dashboard/prayer-board/${item.id}/edit`} className="btn-secondary btn-sm">
+          Edit
+        </Link>
         <form action={deletePrayer} className="ml-auto">
           <input type="hidden" name="id" value={item.id} />
           <ConfirmSubmitButton

@@ -16,7 +16,7 @@ export function IosSteps() {
         Scroll down and tap <strong>Add to Home Screen</strong> <SquarePlus aria-hidden className="mx-0.5 inline h-4 w-4 -translate-y-px text-ink" />.
       </Step>
       <Step n={3}>
-        Tap <strong>Add</strong>. Grace-bound appears on your home screen and opens full screen.
+        Tap <strong>Add</strong>. Grace appears on your home screen and opens full screen.
       </Step>
       <p className="hint">Using Chrome or Edge on iPhone? The Share button is in the address bar; the steps are the same.</p>
     </ol>
@@ -40,7 +40,7 @@ export function ManualSteps({ platform }: { platform: InstallPlatform | null }) 
   return (
     <p className="text-sm text-ink/70">
       In Chrome or Edge, click the install icon at the right of the address bar, or open the browser menu and choose{" "}
-      <strong>Install Grace-bound</strong>. Other browsers may not support installing; the app works fully in the browser too.
+      <strong>Install Grace</strong>. Other browsers may not support installing; the app works fully in the browser too.
     </p>
   );
 }

@@ -71,7 +71,7 @@ export function jpegToPdf(jpeg: Uint8Array, page: { width: number; height: numbe
     "\nendstream",
   ]);
   object(5, `<< /Length ${encoder.encode(content).length} >>\nstream\n${content}\nendstream`);
-  object(6, `<< /Title (${safeTitle}) /Producer (Grace-bound) >>`);
+  object(6, `<< /Title (${safeTitle}) /Producer (Grace by Grace-bound Ventures) >>`);
 
   const xref = length;
   push(`xref\n0 7\n0000000000 65535 f \n${offsets.slice(1).map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("")}`);

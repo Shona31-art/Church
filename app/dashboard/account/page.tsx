@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { DisplaySettings } from "@/components/ui/DisplaySettings";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { roleLabel } from "@/lib/permissions";
 import { PageHeader, Section, DetailList } from "@/components/ui/PageHeader";
@@ -76,8 +77,14 @@ export default async function MyAccountPage({ searchParams }: { searchParams?: {
         </Section>
       )}
 
+      <div id="display" className="scroll-mt-24">
+        <Section title="Display" description="Text size, contrast and light or dark — for this device.">
+          <DisplaySettings />
+        </Section>
+      </div>
+
       <div id="install" className="scroll-mt-24">
-        <Section title="Install the app" description="Open Grace-bound from your phone's home screen, full screen, like any other app.">
+        <Section title="Install the app" description="Open Grace from your phone's home screen, full screen, like any other app.">
           <InstallApp />
         </Section>
       </div>

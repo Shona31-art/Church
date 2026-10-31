@@ -115,3 +115,41 @@ export function activeHref(pathname: string, groups: NavGroup[]): string | null 
   }
   return best;
 }
+
+// Phone tab bar: the few places people go most, in this order of preference,
+// limited to what this person's menu actually contains. Everything else
+// stays one tap away under "More" (the full menu drawer).
+const TAB_PREFERENCE = [
+  "/dashboard",
+  "/dashboard/prayer-board",
+  "/dashboard/chat",
+  "/dashboard/bible",
+  "/dashboard/calendar",
+  "/dashboard/announcements",
+  "/dashboard/giving",
+  "/dashboard/super-admin",
+  "/dashboard/super-admin/churches",
+  "/dashboard/super-admin/users",
+  "/dashboard/support",
+];
+
+// Labels short enough for a 5-across tab bar on a small phone.
+const SHORT_LABELS: Record<string, string> = {
+  "/dashboard/prayer-board": "Prayer",
+  "/dashboard/announcements": "News",
+  "/dashboard/super-admin/users": "Users",
+  "/dashboard/support": "Support",
+};
+
+export function buildTabBar(groups: NavGroup[], max = 4): NavLink[] {
+  const items = groups.flatMap((g) => g.items);
+  const byHref = new Map(items.map((item) => [item.href, item]));
+  const picked = TAB_PREFERENCE.flatMap((href) => (byHref.has(href) ? [byHref.get(href)!] : []));
+  for (const item of items) if (picked.length < max && !picked.includes(item)) picked.push(item);
+  return picked.slice(0, max).map((item) => ({ ...item, label: SHORT_LABELS[item.href] ?? item.label }));
+}
+
+/** Full-screen tools where the tab bar would get in the way (chat threads, the poster editor). */
+export function hidesTabBar(pathname: string): boolean {
+  return /^\/dashboard\/chat\/(?!channels\/|dm\/)[^/]+$/.test(pathname) || pathname.startsWith("/dashboard/posters/editor");
+}

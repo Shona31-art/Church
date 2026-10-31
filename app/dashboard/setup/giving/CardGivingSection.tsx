@@ -18,7 +18,7 @@ export type CardGivingState =
 /**
  * Church admin: card giving through Paystack. Card gifts settle to the
  * church's own bank account (the details above); Paystack's fee comes out of
- * each gift unless the member chooses to add it. Grace-bound takes nothing.
+ * each gift unless the member chooses to add it. Grace-bound Ventures takes nothing.
  */
 export function CardGivingSection({ state }: { state: CardGivingState }) {
   const [enableState, enableAction] = useFormState(enableCardGiving, null);
@@ -81,7 +81,7 @@ export function CardGivingSection({ state }: { state: CardGivingState }) {
           <ul className="list-disc space-y-1 pl-5 text-sm text-ink/70">
             <li>Card gifts are paid into {state.bankLabel}, usually two working days later.</li>
             <li>Paystack&apos;s card fee comes out of each gift, unless the member chooses to add it so you receive the full amount.</li>
-            <li>Grace-bound takes nothing from gifts. Refunds are done in Paystack if ever needed.</li>
+            <li>Grace-bound Ventures takes nothing from gifts. Refunds are done in Paystack if ever needed.</li>
           </ul>
           <form action={enableAction}>
             <input type="hidden" name="expected_details_updated_at" value={state.detailsUpdatedAt} />

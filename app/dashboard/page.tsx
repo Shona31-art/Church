@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ShareButton } from "@/components/ShareButton";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
@@ -17,6 +18,7 @@ import {
   ArrowRight,
   BookOpen,
   Cake,
+  CalendarCheck,
   CalendarPlus,
   ChevronRight,
   CircleCheck,
@@ -203,6 +205,12 @@ export default async function DashboardHomePage() {
             Read in context
           </Link>
         )}
+        {verseText && (
+          <ShareButton
+            content={{ title: `Verse of the day — ${verseRef}`, text: `“${verseText}”\n— ${verseRef} (WEB)` }}
+            className="inline-flex items-center gap-1 font-medium text-on-panel/85 underline-offset-4 hover:text-on-panel hover:underline"
+          />
+        )}
         {has("bible_study_ai") && (
           <Link
             href={`/dashboard/bible/study?ref=${encodeURIComponent(verseRef)}`}
@@ -221,7 +229,7 @@ export default async function DashboardHomePage() {
         <div>
           <p className="eyebrow">{formatDate(now, { weekday: "long", month: "long", year: undefined })}</p>
           <h1 className="mt-3 text-title font-medium leading-tight sm:text-[48px] sm:leading-[1.05]">
-            {greeting(now)}, <em className="italic text-gold-deep">{firstName}</em>
+            {greeting(now)}, <em className="italic text-rose">{firstName}</em>
           </h1>
           <div className="rule-gold mt-5" />
         </div>
@@ -240,6 +248,8 @@ export default async function DashboardHomePage() {
           </div>
         )}
       </header>
+
+      <QuickActions has={has} />
 
       <InstallBanner />
 
@@ -474,6 +484,39 @@ function Stat({ label, value, hint, href }: { label: string; value: string; hint
       <p className="tabular mt-3 truncate font-display text-[34px] font-medium leading-none sm:text-[42px]">{value}</p>
       {hint && <p className="mt-1.5 text-xs text-ink/60">{hint}</p>}
     </Link>
+  );
+}
+
+// The four things members do most, as big thumb-sized buttons at the top of
+// Home (most useful on phones). Only what the church's plan includes.
+const QUICK_ACTIONS: { href: string; label: string; module: ModuleKey; Icon: LucideIcon }[] = [
+  { href: "/dashboard/prayer-board/new", label: "Request prayer", module: "prayer_board", Icon: HandHeart },
+  { href: "/dashboard/giving", label: "Give", module: "giving", Icon: Gift },
+  { href: "/dashboard/bible", label: "Read today", module: "bible", Icon: BookOpen },
+  { href: "/dashboard/calendar", label: "Events & RSVP", module: "calendar", Icon: CalendarCheck },
+];
+
+function QuickActions({ has }: { has: (m: ModuleKey) => boolean }) {
+  const actions = QUICK_ACTIONS.filter((a) => has(a.module));
+  if (actions.length < 2) return null;
+  return (
+    <nav aria-label="Quick actions">
+      <ul className={`grid gap-2 sm:gap-3 ${actions.length === 4 ? "grid-cols-4" : actions.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+        {actions.map(({ href, label, Icon }) => (
+          <li key={href}>
+            <Link
+              href={href}
+              className="card-interactive flex min-h-[88px] flex-col items-center justify-center gap-2 rounded-2xl px-1 py-3 text-center text-xs font-semibold leading-tight sm:flex-row sm:justify-start sm:gap-3 sm:px-4 sm:text-left sm:text-sm"
+            >
+              <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gold/40 text-gold-deep">
+                <Icon className="h-5 w-5" strokeWidth={1.6} />
+              </span>
+              {label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 

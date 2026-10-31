@@ -7,6 +7,7 @@ import { Download } from "lucide-react";
 import { showToast } from "@/components/ui/Toaster";
 import type { PosterDesign } from "@/lib/posters/design";
 import { fontsInDesign, loadFonts } from "@/lib/posters/fonts";
+import { ShareButton } from "@/components/ShareButton";
 
 const EditorCanvas = dynamic(() => import("./EditorCanvas").then((m) => m.EditorCanvas), {
   ssr: false,
@@ -33,6 +34,20 @@ export function PosterViewer({ design, title, imageUrls }: { design: PosterDesig
     observer.observe(el);
     return () => observer.disconnect();
   }, [design.width, design.height]);
+
+  /** The poster as an image file, for the phone's share sheet (straight into WhatsApp). */
+  async function shareFile() {
+    const stage = stageRef.current;
+    if (!stage) return null;
+    try {
+      const blob = await (await fetch(stage.toDataURL({ pixelRatio: 1 / scale, mimeType: "image/jpeg", quality: 0.92 }))).blob();
+      const name = `${(title || "poster").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.jpg`;
+      return { title, file: new File([blob], name, { type: "image/jpeg" }) };
+    } catch {
+      showToast("Couldn't create the image on this device. Try on a computer.", "error");
+      return null;
+    }
+  }
 
   function download(type: "png" | "jpeg") {
     const stage = stageRef.current;
@@ -73,6 +88,7 @@ export function PosterViewer({ design, title, imageUrls }: { design: PosterDesig
         <button type="button" className="btn-secondary" onClick={() => download("jpeg")}>
           Download JPG
         </button>
+        <ShareButton content={shareFile} label="Share image" />
       </div>
     </div>
   );

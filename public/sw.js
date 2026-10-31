@@ -144,8 +144,7 @@ async function trimStatic(cache) {
 // ---------------------------------------------------------------------------
 // Phone pop-ups (Web Push) for the notification bell — sent by lib/push.ts.
 // The payload is { title, body, url, tag }. Only in-app links are followed.
-// BRAND PLACEHOLDER: no icon yet, so browsers show their default; add the
-// logo as `icon` once it exists.
+// The app icon: the Grace cross (scripts/build-brand.mjs).
 // ---------------------------------------------------------------------------
 
 function safeUrl(url) {
@@ -160,8 +159,10 @@ self.addEventListener("push", (event) => {
     // Not JSON: show a generic pop-up rather than nothing.
   }
   event.waitUntil(
-    self.registration.showNotification(data.title || "Grace-bound", {
+    self.registration.showNotification(data.title || "Grace", {
       body: data.body || "",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/favicon-32.png",
       // Same tag (e.g. one chat) replaces the older pop-up instead of stacking.
       tag: data.tag || undefined,
       renotify: Boolean(data.tag),

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HapticOnMount } from "@/components/Haptics";
 import { Landmark } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
@@ -77,6 +78,7 @@ export default async function GivingPage({ searchParams }: { searchParams: { car
       {/* Set by /api/giving/paystack/return after asking Paystack what happened. */}
       {searchParams.card === "received" && (
         <Alert tone="success" title="Thank you for your gift" className="mb-4">
+          <HapticOnMount />
           Your card gift was received. It&apos;s in your history below.
         </Alert>
       )}

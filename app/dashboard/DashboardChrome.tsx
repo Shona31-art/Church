@@ -3,14 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CircleAlert, Info, Menu, TriangleAlert, X } from "lucide-react";
+import { CircleAlert, Info, Menu, MoreHorizontal, TriangleAlert, X } from "lucide-react";
 import { SignOutButton } from "./SignOutButton";
 import { Toaster } from "@/components/ui/Toaster";
 import { NavIcon } from "@/components/ui/NavIcon";
 import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
 import { Avatar } from "@/components/ui/Avatar";
 import { initials } from "@/lib/initials";
-import { activeHref, type NavGroup } from "@/lib/navigation";
+import { activeHref, buildTabBar, hidesTabBar, type NavGroup } from "@/lib/navigation";
+import { KeyboardViewport } from "@/components/KeyboardViewport";
+import { PullToRefresh } from "@/components/PullToRefresh";
+import { HapticClicks } from "@/components/Haptics";
+import { OfflineQueueSender } from "@/components/OfflineQueue";
+import { WelcomeTour } from "@/components/WelcomeTour";
 import { NotificationBell, NotificationsProvider } from "@/components/notifications/NotificationBell";
 // Imported for its side effect: starts listening for the browser's one-time install prompt as early as possible.
 import "@/components/install/install-store";
@@ -53,6 +58,8 @@ export function DashboardChrome({
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const current = activeHref(pathname, navGroups);
+  const tabs = buildTabBar(navGroups);
+  const showTabs = tabs.length > 1 && !hidesTabBar(pathname);
 
   // Close the drawer on navigation, and on Escape (returning focus to the
   // menu button so keyboard users aren't dropped at the top of the page).
@@ -129,11 +136,62 @@ export function DashboardChrome({
 
         <div className="flex min-w-0 flex-1 flex-col">
           {banner && <Banner banner={banner} />}
-          <main id="main" className="flex-1 px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-8 sm:py-8 lg:px-12 lg:py-10 motion-safe:animate-fade-in">
+          <main
+            id="main"
+            className={`flex-1 px-4 py-6 sm:px-8 sm:py-8 md:pb-[max(2rem,env(safe-area-inset-bottom))] lg:px-12 lg:py-10 motion-safe:animate-fade-in ${
+              showTabs ? "pb-[calc(5.5rem+env(safe-area-inset-bottom))]" : "pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+            }`}
+          >
             {children}
           </main>
         </div>
 
+        {showTabs && (
+          <nav
+            aria-label="Quick"
+            data-tab-bar
+            className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur-md md:hidden"
+          >
+            <ul className="mx-auto flex max-w-lg">
+              {tabs.map((tab) => {
+                const active = tab.href === current;
+                return (
+                  <li key={tab.href} className="flex-1">
+                    <Link
+                      href={tab.href}
+                      aria-current={active ? "page" : undefined}
+                      className={`relative flex min-h-[56px] flex-col items-center justify-center gap-1 text-micro font-semibold tracking-wide ${active ? "text-ink" : "text-ink/60"}`}
+                    >
+                      {active && <span aria-hidden className="absolute top-0 h-0.5 w-8 rounded-b-full bg-gold" />}
+                      <NavIcon name={tab.icon} className={`h-[22px] w-[22px] ${active ? "text-gold-deep" : ""}`} />
+                      {tab.label}
+                    </Link>
+                  </li>
+                );
+              })}
+              <li className="flex-1">
+                <button
+                  type="button"
+                  onClick={() => setMobileOpen(true)}
+                  aria-expanded={mobileOpen}
+                  aria-controls="mobile-nav"
+                  className="flex min-h-[56px] w-full flex-col items-center justify-center gap-1 text-micro font-semibold tracking-wide text-ink/60"
+                >
+                  <MoreHorizontal aria-hidden className="h-[22px] w-[22px]" strokeWidth={1.75} />
+                  More
+                </button>
+              </li>
+            </ul>
+          </nav>
+        )}
+
+        <KeyboardViewport />
+        <HapticClicks />
+        <OfflineQueueSender />
+        {pathname === "/dashboard" && userRole !== "Platform admin" && (
+          <WelcomeTour availableHrefs={navGroups.flatMap((g) => g.items.map((i) => i.href))} firstName={userName.split(" ")[0]} />
+        )}
+        <PullToRefresh enabled={!hidesTabBar(pathname) && !pathname.startsWith("/dashboard/bible/read")} />
         <Toaster />
       </div>
     </NotificationsProvider>
@@ -174,12 +232,12 @@ function Sidebar({
     <>
       {/* Church identity. The monogram stands in until the church uploads a
           logo — flagged in the README's placeholder list. */}
-      <div className="flex items-center gap-1 border-b border-line pb-5 pl-5 pr-2 pt-6">
+      <div className="flex items-center gap-1 border-b border-line pb-5 pl-5 pr-12 pt-6 md:pr-2">
         <Link href="/dashboard" className="flex min-w-0 flex-1 items-center gap-3">
           <Monogram text={initials(churchName)} />
           <div className="min-w-0">
             <p className="truncate font-display text-xl font-semibold leading-tight">{churchName}</p>
-            <p className="eyebrow mt-1 text-micro">Grace-bound</p>
+            <p className="mt-0.5 font-script text-lg leading-none text-gold">Grace</p>
           </div>
         </Link>
         {/* Desktop only: on phones the bell lives in the top bar, not the menu drawer. */}

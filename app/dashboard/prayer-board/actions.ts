@@ -10,7 +10,8 @@ import { generateText } from "@/lib/ai";
 import { consumeAiQuota } from "@/lib/ai-quota";
 import { logAudit } from "@/lib/audit";
 import { flash } from "@/lib/flash";
-import { SESSION_EXPIRED } from "@/lib/forms";
+import { formValues, SESSION_EXPIRED, type FormState } from "@/lib/forms";
+import { redirect } from "next/navigation";
 
 // Every action re-checks the session and relies on RLS as the hard boundary
 // (a member can only update their own prayers; see personal_growth_schema.sql
@@ -88,6 +89,37 @@ export async function toggleSharing(formData: FormData) {
 
   await supabase.from("prayer_board_items").update(update).eq("id", parsed.data).eq("user_id", me.id);
   refresh();
+}
+
+const PRAYER_CATEGORIES = ["family", "career", "health", "ministry", "personal"] as const;
+
+/** Edit your own prayer's words and category. Form fields: id, prayer_text, category. */
+export async function updatePrayer(_prev: FormState, formData: FormData): Promise<FormState> {
+  const me = await getCurrentAppUser();
+  if (!me) return { error: SESSION_EXPIRED, values: formValues(formData) };
+  if (!(await checkModuleAccess("prayer_board")).allowed) return { error: "The prayer board isn't available on your church's plan." };
+  const parsed = z
+    .object({
+      id,
+      prayer_text: z.string().trim().min(1, "Write your prayer before saving.").max(4000, "That's a long prayer — please keep it under 4000 characters."),
+      category: z.union([z.enum(PRAYER_CATEGORIES), z.literal("")]),
+    })
+    .safeParse({ id: formData.get("id"), prayer_text: formData.get("prayer_text") ?? "", category: formData.get("category") ?? "" });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message, values: formValues(formData) };
+
+  const { data: updated, error } = await createClient()
+    .from("prayer_board_items")
+    .update({ prayer_text: parsed.data.prayer_text, category: parsed.data.category })
+    .eq("id", parsed.data.id)
+    .eq("user_id", me.id)
+    .select("id");
+  if (error || !updated?.length) {
+    if (error) console.error("[prayer] update failed:", error.message);
+    return { error: "Couldn't save your changes — please try again.", values: formValues(formData) };
+  }
+  refresh();
+  flash("Prayer updated.");
+  redirect("/dashboard/prayer-board");
 }
 
 export async function deletePrayer(formData: FormData) {

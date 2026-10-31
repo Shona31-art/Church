@@ -250,6 +250,17 @@ describe("prayer board & wall", () => {
     ]);
   });
 
+  test("a member can edit their own prayer's words and category (Edit prayer)", async () => {
+    const updated = await asUser(db, MEMBER_A, () =>
+      rows(`update prayer_board_items set prayer_text = 'shared prayer (edited)', category = 'health' where id = $1 and user_id = $2 returning id`, [sharedId, MEMBER_A])
+    );
+    expect(updated).toHaveLength(1);
+    expect(await rows(`select prayer_text, category from prayer_board_items where id = $1`, [sharedId])).toEqual([
+      { prayer_text: "shared prayer (edited)", category: "health" },
+    ]);
+    await db.exec(`update prayer_board_items set prayer_text = 'shared prayer', category = null where id = '${sharedId}'`); // reset
+  });
+
   test("a member cannot edit someone else's prayer", async () => {
     const updated = await asUser(db, MEMBER2_A, () =>
       rows(`update prayer_board_items set prayer_text = 'x' where id = $1 returning id`, [sharedId])
@@ -266,6 +277,18 @@ describe("journal privacy (existing guarantee still holds)", () => {
     `);
     expect(await asUser(db, PASTOR_A, () => rows(`select id from journal_entries`))).toHaveLength(0);
     expect(await asUser(db, MEMBER_A, () => rows(`select id from journal_entries`))).toHaveLength(1);
+  });
+
+  test("only the author can edit a journal entry (Edit entry)", async () => {
+    const [{ id }] = await rows(`select id from journal_entries where user_id = $1 limit 1`, [MEMBER_A]);
+    const byPastor = await asUser(db, PASTOR_A, () => rows(`update journal_entries set iv = '\\x01' where id = $1 returning id`, [id]));
+    expect(byPastor).toHaveLength(0);
+    const byOther = await asUser(db, MEMBER2_A, () => rows(`update journal_entries set iv = '\\x01' where id = $1 returning id`, [id]));
+    expect(byOther).toHaveLength(0);
+    const byAuthor = await asUser(db, MEMBER_A, () =>
+      rows(`update journal_entries set encrypted_content = '\\x02', iv = '\\x02', auth_tag = '\\x02' where id = $1 and user_id = $2 returning id`, [id, MEMBER_A])
+    );
+    expect(byAuthor).toHaveLength(1);
   });
 });
 

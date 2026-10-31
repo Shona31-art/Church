@@ -1,4 +1,4 @@
-import { Mark } from "./BrandMark";
+import { Cross } from "./Cross";
 
 /**
  * Decorative obsidian-and-champagne artwork that holds the place of a hero
@@ -33,7 +33,7 @@ export function Ornament({
           <circle cx="340" cy="210" r="2" />
         </g>
       </svg>
-      <Mark className="h-9 w-9 text-gold" />
+      <Cross className="h-20 w-20 drop-shadow-[0_6px_22px_rgba(63,182,194,0.45)]" halo={false} />
       <blockquote className="mt-8 max-w-[18ch] font-display text-[30px] font-medium italic leading-[1.2] text-ink sm:text-[34px]">{verse}</blockquote>
       <div className="rule-gold mx-auto mt-6" />
       <figcaption className="mt-4 text-eyebrow font-semibold uppercase tracking-[0.24em] text-gold">{reference}</figcaption>

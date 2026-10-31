@@ -25,7 +25,7 @@ export function ServiceWorker() {
     const onControllerChange = () => {
       if (!hadController || announced) return;
       announced = true;
-      showToast("Grace-bound has been updated. Refresh the page when it suits you to get the latest version.", "info");
+      showToast("Grace has been updated. Refresh the page when it suits you to get the latest version.", "info");
     };
     navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
 

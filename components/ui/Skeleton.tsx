@@ -47,3 +47,45 @@ export function ListSkeleton({ rows = 6 }: { rows?: number }) {
     </div>
   );
 }
+
+/** A grid of tiles (games, posters, Bible books, plans). */
+export function TileGridSkeleton({ tiles = 6, className = "h-32" }: { tiles?: number; className?: string }) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: tiles }, (_, i) => (
+        <Bone key={i} className={`rounded-2xl ${className}`} />
+      ))}
+    </div>
+  );
+}
+
+/** Stacked cards with a title and a few lines (announcements, prayers, sermons, journal). */
+export function CardStackSkeleton({ cards = 4 }: { cards?: number }) {
+  return (
+    <div className="space-y-4">
+      {Array.from({ length: cards }, (_, i) => (
+        <div key={i} className="card-elevated space-y-3 rounded-2xl p-5">
+          <Bone className="h-5 w-2/5" />
+          <Bone className="h-3 w-full" />
+          <Bone className="h-3 w-4/5" />
+          <Bone className="h-3 w-1/4" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Detail page: one tall card plus a smaller one. */
+export function DetailSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="card-elevated space-y-3 rounded-2xl p-6">
+        <Bone className="h-4 w-1/3" />
+        <Bone className="h-4 w-1/2" />
+        <Bone className="h-4 w-2/5" />
+        <Bone className="mt-4 h-24 w-full" />
+      </div>
+      <Bone className="h-32 rounded-2xl" />
+    </div>
+  );
+}

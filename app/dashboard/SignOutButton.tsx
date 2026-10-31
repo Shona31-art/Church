@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { clearQueue } from "@/lib/offline-queue";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -28,6 +29,8 @@ export function SignOutButton({ className }: { className?: string }) {
     // The offline copy of the Bible reader page includes the app header with
     // this person's name, so don't leave it on a shared device.
     await clearOfflinePages();
+    // Anything written offline and not yet sent belongs to this person: don't leave it on a shared phone.
+    clearQueue();
     router.push("/login");
     router.refresh();
   }

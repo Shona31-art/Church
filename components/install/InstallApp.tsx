@@ -28,7 +28,7 @@ export function InstallApp() {
     return (
       <p role="status" className="flex items-center gap-2 text-sm text-ink/80">
         <CircleCheck aria-hidden className="h-4 w-4 shrink-0 text-success" />
-        {mode === "installed" ? "You're using the installed app." : "Installed. Open Grace-bound from your home screen or app list."}
+        {mode === "installed" ? "You're using the installed app." : "Installed. Open Grace from your home screen or app list."}
       </p>
     );
   }
@@ -39,7 +39,7 @@ export function InstallApp() {
     return (
       <p role="status" className="flex items-start gap-2 text-sm text-ink/80">
         <LoaderCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0 motion-safe:animate-spin" />
-        Installing — Grace-bound should appear on your home screen or app list in a moment.
+        Installing — Grace should appear on your home screen or app list in a moment.
       </p>
     );
   }
@@ -47,9 +47,9 @@ export function InstallApp() {
   if (mode === "prompt") {
     return (
       <div className="space-y-3">
-        <p className="text-sm text-ink/70">Add Grace-bound to your home screen. It opens full screen, like any other app, and keeps you signed in.</p>
+        <p className="text-sm text-ink/70">Add Grace to your home screen. It opens full screen, like any other app, and keeps you signed in.</p>
         <button type="button" onClick={install} className="btn-primary">
-          <Download aria-hidden className="h-4 w-4" /> Install Grace-bound
+          <Download aria-hidden className="h-4 w-4" /> Install Grace
         </button>
       </div>
     );

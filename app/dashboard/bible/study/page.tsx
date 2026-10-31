@@ -17,7 +17,7 @@ export default async function BibleStudyPage({ searchParams }: { searchParams: {
       />
       {!isAiConfigured() && (
         <Alert tone="warning" className="mb-6">
-          AI isn&apos;t configured on this server yet (ANTHROPIC_API_KEY), so study notes won&apos;t generate. You can still read any passage in the Bible reader.
+          AI isn&apos;t configured on this server yet (ANTHROPIC_API_KEY or GEMINI_API_KEY), so study notes won&apos;t generate. You can still read any passage in the Bible reader.
         </Alert>
       )}
       <StudyTool initialQuery={(searchParams.ref ?? "").slice(0, 200)} />

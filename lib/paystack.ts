@@ -201,9 +201,9 @@ function subaccountBody(input: SubaccountInput) {
     business_name: input.businessName,
     settlement_bank: input.bankCode,
     account_number: input.accountNumber,
-    percentage_charge: 0, // Grace-bound takes nothing from gifts
+    percentage_charge: 0, // Grace-bound Ventures takes nothing from gifts
     primary_contact_email: input.contactEmail,
-    description: "Card giving for this church (Grace-bound)",
+    description: "Card giving for this church (Grace by Grace-bound Ventures)",
   };
 }
 

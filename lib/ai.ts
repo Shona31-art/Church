@@ -12,10 +12,15 @@ import { extractJson } from "@/lib/json";
  * Contract: these functions NEVER throw. They return `null` when AI is not
  * configured or the call fails, and every caller has a non-AI fallback, so
  * the app stays fully usable with zero API keys set.
+ *
+ * Providers: Anthropic Claude (ANTHROPIC_API_KEY) or Google Gemini
+ * (GEMINI_API_KEY). If both are set, Claude is used.
  */
 
 // Overridable so an operator can pick a cheaper model without a code change.
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5-5";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
 // Short user-facing tasks: fail fast rather than leave someone staring at a
 // spinner. One retry covers transient 429/5xx blips.
@@ -28,8 +33,17 @@ function getClient(): Anthropic | null {
   return client;
 }
 
+export type AiProvider = "anthropic" | "gemini";
+
+/** Which AI service answers, or null when no key is set. */
+export function aiProvider(): AiProvider | null {
+  if (process.env.ANTHROPIC_API_KEY) return "anthropic";
+  if (process.env.GEMINI_API_KEY) return "gemini";
+  return null;
+}
+
 export function isAiConfigured(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
+  return aiProvider() !== null;
 }
 
 export interface AiTurn {
@@ -43,10 +57,11 @@ export async function generateText(params: {
   system?: string;
   maxTokens?: number;
 }): Promise<string | null> {
+  const messages: AiTurn[] = params.messages ?? [{ role: "user", content: params.prompt ?? "" }];
+  if (aiProvider() === "gemini") return generateWithGemini({ ...params, messages });
+
   const ai = getClient();
   if (!ai) return null;
-
-  const messages: AiTurn[] = params.messages ?? [{ role: "user", content: params.prompt ?? "" }];
 
   try {
     const response = await ai.beta.messages.create({
@@ -79,6 +94,67 @@ export async function generateText(params: {
     }
     return null;
   }
+}
+
+/** Gemini request body (REST generateContent). Exported for tests. */
+export function geminiRequestBody(params: { messages: AiTurn[]; system?: string; maxTokens?: number }, model = GEMINI_MODEL) {
+  return {
+    ...(params.system ? { systemInstruction: { parts: [{ text: params.system }] } } : {}),
+    // Gemini calls the assistant "model".
+    contents: params.messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
+    generationConfig: {
+      maxOutputTokens: params.maxTokens ?? 2000,
+      // Short-form writing: keep thinking low (Gemini 3 and later), like Claude's effort "low" above.
+      ...(/^gemini-[3-9]/.test(model) ? { thinkingConfig: { thinkingLevel: "low" } } : {}),
+    },
+  };
+}
+
+interface GeminiResponse {
+  candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] }; finishReason?: string }[];
+  promptFeedback?: { blockReason?: string };
+}
+
+/** The answer text, or null when Gemini blocked or returned nothing. Exported for tests. */
+export function geminiText(json: GeminiResponse): string | null {
+  if (json.promptFeedback?.blockReason) return null;
+  const candidate = json.candidates?.[0];
+  if (!candidate || ["SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "RECITATION", "SPII"].includes(candidate.finishReason ?? "")) return null;
+  const text = (candidate.content?.parts ?? [])
+    .filter((p) => !p.thought)
+    .map((p) => p.text ?? "")
+    .join("")
+    .trim();
+  return text || null;
+}
+
+async function generateWithGemini(params: { messages: AiTurn[]; system?: string; maxTokens?: number }): Promise<string | null> {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return null;
+  const url = `${GEMINI_URL}/${encodeURIComponent(GEMINI_MODEL)}:generateContent`;
+  const body = JSON.stringify(geminiRequestBody(params));
+  // One retry for transient 429/5xx blips, matching the Claude client.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": key },
+        body,
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+        cache: "no-store",
+      });
+      if (res.ok) return geminiText((await res.json()) as GeminiResponse);
+      const detail = (await res.text()).slice(0, 300);
+      if (attempt === 0 && (res.status === 429 || res.status >= 500)) continue;
+      console.error(`[ai] Gemini API error ${res.status} (model ${GEMINI_MODEL}${res.status === 404 ? " — check GEMINI_MODEL" : ""}): ${detail}`);
+      return null;
+    } catch (error) {
+      if (attempt === 0) continue;
+      console.error("[ai] Gemini request failed:", error);
+      return null;
+    }
+  }
+  return null;
 }
 
 /** Asks for JSON and parses it (tolerant of ```json fences — see lib/json.ts). */

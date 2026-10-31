@@ -28,7 +28,7 @@ export async function generateQuestionsWithAI(
   count: number = 5
 ): Promise<{ questions: GeneratedQuestion[]; error?: string }> {
   if (!isAiConfigured()) {
-    return { questions: [], error: "AI isn't configured (ANTHROPIC_API_KEY) — add questions manually instead." };
+    return { questions: [], error: "AI isn't configured (ANTHROPIC_API_KEY or GEMINI_API_KEY) — add questions manually instead." };
   }
   const me = await getCurrentAppUser();
   if (!me || !["church_admin", "pastor"].includes(me.role)) {

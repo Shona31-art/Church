@@ -131,7 +131,22 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
               <EmptyState title={`No gifts received in ${year}`} description="Bank transfers appear here once you mark them received; card gifts appear automatically." />
             ) : (
               <>
-                <div className="overflow-x-auto">
+                {/* Phones: one card per gift instead of a table to scroll sideways. */}
+                <ul className="divide-y divide-line md:hidden">
+                  {list.map((g) => (
+                    <li key={g.id} className="flex items-start justify-between gap-3 py-3 first:pt-0">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{g.app_users?.name ?? <span className="text-ink/60">Former member</span>}</p>
+                        <p className="mt-0.5 text-xs text-ink/60">
+                          {formatDate(g.method === "eft" && g.paid_on ? g.paid_on : g.created_at, { weekday: undefined })} · {fundLabel(g.fund)} ·{" "}
+                          {g.method === "eft" ? <>Transfer <span className="tabular">{g.reference}</span></> : "Card"}
+                        </p>
+                      </div>
+                      <p className="shrink-0 font-semibold tabular-nums">{formatMoney(g.amount_cents)}</p>
+                    </li>
+                  ))}
+                </ul>
+                <div className="hidden overflow-x-auto md:block">
                   <table className="w-full text-sm">
                     <caption className="sr-only">Gifts received in {year}</caption>
                     <thead className="text-left text-xs uppercase tracking-wide text-ink/60">

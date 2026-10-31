@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HapticOnMount } from "@/components/Haptics";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { getChurchAccess } from "@/lib/paywall";
@@ -62,15 +63,16 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
 
       {result && (
         <Alert tone={result.tone} title={result.title}>
+          {searchParams.payment === "paid" && <HapticOnMount />}
           {result.body}
         </Alert>
       )}
 
       {/* Online billing (Paystack subscriptions) when it's configured;
-          otherwise plan changes are arranged with the Grace-bound team. */}
+          otherwise plan changes are arranged with the Grace-bound Ventures team. */}
       {!online || billingState === "arranged" ? (
         <Alert tone="info" title="Changing your plan">
-          The Grace-bound team sets up plan changes and invoices for you. <Link href="/dashboard/support/new" className="underline">Open a support ticket</Link> or use
+          The Grace-bound Ventures team sets up plan changes and invoices for you. <Link href="/dashboard/support/new" className="underline">Open a support ticket</Link> or use
           &ldquo;Ask to switch&rdquo; below.
         </Alert>
       ) : null}

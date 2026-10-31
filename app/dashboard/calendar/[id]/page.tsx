@@ -10,6 +10,7 @@ import { PageHeader, Section, DetailList } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Alert } from "@/components/ui/Alert";
 import { OrganiserActions, RsvpButtons } from "./EventControls";
+import { ShareButton } from "@/components/ShareButton";
 
 export default async function EventDetailPage({ params }: { params: { id: string } }) {
   const gate = await moduleGate("calendar");
@@ -38,6 +39,17 @@ export default async function EventDetailPage({ params }: { params: { id: string
       <PageHeader
         back={{ href: "/dashboard/calendar", label: "Calendar" }}
         title={event.title}
+        actions={
+          !cancelled && !isPast ? (
+            <ShareButton
+              content={{
+                title: event.title,
+                text: `${event.title}\n${formatDate(event.start_time)} · ${formatTime(event.start_time)}${event.location ? `\n${event.location}` : ""}`,
+                url: `/dashboard/calendar/${event.id}`,
+              }}
+            />
+          ) : undefined
+        }
         meta={
           <>
             {cancelled && <StatusBadge tone="danger">Cancelled</StatusBadge>}

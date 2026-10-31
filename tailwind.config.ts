@@ -9,7 +9,7 @@ import type { Config } from "tailwindcss";
 // active, and opacity modifiers keep working.
 //
 // Neutrals (ink, parchment, surface, line) carry most of every screen.
-// ember is for primary actions (obsidian in light, champagne in dark), with
+// ember is for primary actions (deep plum in light, teal in dark), with
 // on-ember as the text that sits on it; gold is a small accent only.
 // success / warning / danger / info are reserved for state and always paired
 // with an icon or words, never colour alone. Each foreground colour passes
@@ -29,8 +29,11 @@ const config: Config = {
         "line-strong": token("line-strong"), // input borders
         ember: token("ember"), // primary actions, links
         "on-ember": token("on-ember"), // text/icons on an ember background
-        gold: { DEFAULT: token("gold"), deep: token("gold-deep"), soft: token("gold-soft") }, // champagne — hairlines, icons, small accents; `gold-deep` for text, `gold-soft` for tints
-        panel: token("panel"), // obsidian brand panel (sidebar, auth screens, landing hero) in both themes
+        // "gold" is the brand accent — teal since the Grace rebrand; the name stays so pages don't change.
+        gold: { DEFAULT: token("gold"), deep: token("gold-deep"), soft: token("gold-soft") }, // hairlines, icons, small accents; `gold-deep` for text, `gold-soft` for tints
+        teal: { DEFAULT: token("teal"), soft: token("teal-soft") }, // brand teal (decorative; text uses gold-deep)
+        rose: token("rose"), // highlights only: a name, one emphasised word
+        panel: token("panel"), // aubergine brand panel (sidebar, auth screens, landing hero) in both themes
         "on-panel": token("on-panel"), // text on the brand panel
         success: { DEFAULT: token("success"), tint: token("success-tint"), line: token("success-line") },
         warning: { DEFAULT: token("warning"), tint: token("warning-tint"), line: token("warning-line") },
@@ -39,23 +42,25 @@ const config: Config = {
         // Bible verse highlights only (components/bible/) — a member's own colour choice, not state.
         hl: { yellow: token("hl-yellow"), green: token("hl-green"), blue: token("hl-blue"), pink: token("hl-pink"), purple: token("hl-purple") },
       },
-      // Type scale. Use these instead of text-[NNpx]. Exceptions on purpose:
+      // Type scale, in rem so the "Text size" setting (lib/display-prefs.ts)
+      // enlarges everything at once. Use these instead of text-[NNpx]. Exceptions on purpose:
       // the Bible reader's reading sizes (components/bible/ChapterText.tsx),
       // crossword grid numbers and kids-mode game text, which scale content.
       fontSize: {
-        micro: ["10px", { lineHeight: "14px" }], // counter badges, date-tile months
-        eyebrow: ["11px", { lineHeight: "16px" }], // uppercase labels (.eyebrow), timestamps
-        lede: ["15px", { lineHeight: "1.55" }], // page descriptions, intro lines
-        "title-sm": ["24px", { lineHeight: "1.3" }],
-        title: ["32px", { lineHeight: "1.15" }], // page titles on phones
-        "title-lg": ["40px", { lineHeight: "1.1" }], // page titles from sm up
-        display: ["46px", { lineHeight: "1.05" }], // landing hero on phones
-        "display-lg": ["72px", { lineHeight: "1.0" }], // landing hero on desktop
+        micro: ["0.625rem", { lineHeight: "0.875rem" }], // counter badges, date-tile months
+        eyebrow: ["0.6875rem", { lineHeight: "1rem" }], // uppercase labels (.eyebrow), timestamps
+        lede: ["0.9375rem", { lineHeight: "1.55" }], // page descriptions, intro lines
+        "title-sm": ["1.5rem", { lineHeight: "1.3" }],
+        title: ["2rem", { lineHeight: "1.15" }], // page titles on phones
+        "title-lg": ["2.5rem", { lineHeight: "1.1" }], // page titles from sm up
+        display: ["2.875rem", { lineHeight: "1.05" }], // landing hero on phones
+        "display-lg": ["4.5rem", { lineHeight: "1.0" }], // landing hero on desktop
       },
       fontFamily: {
         // Loaded with next/font in app/layout.tsx (self-hosted, no layout shift).
         sans: ["var(--font-sans)", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
         display: ["var(--font-display)", "Georgia", "serif"],
+        script: ["var(--font-script)", "cursive"], // wordmarks only — never for reading text
       },
       boxShadow: {
         // Layered, low-opacity shadows read as depth rather than "drop shadow".

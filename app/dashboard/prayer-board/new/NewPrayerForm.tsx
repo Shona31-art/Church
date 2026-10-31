@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { QueuedNotice } from "@/components/OfflineQueue";
+import { useOfflineSubmit } from "@/lib/use-offline-submit";
 import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
 import { createPrayer } from "./actions";
@@ -18,6 +20,10 @@ export function NewPrayerForm({ aiAvailable }: { aiAvailable: boolean }) {
   const [category, setCategory] = useState("");
   const [drafting, setDrafting] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const onSubmit = useOfflineSubmit("prayer", () => {
+    setText("");
+    setCategory("");
+  });
 
   async function handleDraft() {
     setDrafting(true);
@@ -29,12 +35,13 @@ export function NewPrayerForm({ aiAvailable }: { aiAvailable: boolean }) {
   }
 
   return (
-    <form action={formAction} className="max-w-lg space-y-4">
+    <form action={formAction} onSubmit={onSubmit} className="max-w-lg space-y-4">
       <PageHeader title="Add a prayer" back={{ href: "/dashboard/prayer-board", label: "My prayer board" }} />
 
       {state?.error && (
         <Alert tone="error">{state.error}</Alert>
       )}
+      <QueuedNotice kind="prayer" />
 
       <div>
         <label htmlFor="prayer_text" className="label">

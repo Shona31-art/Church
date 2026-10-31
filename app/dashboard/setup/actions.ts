@@ -8,6 +8,7 @@ import { getCurrentAppUser } from "@/lib/current-user";
 import { logAudit } from "@/lib/audit";
 import { flash } from "@/lib/flash";
 import { can } from "@/lib/permissions";
+import { CHURCH_LOGO_BUCKET, churchLogoPathFromUrl, isOwnChurchLogoPath } from "@/lib/church-logo";
 import { churchNameSchema } from "@/lib/account-schemas";
 import { phoneSchema } from "@/lib/member-schemas";
 import { FormState, SESSION_EXPIRED, formValues, invalid, optionalField } from "@/lib/forms";
@@ -21,16 +22,9 @@ const ProfileSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email address.").max(254).optional(),
   phone: phoneSchema,
   address: z.string().trim().max(300, "Keep the address under 300 characters.").optional(),
-  logoUrl: z
-    .string()
-    .trim()
-    .url("Paste a full link starting with https://")
-    .refine((u) => u.startsWith("https://"), "The logo link must start with https://")
-    .max(500)
-    .optional(),
 });
 
-/** Church admins only (churches_update policy). Form fields: name, email?, phone?, address?, logo_url? */
+/** Church admins only (churches_update policy). Form fields: name, email?, phone?, address? (the logo has its own upload below) */
 export async function saveChurchProfile(_prev: FormState, formData: FormData): Promise<FormState> {
   const me = await getCurrentAppUser();
   if (!me || !me.church_id) return { error: SESSION_EXPIRED };
@@ -41,11 +35,9 @@ export async function saveChurchProfile(_prev: FormState, formData: FormData): P
     email: optionalField(formData, "email"),
     phone: optionalField(formData, "phone"),
     address: optionalField(formData, "address"),
-    logoUrl: optionalField(formData, "logo_url"),
   });
   if (!parsed.success) {
     const result = invalid(parsed.error, formData);
-    if (result?.fieldErrors?.logoUrl) result.fieldErrors.logo_url = result.fieldErrors.logoUrl;
     return result;
   }
 
@@ -56,7 +48,6 @@ export async function saveChurchProfile(_prev: FormState, formData: FormData): P
       email: parsed.data.email ?? null,
       phone: parsed.data.phone ?? null,
       address: parsed.data.address ?? null,
-      logo_url: parsed.data.logoUrl ?? null,
     })
     .eq("id", me.church_id)
     .select("id");
@@ -202,5 +193,53 @@ export async function disableCardGiving(_prev: FormState, _formData: FormData): 
   revalidatePath("/dashboard/setup/giving");
   revalidatePath("/dashboard/giving");
   flash("Card giving is off. Members can still give by bank transfer.");
+  return { ok: true };
+}
+
+/**
+ * Church admins only. The browser has already uploaded the logo into the
+ * church's folder (storage rules: supabase/church_logo.sql); this saves its
+ * public link on the church and removes the previous upload.
+ */
+export async function setChurchLogo(path: string): Promise<{ error?: string; ok?: boolean }> {
+  const me = await getCurrentAppUser();
+  if (!me || !me.church_id) return { error: SESSION_EXPIRED };
+  if (!can(me.role, "manageChurchProfile")) return { error: "Only church admins can change the church logo." };
+  if (typeof path !== "string" || !isOwnChurchLogoPath(path, me.church_id)) return { error: "That upload couldn't be used — please try again." };
+
+  const supabase = createClient();
+  const publicUrl = supabase.storage.from(CHURCH_LOGO_BUCKET).getPublicUrl(path).data.publicUrl;
+  const { data: before } = await supabase.from("churches").select("logo_url").eq("id", me.church_id).maybeSingle();
+  const { data: updated, error } = await supabase.from("churches").update({ logo_url: publicUrl }).eq("id", me.church_id).select("id");
+  if (error || !updated?.length) {
+    console.error("[setup] logo save failed:", error?.message);
+    await supabase.storage.from(CHURCH_LOGO_BUCKET).remove([path]);
+    return { error: "Couldn't save the logo — please try again." };
+  }
+  const oldPath = churchLogoPathFromUrl(before?.logo_url);
+  if (oldPath && oldPath !== path) await supabase.storage.from(CHURCH_LOGO_BUCKET).remove([oldPath]);
+
+  await logAudit({ churchId: me.church_id, actorId: me.id, action: "church.logo_updated", targetTable: "churches", targetId: me.church_id });
+  revalidatePath("/dashboard", "layout");
+  return { ok: true };
+}
+
+/** Church admins only. Back to the initials in the header. */
+export async function removeChurchLogo(): Promise<{ error?: string; ok?: boolean }> {
+  const me = await getCurrentAppUser();
+  if (!me || !me.church_id) return { error: SESSION_EXPIRED };
+  if (!can(me.role, "manageChurchProfile")) return { error: "Only church admins can change the church logo." };
+
+  const supabase = createClient();
+  const { data: before } = await supabase.from("churches").select("logo_url").eq("id", me.church_id).maybeSingle();
+  const { error } = await supabase.from("churches").update({ logo_url: null }).eq("id", me.church_id);
+  if (error) {
+    console.error("[setup] logo remove failed:", error.message);
+    return { error: "Couldn't remove the logo — please try again." };
+  }
+  const oldPath = churchLogoPathFromUrl(before?.logo_url);
+  if (oldPath) await supabase.storage.from(CHURCH_LOGO_BUCKET).remove([oldPath]);
+  await logAudit({ churchId: me.church_id, actorId: me.id, action: "church.logo_removed", targetTable: "churches", targetId: me.church_id });
+  revalidatePath("/dashboard", "layout");
   return { ok: true };
 }

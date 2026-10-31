@@ -13,6 +13,13 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
  * action and API route re-checks the session itself, and RLS enforces access.
  */
 export async function middleware(request: NextRequest) {
+  // Missing keys would otherwise crash every request into a blank white page.
+  // Say exactly what's wrong instead (no secrets are shown, only variable names).
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    console.error("[middleware] NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY are not set.");
+    return new NextResponse(SETUP_PAGE, { status: 503, headers: { "content-type": "text/html; charset=utf-8" } });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -66,3 +73,10 @@ export const config = {
   // offline service worker, web app manifest and poster fonts (public/fonts/).
   matcher: ["/((?!_next/static|_next/image|favicon.ico|api/paystack/webhook|api/notifications/push|bibles/|fonts/|sw\\.js|offline\\.html|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };
+
+const SETUP_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Grace: setup needed</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#050a1c;color:#f6efe2;font:16px/1.6 system-ui,sans-serif;padding:24px}main{max-width:560px}h1{color:#f5c86a;font-size:1.5rem}code{background:#14204a;padding:2px 6px;border-radius:4px}</style></head>
+<body><main><h1>Grace can't reach its database yet</h1>
+<p>The Supabase keys aren't set, so the app can't start.</p>
+<p><strong>Running locally:</strong> copy <code>.env.example</code> to <code>.env.local</code>, fill in <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> (Supabase → Project Settings → API), then stop and restart <code>pnpm dev</code>.</p>
+<p><strong>On Vercel:</strong> add them under Settings → Environment Variables, then redeploy.</p></main></body></html>`;

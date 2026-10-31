@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { useFormState } from "react-dom";
-import { deleteMemberPermanently, resendInvite, setMemberStatus } from "../actions";
+import { deleteMemberPermanently, resendInvite, setMemberPassword, setMemberStatus } from "../actions";
+import { PasswordField } from "../MemberForm";
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
 import { Alert } from "@/components/ui/Alert";
 import { FormField } from "@/components/ui/FormField";
@@ -11,7 +12,7 @@ import type { AccountStatus } from "@/lib/permissions";
 
 /**
  * Account actions on a member profile, from least to most destructive:
- * resend invite → export data → deactivate/reactivate → permanent deletion.
+ * resend invite → set password → export data → deactivate/reactivate → permanent deletion.
  */
 export function MemberAccountActions({
   memberId,
@@ -90,7 +91,52 @@ export function MemberAccountActions({
         )}
       </div>
 
+      {canChangeAccess && status !== "disabled" && <SetPassword memberId={memberId} memberName={memberName} />}
+
       {canDelete && <DeleteMember memberId={memberId} memberName={memberName} />}
+    </div>
+  );
+}
+
+function SetPassword({ memberId, memberName }: { memberId: string; memberName: string }) {
+  const [state, action] = useFormState(setMemberPassword, null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (state?.ok) {
+      dialogRef.current?.close();
+      showToast(`New password set for ${memberName}. Share it with them privately.`);
+    }
+  }, [state, memberName]);
+
+  return (
+    <div>
+      <button type="button" className="btn-secondary" onClick={() => dialogRef.current?.showModal()} aria-haspopup="dialog">
+        Set a new password…
+      </button>
+      <dialog
+        ref={dialogRef}
+        aria-labelledby="set-password-title"
+        className="w-[calc(100%-2rem)] max-w-md rounded-2xl p-0 text-ink shadow-xl backdrop:bg-ink/40"
+      >
+        {/* Re-keyed after success so the next open starts empty. */}
+        <form key={state?.ok ? "done" : "open"} action={action} className="p-6 space-y-4">
+          <input type="hidden" name="member_id" value={memberId} />
+          <h2 id="set-password-title" className="text-lg font-semibold">
+            Set a new password for {memberName}
+          </h2>
+          <p className="text-sm text-ink/70">
+            For when they&apos;ve forgotten theirs. Their old password stops working straight away. No email is sent.
+          </p>
+          {state?.error && !state.fieldErrors && <Alert tone="error">{state.error}</Alert>}
+          <PasswordField label="New password" error={state?.fieldErrors?.password} />
+          <div className="flex flex-wrap justify-end gap-2">
+            <button type="button" className="btn-secondary" onClick={() => dialogRef.current?.close()}>
+              Cancel
+            </button>
+            <PendingButton pendingLabel="Saving…">Set password</PendingButton>
+          </div>
+        </form>
+      </dialog>
     </div>
   );
 }

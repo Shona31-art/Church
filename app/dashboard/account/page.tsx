@@ -131,7 +131,9 @@ export default async function MyAccountPage({ searchParams }: { searchParams?: {
       </div>
 
       <Section title="Password">
-        <PasswordForm />
+        <div id="password" className="scroll-mt-24">
+          <PasswordForm />
+        </div>
       </Section>
 
       {me.church_id && (

@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import { generatePassword } from "@/lib/passwords";
 import { useFormState } from "react-dom";
 import { createMember, updateMember } from "./actions";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
@@ -68,7 +70,7 @@ export function MemberForm({
       </FormField>
 
       {mode === "create" ? (
-        <FormField label="Email" htmlFor="email" required error={fe.email} hint="We'll email an invite so they can choose their own password.">
+        <FormField label="Email" htmlFor="email" required error={fe.email} hint="This is what they'll sign in with. No email is sent.">
           <input id="email" name="email" type="email" required maxLength={254} autoComplete="off" defaultValue={value("email", "")} className="input" aria-invalid={Boolean(fe.email)} />
         </FormField>
       ) : (
@@ -76,6 +78,8 @@ export function MemberForm({
           <input id="email" value={member?.email} disabled className="input" />
         </FormField>
       )}
+
+      {mode === "create" && <PasswordField error={fe.password} />}
 
       <FormField label="Phone" htmlFor="phone" optional error={fe.phone}>
         <input id="phone" name="phone" type="tel" maxLength={20} autoComplete="off" placeholder="082 123 4567" defaultValue={value("phone", member?.phone)} className="input" aria-invalid={Boolean(fe.phone)} />
@@ -127,13 +131,57 @@ export function MemberForm({
       )}
 
       <FormActions>
-        <PendingButton pendingLabel={mode === "create" ? "Sending invite…" : "Saving…"}>
-          {mode === "create" ? "Add member & send invite" : "Save changes"}
+        <PendingButton pendingLabel={mode === "create" ? "Adding…" : "Saving…"}>
+          {mode === "create" ? "Add member" : "Save changes"}
         </PendingButton>
         <Link href={cancelHref} className="btn-secondary">
           Cancel
         </Link>
       </FormActions>
     </form>
+  );
+}
+
+/** Password input with show/hide and a "Suggest one" button. Never prefilled after a failed save. */
+export function PasswordField({ error, label = "Password", name = "password" }: { error?: string; label?: string; name?: string }) {
+  const [value, setValue] = useState("");
+  const [shown, setShown] = useState(false);
+  return (
+    <FormField
+      label={label}
+      htmlFor={name}
+      required
+      error={error}
+      hint="At least 8 characters, letters and numbers. Share it with them privately; they'll be asked to choose their own when they first sign in."
+    >
+      <div className="flex gap-2">
+        <input
+          id={name}
+          name={name}
+          type={shown ? "text" : "password"}
+          required
+          minLength={8}
+          maxLength={72}
+          autoComplete="new-password"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="input min-w-0 flex-1"
+          aria-invalid={Boolean(error)}
+        />
+        <button type="button" className="btn-secondary btn-sm shrink-0" onClick={() => setShown((s) => !s)} aria-pressed={shown}>
+          {shown ? "Hide" : "Show"}
+        </button>
+      </div>
+      <button
+        type="button"
+        className="mt-2 text-sm font-medium text-ember"
+        onClick={() => {
+          setValue(generatePassword());
+          setShown(true);
+        }}
+      >
+        Suggest a password
+      </button>
+    </FormField>
   );
 }

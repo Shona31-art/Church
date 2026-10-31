@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { Alert } from "@/components/ui/Alert";
 import { ProfileForm } from "./ProfileForm";
+import { ChurchLogoForm } from "./ChurchLogoForm";
 
 export default async function ChurchProfilePage() {
   const me = await getCurrentAppUser();
@@ -16,6 +17,7 @@ export default async function ChurchProfilePage() {
   return (
     <div>
       <PageHeader back={{ href: "/dashboard/setup", label: "Church settings" }} title="Church profile" />
+      {church && <ChurchLogoForm churchId={me.church_id!} churchName={church.name} logoUrl={church.logo_url} />}
       {church ? <ProfileForm church={church} /> : <Alert tone="error">Couldn&apos;t load your church&apos;s details — refresh to try again.</Alert>}
     </div>
   );

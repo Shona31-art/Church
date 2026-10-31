@@ -47,6 +47,7 @@ export const MIGRATION_ORDER = [
   "church_move.sql",
   "email_sync.sql",
   "paystack_billing.sql",
+  "church_logo.sql",
 ];
 
 const SUPABASE_STUBS = `

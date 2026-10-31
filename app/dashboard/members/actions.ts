@@ -11,6 +11,7 @@ import { logAudit } from "@/lib/audit";
 import { flash } from "@/lib/flash";
 import { assignableRoles, can, canEditMemberRole } from "@/lib/permissions";
 import { memberCreateSchema, memberUpdateSchema } from "@/lib/member-schemas";
+import { passwordSchema } from "@/lib/account-schemas";
 import { FormState, SESSION_EXPIRED, formValues, invalid, optionalField } from "@/lib/forms";
 import { AVATAR_BUCKET } from "@/lib/avatar-path";
 import { getMemberLimitStatus } from "@/lib/member-limit";
@@ -49,8 +50,9 @@ async function departmentBelongsToChurch(departmentId: string | null, churchId: 
 }
 
 /**
- * Add member: creates their login (invite email) and church profile.
- * Form fields: name, email, phone?, role, department_id?
+ * Add member: creates their login (with the password the admin chose, no
+ * email sent) and church profile.
+ * Form fields: name, email, phone?, role, department_id?, password
  */
 export async function createMember(_prev: FormState, formData: FormData): Promise<FormState> {
   const me = await requireMemberManager();
@@ -62,10 +64,16 @@ export async function createMember(_prev: FormState, formData: FormData): Promis
     phone: optionalField(formData, "phone"),
     role: formData.get("role"),
     departmentId: formData.get("department_id") ?? "",
+    password: formData.get("password") ?? "",
   });
-  if (!parsed.success) return invalid(parsed.error, formData);
+  if (!parsed.success) {
+    const result = invalid(parsed.error, formData);
+    if (result?.values) delete result.values.password; // never echo a password back
+    return result;
+  }
   const input = parsed.data;
   const values = formValues(formData);
+  delete values.password;
 
   // The service-role client below bypasses RLS, so every rule the database
   // would enforce is checked here first.
@@ -98,17 +106,25 @@ export async function createMember(_prev: FormState, formData: FormData): Promis
     };
   }
 
-  const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(input.email, {
-    redirectTo: new URL("/reset-password", APP_URL).toString(),
-    data: { name: input.name },
+  // The admin sets the first password, so no email is sent. The member is
+  // asked to choose their own password the first time they sign in.
+  const { data: invited, error: inviteError } = await admin.auth.admin.createUser({
+    email: input.email,
+    password: input.password,
+    email_confirm: true,
+    user_metadata: { name: input.name, must_change_password: true },
   });
   if (inviteError || !invited.user) {
-    console.error("[members] invite failed:", inviteError?.message);
-    const already = /already/i.test(inviteError?.message ?? "");
+    console.error("[members] create login failed:", inviteError?.message);
+    const already = /already|registered|exists/i.test(inviteError?.message ?? "");
+    const weak = /password/i.test(inviteError?.message ?? "");
     return {
       error: already
         ? "That email already has a login. Ask platform support to link it to your church."
-        : "We couldn't send the invite email. Check the address and try again in a minute.",
+        : weak
+        ? "Supabase rejected that password. Try a longer one with letters, numbers and a symbol."
+        : "We couldn't create their login. Check the address and try again in a minute.",
+      fieldErrors: weak ? { password: "Choose a stronger password." } : undefined,
       values,
     };
   }
@@ -123,7 +139,7 @@ export async function createMember(_prev: FormState, formData: FormData): Promis
       phone: input.phone ?? null,
       role: input.role,
       department_id: input.departmentId,
-      status: "invited",
+      status: "active",
     })
     .select("id")
     .single();
@@ -132,13 +148,13 @@ export async function createMember(_prev: FormState, formData: FormData): Promis
     console.error("[members] profile insert failed:", insertError?.message);
     // Don't leave a login with no profile behind.
     await admin.auth.admin.deleteUser(invited.user.id);
-    return { error: "We couldn't create the member profile, so the invite was cancelled. Please try again.", values };
+    return { error: "We couldn't create the member profile, so their login was removed again. Please try again.", values };
   }
 
   await logAudit({
     churchId: me.church_id,
     actorId: me.id,
-    action: "member.invited",
+    action: "member.created",
     targetTable: "app_users",
     targetId: created.id,
     metadata: { role: input.role },
@@ -312,6 +328,43 @@ export async function resendInvite(_prev: FormState, formData: FormData): Promis
     };
   }
   await logAudit({ churchId: me.church_id, actorId: me.id, action: "member.invite_resent", targetTable: "app_users", targetId: target.id });
+  return { ok: true };
+}
+
+/**
+ * Form fields: member_id, password. A pastor or church admin sets a new
+ * temporary password for someone who forgot theirs (no email involved). They
+ * are asked to change it the next time they sign in.
+ */
+export async function setMemberPassword(_prev: FormState, formData: FormData): Promise<FormState> {
+  const me = await requireMemberManager();
+  if (!me) return { error: SESSION_EXPIRED };
+  const memberId = uuid.safeParse(formData.get("member_id"));
+  if (!memberId.success) return { error: "That member couldn't be found." };
+  if (memberId.data === me.id) return { error: "Change your own password in My account." };
+  const password = passwordSchema.safeParse(formData.get("password") ?? "");
+  if (!password.success) return { error: "Please fix the highlighted field.", fieldErrors: { password: password.error.issues[0]?.message ?? "Choose a stronger password." } };
+
+  const target = await loadMember(memberId.data, me.church_id!);
+  if (!target) return { error: "That member couldn't be found in your church." };
+  // Same rule as roles: only a church admin may touch another church admin's login.
+  if (target.role === "church_admin" && me.role !== "church_admin") {
+    return { error: "Only a church admin can reset another church admin's password." };
+  }
+
+  const admin = createAdminClient();
+  const { data: existing } = await admin.auth.admin.getUserById(target.id);
+  const { error } = await admin.auth.admin.updateUserById(target.id, {
+    password: password.data,
+    user_metadata: { ...(existing?.user?.user_metadata ?? {}), must_change_password: true },
+  });
+  if (error) {
+    console.error("[members] set password failed:", error.message);
+    return { error: "Couldn't set the new password — please try again." };
+  }
+  if (target.status === "invited") await admin.from("app_users").update({ status: "active" }).eq("id", target.id);
+  await logAudit({ churchId: me.church_id, actorId: me.id, action: "member.password_set", targetTable: "app_users", targetId: target.id });
+  revalidatePath(`/dashboard/members/${target.id}`);
   return { ok: true };
 }
 

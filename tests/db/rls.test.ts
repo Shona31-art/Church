@@ -326,3 +326,28 @@ describe("member deletion / POPIA erasure", () => {
     expect(await rows(`select user_id from givings where fund = 'erasure-test'`)).toEqual([{ user_id: null }]);
   });
 });
+
+describe("church logo uploads (church_logo.sql)", () => {
+  const upload = (uid: string, path: string) =>
+    asUser(db, uid, () => rows(`insert into storage.objects (bucket_id, name) values ('church-logos', $1) returning name`, [path]));
+
+  test("a church admin can upload into their own church's folder", async () => {
+    expect(await upload(ADMIN_A, `${CHURCH_A}/logo-1.webp`)).toHaveLength(1);
+  });
+
+  test("pastors and members can't change the church logo", async () => {
+    await expect(upload(PASTOR_A, `${CHURCH_A}/logo-2.webp`)).rejects.toThrow();
+    await expect(upload(MEMBER_A, `${CHURCH_A}/logo-3.webp`)).rejects.toThrow();
+  });
+
+  test("an admin can't put a logo in another church's folder", async () => {
+    await expect(upload(ADMIN_A, `${CHURCH_B}/logo.webp`)).rejects.toThrow();
+  });
+
+  test("only the church's admin can delete its logo files", async () => {
+    const del = (uid: string) => asUser(db, uid, () => rows(`delete from storage.objects where bucket_id = 'church-logos' and name = $1 returning name`, [`${CHURCH_A}/logo-1.webp`]));
+    expect(await del(PASTOR_B)).toHaveLength(0);
+    expect(await del(MEMBER_A)).toHaveLength(0);
+    expect(await del(ADMIN_A)).toHaveLength(1);
+  });
+});

@@ -35,6 +35,7 @@ const BANNER: Record<AccountBanner["tone"], { className: string; Icon: typeof In
 export function DashboardChrome({
   navGroups,
   churchName,
+  churchLogoUrl,
   userId,
   initialUnread,
   userName,
@@ -45,6 +46,7 @@ export function DashboardChrome({
 }: {
   navGroups: NavGroup[];
   churchName: string;
+  churchLogoUrl?: string | null;
   userId: string;
   /** Unread notifications when the page was rendered; the bell keeps it live after that. */
   initialUnread: number;
@@ -77,7 +79,7 @@ export function DashboardChrome({
   }, [mobileOpen]);
 
   const sidebar = (
-    <Sidebar groups={navGroups} current={current} churchName={churchName} userName={userName} userRole={userRole} userPhotoUrl={userPhotoUrl} />
+    <Sidebar groups={navGroups} current={current} churchName={churchName} churchLogoUrl={churchLogoUrl} userName={userName} userRole={userRole} userPhotoUrl={userPhotoUrl} />
   );
 
   return (
@@ -110,9 +112,10 @@ export function DashboardChrome({
           >
             <Menu aria-hidden className="h-5 w-5" />
           </button>
-          <Link href="/dashboard" className="flex min-w-0 items-center gap-2">
-            <Monogram text={initials(churchName)} small />
-            <span className="truncate font-display text-lg font-semibold">{churchName}</span>
+          <Link href="/dashboard" className="flex min-w-0 flex-1 items-center gap-2">
+            <ChurchMark name={churchName} logoUrl={churchLogoUrl} small />
+            {/* Long names wrap onto a second line instead of being cut off. */}
+            <span className="line-clamp-2 break-words font-display text-[1.05rem] font-semibold leading-[1.15]">{churchName}</span>
           </Link>
           <div className="flex shrink-0 items-center gap-1">
             <NotificationBell />
@@ -217,6 +220,7 @@ function Sidebar({
   groups,
   current,
   churchName,
+  churchLogoUrl,
   userName,
   userRole,
   userPhotoUrl,
@@ -224,6 +228,7 @@ function Sidebar({
   groups: NavGroup[];
   current: string | null;
   churchName: string;
+  churchLogoUrl?: string | null;
   userName: string;
   userRole: string;
   userPhotoUrl: string | null;
@@ -234,9 +239,9 @@ function Sidebar({
           logo — flagged in the README's placeholder list. */}
       <div className="flex items-center gap-1 border-b border-line pb-5 pl-5 pr-12 pt-6 md:pr-2">
         <Link href="/dashboard" className="flex min-w-0 flex-1 items-center gap-3">
-          <Monogram text={initials(churchName)} />
+          <ChurchMark name={churchName} logoUrl={churchLogoUrl} />
           <div className="min-w-0">
-            <p className="truncate font-display text-xl font-semibold leading-tight">{churchName}</p>
+            <p className="line-clamp-2 break-words font-display text-xl font-semibold leading-tight">{churchName}</p>
             <p className="mt-0.5 font-script text-lg leading-none text-gold">Grace</p>
           </div>
         </Link>
@@ -288,6 +293,17 @@ function Sidebar({
         </div>
       </div>
     </>
+  );
+}
+
+/** The church's uploaded logo, or its initials until one is uploaded. */
+function ChurchMark({ name, logoUrl, small = false }: { name: string; logoUrl?: string | null; small?: boolean }) {
+  if (!logoUrl) return <Monogram text={initials(name)} small={small} />;
+  return (
+    <span className={`grid shrink-0 place-items-center overflow-hidden rounded-full bg-white shadow-[inset_0_0_0_1px_rgb(var(--gold)/0.5),0_0_0_3px_rgb(var(--gold)/0.12)] ${small ? "h-10 w-10" : "h-12 w-12"}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- uploaded logo from Supabase Storage */}
+      <img src={logoUrl} alt="" className="h-full w-full object-contain p-1" />
+    </span>
   );
 }
 

@@ -151,8 +151,8 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
         description="The member record above is your church's directory entry. Their login is how they sign in to the app."
       >
         <p className="text-sm text-ink/70">
-          {member.status === "invited" && "An invite email was sent. They haven't set their password yet."}
-          {member.status === "active" && "They can sign in with their email address."}
+          {member.status === "invited" && "Added by invite email, which they haven't accepted yet. You can set a password for them below instead."}
+          {member.status === "active" && "They sign in with their email address and password. If they forget it, they can use “Forgot password” on the sign-in page, or you can set a new one below."}
           {member.status === "disabled" && "Deactivated — they can't sign in. Their records and history are kept, and you can reactivate them at any time."}
         </p>
         {!isSelf && (

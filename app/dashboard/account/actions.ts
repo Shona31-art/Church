@@ -66,7 +66,7 @@ export async function changeMyPassword(_prev: FormState, formData: FormData): Pr
     .safeParse({ password: formData.get("password") ?? "", confirm: formData.get("confirm_password") ?? "" });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check your new password." };
 
-  const { error } = await createClient().auth.updateUser({ password: parsed.data.password });
+  const { error } = await createClient().auth.updateUser({ password: parsed.data.password, data: { must_change_password: false } });
   if (error) {
     console.error("[account] password change failed:", error.message);
     return {

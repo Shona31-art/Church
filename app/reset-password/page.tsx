@@ -52,7 +52,7 @@ export default function ResetPasswordPage() {
     if (password !== confirm) return setError("The passwords don't match.");
 
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
+    const { error } = await supabase.auth.updateUser({ password, data: { must_change_password: false } });
     setLoading(false);
     if (error) {
       console.error("[reset-password] update failed:", error.message);

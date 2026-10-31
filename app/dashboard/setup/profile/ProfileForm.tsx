@@ -29,9 +29,6 @@ export function ProfileForm({ church }: { church: { name: string; email: string 
       <FormField label="Address" htmlFor="address" optional error={fe.address}>
         <textarea id="address" name="address" rows={2} maxLength={300} defaultValue={v("address", church.address)} className="input" />
       </FormField>
-      <FormField label="Logo link" htmlFor="logo_url" optional error={fe.logo_url} hint="A link to your logo image (https://…). Used on posters and printouts.">
-        <input id="logo_url" name="logo_url" type="url" maxLength={500} defaultValue={v("logo_url", church.logo_url)} className="input" aria-invalid={Boolean(fe.logo_url)} />
-      </FormField>
       <FormActions>
         <PendingButton>Save profile</PendingButton>
         <Link href="/dashboard/setup" className="btn-secondary">

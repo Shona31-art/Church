@@ -3,11 +3,9 @@ import { nameSchema, phoneSchema } from "@/lib/member-schemas";
 
 // Account creation rules shared by registration and the super-admin screens.
 
-export const passwordSchema = z
-  .string()
-  .min(8, "Use at least 8 characters.")
-  .max(72, "Keep the password under 72 characters.")
-  .refine((p) => /[A-Za-z]/.test(p) && /[0-9]/.test(p), "Use a mix of letters and numbers.");
+// Lives in its own file so member-schemas can use it without a circular import.
+export { passwordSchema } from "@/lib/password-schema";
+import { passwordSchema } from "@/lib/password-schema";
 
 export const churchNameSchema = z.string().trim().min(2, "Enter the church's name.").max(200, "Keep the name under 200 characters.");
 

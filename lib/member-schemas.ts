@@ -1,3 +1,4 @@
+import { passwordSchema } from "@/lib/password-schema";
 import { z } from "zod";
 import { CHURCH_ROLES } from "@/lib/permissions";
 
@@ -21,6 +22,7 @@ export const memberCreateSchema = z.object({
   phone: phoneSchema,
   role: z.enum(CHURCH_ROLES, { message: "Choose a role." }),
   departmentId,
+  password: passwordSchema,
 });
 
 export const memberUpdateSchema = z.object({

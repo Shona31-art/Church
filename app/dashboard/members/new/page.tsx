@@ -22,7 +22,7 @@ export default async function NewMemberPage() {
       <PageHeader
         back={{ href: "/dashboard/members", label: "Members" }}
         title="Add member"
-        description="Creates their member record and emails them an invite to set up their login."
+        description="Creates their member record and login with the password you choose. No email is sent."
       />
       <MemberForm mode="create" departments={departments ?? []} roles={assignableRoles(me.role)} />
     </div>

@@ -41,8 +41,15 @@ export default async function DashboardLayout({ children, modal }: { children: R
 
   const [access, churchRes] = await Promise.all([
     getChurchAccess(),
-    me.church_id ? supabase.from("churches").select("name").eq("id", me.church_id).maybeSingle() : Promise.resolve(null),
+    me.church_id ? supabase.from("churches").select("name, logo_url").eq("id", me.church_id).maybeSingle() : Promise.resolve(null),
   ]);
+
+  // Set by an admin who chose this person's password (members/actions.ts).
+  // Read from the session cookie: it only decides whether to show a reminder.
+  const {
+    data: { session: authSession },
+  } = await supabase.auth.getSession();
+  const mustChangePassword = authSession?.user?.user_metadata?.must_change_password === true;
 
   const churchName = me.role === "super_admin" ? "Platform administration" : churchRes?.data?.name ?? "Your church";
   const navGroups = buildNavigation(me.role, access?.modules ?? new Set());
@@ -99,10 +106,20 @@ export default async function DashboardLayout({ children, modal }: { children: R
     }
   }
 
+  // A temporary password set by an admin comes first: it's about their own account.
+  if (mustChangePassword) {
+    banner = {
+      tone: "warning",
+      message: "You're using a temporary password your church set for you. Please choose your own.",
+      action: { href: "/dashboard/account#password", label: "Change password" },
+    };
+  }
+
   return (
     <DashboardChrome
       navGroups={navGroups}
       churchName={churchName}
+      churchLogoUrl={me.role === "super_admin" ? null : churchRes?.data?.logo_url ?? null}
       userId={me.id}
       initialUnread={await unreadNotifications(me.id)}
       userName={me.name}

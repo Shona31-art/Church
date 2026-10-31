@@ -7,6 +7,8 @@ import { can, roleLabel } from "@/lib/permissions";
 import { PageHeader, Section } from "@/components/ui/PageHeader";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { DeleteDepartmentButton, RenameDepartmentForm } from "../DepartmentForms";
+import { DepartmentPeople, type DeptPerson } from "./DepartmentPeople";
+import { getAvatarUrls } from "@/lib/avatars";
 
 export default async function DepartmentDetailPage({ params }: { params: { id: string } }) {
   const me = await getCurrentAppUser();
@@ -16,21 +18,32 @@ export default async function DepartmentDetailPage({ params }: { params: { id: s
   if (!z.string().uuid().safeParse(params.id).success) notFound();
 
   const supabase = createClient();
-  const [{ data: department }, { data: members }, { count: announcementCount }, { count: eventCount }, { data: channel }] = await Promise.all([
+  const [{ data: department }, { data: everyone }, { count: announcementCount }, { count: eventCount }, { data: channel }] = await Promise.all([
     supabase.from("departments").select("id, name, created_at").eq("id", params.id).eq("church_id", me.church_id).maybeSingle(),
     supabase
       .from("app_users")
-      .select("id, name, role, status")
+      .select("id, name, role, status, department_id, departments(name)")
       .eq("church_id", me.church_id)
-      .eq("department_id", params.id)
       .neq("status", "disabled")
+      .neq("role", "super_admin")
       .order("name")
-      .limit(200),
+      .limit(1000),
     supabase.from("announcements").select("id", { count: "exact", head: true }).eq("department_id", params.id),
     supabase.from("events").select("id", { count: "exact", head: true }).eq("department_id", params.id),
     supabase.from("chat_channels").select("id").eq("department_id", params.id).eq("is_dm", false).maybeSingle(),
   ]);
   if (!department) notFound();
+
+  const members = (everyone ?? []).filter((m) => m.department_id === department.id);
+  const photos = await getAvatarUrls((everyone ?? []).map((m) => m.id));
+  const toPerson = (m: NonNullable<typeof everyone>[number]): DeptPerson => ({
+    id: m.id,
+    name: m.name,
+    role: m.role,
+    roleLabel: roleLabel(m.role),
+    photoUrl: photos.get(m.id) ?? null,
+    currentDepartment: m.department_id && m.department_id !== department.id ? ((m.departments as unknown as { name: string } | null)?.name ?? "another department") : null,
+  });
 
   const leaders = (members ?? []).filter((m) => m.role === "department_leader");
 
@@ -42,7 +55,7 @@ export default async function DepartmentDetailPage({ params }: { params: { id: s
         description={
           leaders.length
             ? `Led by ${leaders.map((l) => l.name).join(", ")}.`
-            : "No department leader yet — edit a member and set their role to Department leader."
+            : "No department leader yet — tap “Make leader” next to someone below."
         }
         actions={
           channel ? (
@@ -53,29 +66,15 @@ export default async function DepartmentDetailPage({ params }: { params: { id: s
         }
       />
 
-      <Section
-        title={`Members (${members?.length ?? 0})`}
-        description="To add someone, open their member profile and choose this department."
-        actions={
-          <Link href={`/dashboard/members?department=${department.id}`} className="btn-ghost btn-sm">
-            View in directory
-          </Link>
-        }
-      >
-        {members?.length ? (
-          <ul className="divide-y divide-line">
-            {members.map((m) => (
-              <li key={m.id} className="py-2 flex items-center justify-between gap-3">
-                <Link href={`/dashboard/members/${m.id}`} className="text-sm font-medium hover:underline">
-                  {m.name}
-                </Link>
-                <span className="text-xs text-ink/60">{roleLabel(m.role)}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-ink/60">Nobody is in this department yet.</p>
-        )}
+      <Section title={`Members (${members.length})`}>
+        <DepartmentPeople
+          departmentId={department.id}
+          departmentName={department.name}
+          members={members.map(toPerson)}
+          others={(everyone ?? []).filter((m) => m.department_id !== department.id).map(toPerson)}
+          meId={me.id}
+          canManage={can(me.role, "manageMembers")}
+        />
       </Section>
 
       <Section title="Settings">
@@ -87,7 +86,7 @@ export default async function DepartmentDetailPage({ params }: { params: { id: s
           <DeleteDepartmentButton
             id={department.id}
             name={department.name}
-            memberCount={members?.length ?? 0}
+            memberCount={members.length}
             announcementCount={announcementCount ?? 0}
             eventCount={eventCount ?? 0}
           />

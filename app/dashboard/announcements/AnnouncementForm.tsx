@@ -142,7 +142,23 @@ export function AnnouncementForm({
 
       {canPostChurchWide ? (
         <>
-          <FormField label="Who should see it?" htmlFor="department_id">
+          <FormField
+            label="Who should see it?"
+            htmlFor="department_id"
+            hint={
+              departments.length ? (
+                "Choose a department to send it to that group only."
+              ) : (
+                <>
+                  To send to one group only (e.g. Youth or Worship), first{" "}
+                  <Link href="/dashboard/departments" className="link">
+                    create your departments
+                  </Link>
+                  . They&apos;ll then appear in this list.
+                </>
+              )
+            }
+          >
             <select id="department_id" name="department_id" defaultValue={announcement?.department_id ?? ""} className="input">
               <option value="">Everyone in the church</option>
               {departments.map((d) => (

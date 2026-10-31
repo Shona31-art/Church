@@ -4,6 +4,9 @@ module.exports = {
   experimental: {
     // instrumentation.ts: sends server errors to Sentry when SENTRY_DSN is set.
     instrumentationHook: true,
+    // AI posters send up to 3 shrunk photos (and the previous poster) to a
+    // server action. Default is 1 MB; Vercel's own request cap is 4.5 MB.
+    serverActions: { bodySizeLimit: "4mb" },
     // Server code that reads Bible text from disk (lib/bible/text.ts) needs the
     // files bundled with its route: on Vercel, public/ is served by the CDN and
     // isn't in server functions by default. WEB only — it's the version used

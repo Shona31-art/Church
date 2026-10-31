@@ -14,6 +14,7 @@ import { PermissionDenied } from "@/components/ui/Gates";
 import { PosterPreview } from "./PosterCanvas";
 import { NAV_ICONS } from "@/components/ui/NavIcon";
 import Image from "next/image";
+import { Sparkles } from "lucide-react";
 import { signPosterAssets } from "@/lib/posters/assets";
 
 type PosterRow = {
@@ -70,6 +71,9 @@ export default async function PostersPage({ searchParams }: { searchParams: { pa
   // "New design" opens the template gallery; "Quick poster" is the original fixed-layout maker.
   const newButton = (
     <>
+      <Link href="/dashboard/posters/ai" className="btn btn-amber">
+        <Sparkles aria-hidden className="h-4 w-4" /> Create with AI
+      </Link>
       <Link href="/dashboard/posters/new" className="btn-ghost">
         Quick poster
       </Link>

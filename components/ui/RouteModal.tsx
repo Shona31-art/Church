@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
 import { useConfirm } from "./ConfirmDialog";
 
 const WIDTHS = {
@@ -77,12 +77,23 @@ export function RouteModal({ children, size = "lg" }: { children: React.ReactNod
         e.preventDefault(); // Escape: run the same unsaved-changes check as the close button
         close();
       }}
-      onInput={() => {
+      onInput={(e) => {
+        // Only typing counts as unsaved. Photo pickers, switches and the like
+        // save the moment they change, so they don't make the form "dirty".
+        const el = e.target as HTMLInputElement;
+        if (el.type === "file" || el.type === "checkbox" || el.type === "radio") return;
         dirty.current = true;
+      }}
+      onSubmit={() => {
+        // Sent: nothing left to lose.
+        dirty.current = false;
       }}
       className={`m-0 h-full max-h-full w-full max-w-full rounded-none bg-parchment overflow-y-auto p-0 text-ink shadow-pop backdrop:bg-ink/45 backdrop:backdrop-blur-[2px] md:border md:border-line motion-safe:animate-modal-in md:m-auto md:h-auto md:max-h-[90vh] md:w-[calc(100%-2rem)] md:rounded-2xl ${WIDTHS[size]} [&_[data-page-back]]:hidden`}
     >
-      <div className="sticky top-0 z-10 flex justify-end bg-parchment/95 px-3 pt-3 backdrop-blur">
+      <div className="sticky top-0 z-10 flex items-center justify-between bg-parchment/95 px-3 pt-3 backdrop-blur">
+        <button type="button" onClick={close} className="btn-ghost btn-sm -ml-1 gap-1 text-ink/70">
+          <ChevronLeft aria-hidden className="h-4 w-4" /> Back
+        </button>
         <button type="button" onClick={close} className="btn-secondary btn-sm h-9 w-9 rounded-full p-0" aria-label="Close">
           <X aria-hidden className="h-4 w-4" />
         </button>

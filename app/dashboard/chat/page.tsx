@@ -138,7 +138,7 @@ function ChatList({ rows, photos }: { rows: ChatRow[]; photos: Map<string, strin
         const showCount = r.unread > 0 && !r.muted;
         return (
           <li key={r.channelId}>
-            <ChatSwipeRow channelId={r.channelId} unread={r.unread} muted={r.muted}>
+            <ChatSwipeRow channelId={r.channelId} unread={r.unread} muted={r.muted} dmName={r.kind === "dm" ? r.name : undefined}>
             <Link href={`/dashboard/chat/${r.channelId}`} className="flex items-center gap-3 rounded-xl px-2 py-3 hover:bg-ink/[0.03]">
               {r.kind === "dm" ? (
                 <Avatar name={r.name} src={r.otherId ? photos.get(r.otherId) : null} size="md" />

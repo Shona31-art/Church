@@ -52,7 +52,7 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
 
   let query = supabase
     .from("prayer_board_items")
-    .select("id, user_id, prayer_text, category, scripture_refs, status, answered_reflection, created_at, answered_at, app_users(name)")
+    .select("id, user_id, prayer_text, category, scripture_refs, status, answered_reflection, created_at, answered_at, app_users!user_id(name)")
     .eq("church_id", me.church_id)
     .or("is_shared_request.eq.true,is_testimony_shared.eq.true");
   if (show === "requests") query = query.neq("status", "answered");
@@ -74,6 +74,7 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
     shared().neq("status", "answered"),
     shared().eq("status", "answered"),
   ]);
+  if (error) console.error("[prayer-wall] load failed:", error.message);
 
   const hasMore = (prayers?.length ?? 0) > PAGE_SIZE;
   const visible: any[] = (prayers ?? []).slice(0, PAGE_SIZE);

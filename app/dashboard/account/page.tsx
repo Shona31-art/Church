@@ -12,8 +12,7 @@ import { PushSettings } from "@/components/notifications/PushSettings";
 import { InstallApp } from "@/components/install/InstallApp";
 import { EmailChangeForm } from "./EmailChangeForm";
 
-// searchParams is optional: the popup version of this page renders it without one.
-export default async function MyAccountPage({ searchParams }: { searchParams?: { email?: string } } = {}) {
+export default async function MyAccountPage({ searchParams }: { searchParams: { email?: string } }) {
   const me = (await getCurrentAppUser())!;
   const supabase = createClient();
   // Supabase keeps a requested-but-unconfirmed email as `new_email` on the auth user.
@@ -49,7 +48,7 @@ export default async function MyAccountPage({ searchParams }: { searchParams?: {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <PageHeader title="My account" description="Your details, password and personal data." />
+      <PageHeader title="My account" description="Your details, password and personal data." back={{ href: "/dashboard", label: "Home" }} />
 
       {me.church_id && (
         <Section title="Profile photo" description="How people in your church recognise you in chats and lists.">

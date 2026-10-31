@@ -130,7 +130,21 @@ export default async function ChatChannelPage({ params }: { params: { id: string
   const mutedUntil = isMuted(settings?.muted_until) ? settings!.muted_until : null;
 
   return (
-    <div className="max-w-3xl">
+    <div className="relative max-w-3xl">
+      {/* The ⋮ menu sits top right, level with "‹ Chats", where people expect it. */}
+      {v2 && (
+        <div className="absolute right-0 top-0 z-20">
+          <ChatMenu
+            channelId={channel.id}
+            mutedUntil={mutedUntil}
+            pinned={Boolean(settings?.pinned_at)}
+            dmWith={otherUserId ? { id: otherUserId, name: title, blockedByMe: Boolean(myBlock) } : null}
+            channelName={channel.is_dm ? undefined : channel.name}
+            canEdit={!channel.is_dm && isCustom && can(me.role, "manageChatChannels")}
+            canDelete={!channel.is_dm && (isCustom || Boolean(channel.department_id)) && can(me.role, "deleteChatChannels")}
+          />
+        </div>
+      )}
       <PageHeader
         back={{ href: "/dashboard/chat", label: "Chats" }}
         title={
@@ -160,19 +174,6 @@ export default async function ChatChannelPage({ params }: { params: { id: string
               {settings?.pinned_at && <StatusBadge tone="neutral">Pinned</StatusBadge>}
               {mutedUntil && <StatusBadge tone="neutral">{muteLabel(mutedUntil)}</StatusBadge>}
             </>
-          ) : undefined
-        }
-        actions={
-          v2 ? (
-            <ChatMenu
-              channelId={channel.id}
-              mutedUntil={mutedUntil}
-              pinned={Boolean(settings?.pinned_at)}
-              dmWith={otherUserId ? { id: otherUserId, name: title, blockedByMe: Boolean(myBlock) } : null}
-              channelName={channel.is_dm ? undefined : channel.name}
-              canEdit={!channel.is_dm && isCustom && can(me.role, "manageChatChannels")}
-              canDelete={!channel.is_dm && (isCustom || Boolean(channel.department_id)) && can(me.role, "deleteChatChannels")}
-            />
           ) : undefined
         }
       />

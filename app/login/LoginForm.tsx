@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/Alert";
 import { FormField } from "@/components/ui/FormField";
 import { AuthShell, AuthHeading } from "@/components/brand/AuthShell";
+import { recordSignIn } from "./actions";
 
 // Only ever redirect back into the app — never to an arbitrary URL from the
 // query string (open-redirect protection).
@@ -57,6 +58,7 @@ export function LoginForm({ expired, nextPath, reason }: { expired: boolean; nex
       );
       return;
     }
+    await recordSignIn();
     router.push(next);
     router.refresh();
   }

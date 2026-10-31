@@ -234,3 +234,14 @@ export function isValidWebhookSignature(rawBody: string, signature: string | nul
   const b = Buffer.from(signature.trim().toLowerCase(), "utf8");
   return a.length === b.length && timingSafeEqual(a, b);
 }
+
+/**
+ * Changes a Paystack plan's price (new subscriptions pay the new amount;
+ * existing subscribers keep theirs until they subscribe again).
+ */
+export async function updatePlanAmount(planCode: string, amountCents: number): Promise<void> {
+  await call(`/plan/${encodeURIComponent(planCode)}`, {
+    method: "PUT",
+    body: { amount: amountCents, currency: "ZAR", update_existing_subscriptions: false },
+  });
+}

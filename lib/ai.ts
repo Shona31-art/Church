@@ -1,4 +1,5 @@
 import "server-only";
+import { geminiApiKey } from "@/lib/ai-key";
 import Anthropic from "@anthropic-ai/sdk";
 import { extractJson } from "@/lib/json";
 
@@ -44,7 +45,7 @@ export function lastAiFailure() {
 /** Which AI service answers, or null when no key is set. */
 export function aiProvider(): AiProvider | null {
   if (process.env.ANTHROPIC_API_KEY) return "anthropic";
-  if (process.env.GEMINI_API_KEY) return "gemini";
+  if (geminiApiKey()) return "gemini";
   return null;
 }
 
@@ -136,7 +137,7 @@ export function geminiText(json: GeminiResponse): string | null {
 }
 
 async function generateWithGemini(params: { messages: AiTurn[]; system?: string; maxTokens?: number }): Promise<string | null> {
-  const key = process.env.GEMINI_API_KEY;
+  const key = geminiApiKey();
   if (!key) return null;
   const url = `${GEMINI_URL}/${encodeURIComponent(GEMINI_MODEL)}:generateContent`;
   const body = JSON.stringify(geminiRequestBody(params));

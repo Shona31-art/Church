@@ -5,7 +5,7 @@ import { getCurrentAppUser } from "@/lib/current-user";
 import { getChurchAccess } from "@/lib/paywall";
 import { can } from "@/lib/permissions";
 import { MODULE_LABELS, PLAN_LABELS, type ModuleKey } from "@/lib/subscription";
-import { onlineBillingState, planCodesFromEnv, SELF_SERVE_PLANS } from "@/lib/billing";
+import { onlineBillingState, planCodesFromEnv, SELF_SERVE_PLANS, type BillingInterval } from "@/lib/billing";
 import { onlineBillingConfigured } from "@/lib/subscription-billing";
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
 import { cancelSubscription, startSubscription } from "./actions";
@@ -27,13 +27,13 @@ const STATUS: Record<string, { tone: BadgeTone; label: string }> = {
 };
 
 const PAYMENT_RESULT: Record<string, { tone: "success" | "error" | "info" | "warning"; title: string; body: string }> = {
-  paid: { tone: "success", title: "Payment received", body: "Thank you — your plan is active. Paystack will charge the same card monthly; you can cancel any time here." },
+  paid: { tone: "success", title: "Payment received", body: "Thank you — your plan is active. Paystack will charge the same card when it renews; you can cancel any time here." },
   failed: { tone: "error", title: "The payment didn't go through", body: "You haven't been charged. Try again, or use a different card." },
   pending: { tone: "info", title: "Payment still processing", body: "Paystack is still confirming it. This page updates automatically once it's done — usually within a few minutes." },
   unconfirmed: { tone: "warning", title: "We couldn't confirm the payment yet", body: "If you were charged, your plan will update as soon as Paystack tells us. Refresh in a few minutes, or open a support ticket." },
 };
 
-export default async function BillingPage({ searchParams }: { searchParams: { payment?: string } }) {
+export default async function BillingPage({ searchParams }: { searchParams: { payment?: string; interval?: string } }) {
   const me = await getCurrentAppUser();
   if (!me || !can(me.role, "manageBilling")) {
     return <PermissionDenied message="Only church admins can manage billing." />;
@@ -43,14 +43,18 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
   const [access, { data: sub }, { data: plans }, { data: planModules }, { count: activeMembers }, { data: payments }] = await Promise.all([
     getChurchAccess(),
     supabase.from("church_subscriptions").select("*").eq("church_id", me.church_id).maybeSingle(),
-    supabase.from("plans").select("key, name, monthly_price, member_limit, description").in("key", [...SELF_SERVE_PLANS]),
+    supabase.from("plans").select("*").in("key", [...SELF_SERVE_PLANS]),
     supabase.from("plan_modules").select("plan_key, module_key").in("plan_key", [...SELF_SERVE_PLANS]),
     supabase.from("app_users").select("id", { count: "exact", head: true }).eq("church_id", me.church_id).neq("status", "disabled"),
     // Empty until paystack_billing.sql (#34) has been run.
-    supabase.from("billing_payments").select("id, plan_key, amount_cents, status, kind, paid_at, period_end, created_at").eq("church_id", me.church_id).neq("status", "pending").order("created_at", { ascending: false }).limit(12),
+    supabase.from("billing_payments").select("*").eq("church_id", me.church_id).neq("status", "pending").order("created_at", { ascending: false }).limit(12),
   ]);
   const online = onlineBillingConfigured();
-  const planCodes = planCodesFromEnv();
+  const yearlyCodes = planCodesFromEnv(process.env, "yearly");
+  // Yearly is offered when at least one plan has a yearly price and a yearly Paystack plan.
+  const yearlyAvailable = (plans ?? []).some((p: any) => Number(p.yearly_price) > 0 && yearlyCodes[p.key as keyof typeof yearlyCodes]);
+  const interval: BillingInterval = searchParams.interval === "yearly" && yearlyAvailable ? "yearly" : "monthly";
+  const planCodes = interval === "yearly" ? yearlyCodes : planCodesFromEnv();
   const billingState = onlineBillingState(sub);
   const result = searchParams.payment ? PAYMENT_RESULT[searchParams.payment] : undefined;
 
@@ -88,7 +92,9 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
             { label: "Active members", value: String(activeMembers ?? 0) },
             ...(status === "trial" && sub?.trial_expires_at ? [{ label: "Trial ends", value: `${formatDate(sub.trial_expires_at)} (${access?.trialDaysLeft ?? 0} days left)` }] : []),
             ...(status === "grace" && sub?.grace_period_end ? [{ label: "Access until", value: formatDate(sub.grace_period_end) }] : []),
-            ...(billingState === "subscribed" && sub?.billing_date ? [{ label: "Next payment", value: `${formatDate(sub.billing_date)} · card, via Paystack` }] : []),
+            ...(billingState === "subscribed" && sub?.billing_date
+              ? [{ label: "Next payment", value: `${formatDate(sub.billing_date)} · ${sub.billing_interval === "yearly" ? "yearly" : "monthly"}, card via Paystack` }]
+              : []),
             ...(billingState === "cancelled" && sub?.billing_date && status !== "suspended" ? [{ label: "Cancelled", value: `Active until ${formatDate(sub.billing_date)}` }] : []),
           ]}
         />
@@ -96,7 +102,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
           <form action={cancelSubscription} className="mt-5">
             <ConfirmSubmitButton
               title="Cancel your subscription?"
-              message={`You won't be charged again. Your plan stays active until ${sub?.billing_date ? formatDate(sub.billing_date) : "the end of the month you've paid for"}, then most features pause. Your church's data is kept, and you can subscribe again any time.`}
+              message={`You won't be charged again. Your plan stays active until ${sub?.billing_date ? formatDate(sub.billing_date) : "the end of the time you've paid for"}, then most features pause. Your church's data is kept, and you can subscribe again any time.`}
               confirmLabel="Cancel subscription"
               className="btn-danger-outline btn-sm"
               pendingLabel="Cancelling…"
@@ -118,14 +124,28 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
       </Section>
 
       <section aria-labelledby="plans-heading">
-        <h2 id="plans-heading" className="text-lg font-semibold mb-3">
-          Plans
-        </h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          {sorted.map((plan) => {
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 id="plans-heading" className="text-lg font-semibold">
+            Plans
+          </h2>
+          {yearlyAvailable && (
+            <nav aria-label="Pay monthly or yearly" className="inline-flex rounded-full border border-line bg-surface p-1 text-sm">
+              <Link href="/dashboard/billing" aria-current={interval === "monthly" ? "page" : undefined} className={`rounded-full px-4 py-1.5 font-medium ${interval === "monthly" ? "bg-ember text-on-ember" : "text-ink/70"}`}>
+                Monthly
+              </Link>
+              <Link href="/dashboard/billing?interval=yearly" aria-current={interval === "yearly" ? "page" : undefined} className={`rounded-full px-4 py-1.5 font-medium ${interval === "yearly" ? "bg-ember text-on-ember" : "text-ink/70"}`}>
+                Yearly <span className={interval === "yearly" ? "opacity-80" : "text-success"}>· 2 months free</span>
+              </Link>
+            </nav>
+          )}
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          {sorted.map((plan: any) => {
             const features = (planModules ?? []).filter((m) => m.plan_key === plan.key).map((m) => MODULE_LABELS[m.module_key as ModuleKey] ?? m.module_key);
             const current = sub?.plan_key === plan.key && status !== "suspended";
-            const price = `${formatMoney(Math.round(Number(plan.monthly_price) * 100))}/month`;
+            const yearly = interval === "yearly" && Number(plan.yearly_price) > 0;
+            const price = yearly ? `${formatMoney(Math.round(Number(plan.yearly_price) * 100))}/year` : `${formatMoney(Math.round(Number(plan.monthly_price) * 100))}/month`;
+            const saving = yearly ? Math.round(Number(plan.monthly_price) * 12 - Number(plan.yearly_price)) : 0;
             return (
               <article key={plan.key} className={`card-elevated rounded-2xl p-5 flex flex-col ${current ? "ring-2 ring-ember" : ""}`}>
                 <div className="flex items-center justify-between gap-2">
@@ -133,6 +153,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
                   {current && <StatusBadge tone="success">Current plan</StatusBadge>}
                 </div>
                 <p className="text-2xl font-semibold tabular-nums mt-2">{price}</p>
+                {yearly && saving > 0 && <p className="text-xs font-semibold text-success">Save {formatMoney(saving * 100)} a year</p>}
                 <p className="text-sm text-ink/60 mt-1">{plan.member_limit ? `Up to ${plan.member_limit} active members` : "Unlimited members"}</p>
                 {plan.description && <p className="text-sm text-ink/70 mt-2">{plan.description}</p>}
                 <ul className="mt-4 space-y-1 text-sm flex-1">
@@ -149,6 +170,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
                   ) : online && billingState !== "arranged" && billingState !== "subscribed" && planCodes[plan.key as keyof typeof planCodes] ? (
                     <form action={startSubscription}>
                       <input type="hidden" name="plan" value={plan.key} />
+                      <input type="hidden" name="interval" value={yearly ? "yearly" : "monthly"} />
                       <PendingButton className={current ? "btn-secondary w-full" : "btn-primary w-full"} pendingLabel="Opening secure checkout…">
                         {current ? `Pay online — ${price}` : `Subscribe — ${price}`}
                       </PendingButton>
@@ -166,9 +188,6 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
             );
           })}
         </div>
-        <p className="text-xs text-ink/60 mt-4">
-          Need more than one campus or custom terms? <Link href="/dashboard/support/new" className="link">Contact us about Enterprise</Link>.
-        </p>
       </section>
 
       {payments && payments.length > 0 && (
@@ -178,7 +197,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
               <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0 last:pb-0">
                 <div>
                   <p className="font-medium">
-                    {PLAN_LABELS[p.plan_key] ?? p.plan_key} · {p.kind === "renewal" ? "Monthly renewal" : "Subscription"}
+                    {PLAN_LABELS[p.plan_key] ?? p.plan_key} · {p.kind === "renewal" ? (p.interval === "yearly" ? "Yearly renewal" : "Monthly renewal") : p.interval === "yearly" ? "Yearly subscription" : "Subscription"}
                   </p>
                   <p className="text-xs text-ink/60">
                     {formatDate(p.paid_at ?? p.created_at)}

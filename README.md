@@ -74,6 +74,10 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 37 | `counseling_delete.sql` | Members can delete their own counseling conversations (with all messages); not while a safety flag is still waiting for a pastor's follow-up |
 | 38 | `games_jigsaw.sql` | Lets the scoreboard record the Bible jigsaw game; keeps each finished game's answers so a past game can be opened again |
 | 39 | `jigsaw_pictures.sql` | Each church's own jigsaw pictures (AI-painted or uploaded): members play them, pastors and church admins add/remove; files in a private `jigsaw-pictures` bucket that only the server reads |
+| 40 | `sermon_audio.sql` | Sermon recordings uploaded from a phone: a `sermon-audio` bucket (50 MB per file); uploads only through one-time links the server issues to sermon editors |
+| 41 | `plans_v3.sql` | Plans: Basic unchanged (R299, 50 members); Premium for 50–150 members (R799); Unlimited (the Enterprise slot) R1,300 with unlimited members and every feature, payable online |
+| 42 | `activity_log.sql` | Audit log: records every add/edit/delete people make in every church (field names only, never private content), for the platform Audit log page |
+| 43 | `pastor_alerts.sql` | Pastor alerts for shared counseling conversations and new prayer requests, plus each pastor's WhatsApp alert setting |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so
@@ -116,6 +120,7 @@ shared prayer and care note. It refuses to run without `SEED_CONFIRM=yes` —
 | `PAYSTACK_FEE_PERCENT`, `PAYSTACK_FEE_FLAT_CENTS` | no | Paystack's card fee (from their pricing page) so members can choose to add it. Blank = option hidden |
 | `NOTIFY_WEBHOOK_URL`, `NOTIFY_WEBHOOK_SECRET` | no | Send alerts via a Make.com/n8n webhook; blank = in-app only |
 | `CRON_SECRET` | yes in production | Lets Vercel Cron call `/api/cron/expire-chat-media` (deletes voice notes after 90 days). Blank = the job refuses to run |
+| `MAKE_WEBHOOK_URL`, `MAKE_WEBHOOK_SECRET` | no | Pastor & admin alerts on WhatsApp, through a Make.com scenario. See "WhatsApp alerts" |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | no | Phone/computer pop-ups for the notification bell (Web Push). Blank = bell only. See below |
 | `NOTIFICATIONS_WEBHOOK_SECRET` | with pop-ups | Secret the Supabase Database Webhook sends to `/api/notifications/push` |
 | `PEXELS_API_KEY` | no | Free stock photo search in the poster editor (free key from pexels.com/api). Blank = uploads only |
@@ -197,6 +202,27 @@ environment (dev and production each get their own keys and webhook):
 Then on a phone: open the live site (HTTPS) → My account → Notifications →
 Turn on → Send a test. On iPhone, add the app to the Home Screen first (iOS 16.4+).
 Pop-ups don't work in `pnpm dev` (the service worker is production-only).
+
+### WhatsApp alerts (optional)
+
+Pastors and church admins get an alert (bell + pop-up) for: booking
+requests, a counseling conversation shared with them or flagged for crisis,
+new prayer requests on the wall, and new members. These can also go to their
+WhatsApp, through **one Make.com scenario**. It uses the **same Supabase
+webhook as pop-ups** (step 2 above), so set that up first. WhatsApp goes to
+the phone number in each pastor's details; they can turn it off in
+My account → Notifications.
+
+1. Make → Create scenario → **Webhooks → Custom webhook** → copy its URL into
+   `MAKE_WEBHOOK_URL` in Vercel, and a random string into `MAKE_WEBHOOK_SECRET`. Redeploy.
+2. Add **WhatsApp Business Cloud → Send a Message** (connect your Meta WhatsApp
+   Business account). To = `whatsapp_to`. Use an approved template with
+   variables `title`, `body`, `link` (Meta requires a template when the person
+   hasn't messaged your number in the last 24 hours).
+3. Optional: a filter between them, header `X-Notify-Secret` = your secret.
+
+Each call is for one person and carries: `name`, `church`, `title`, `body`,
+`link`, `whatsapp_to` (e.g. `+27825550000`) and `whatsapp_text` (everything as one message).
 
 ### Creating a Super Admin
 

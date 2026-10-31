@@ -84,3 +84,55 @@ export async function removeAvailabilityBlock(_prev: FormResult, formData: FormD
   revalidatePath("/dashboard/booking/availability");
   return { ok: true };
 }
+
+/**
+ * Change a blocked period: new dates and/or note. Form fields: id (repeated —
+ * the period's current days), blocked_date, until_date?, note?. The old days
+ * are replaced by the new ones; the pastor stays the same.
+ */
+export async function updateAvailabilityBlock(_prev: FormResult, formData: FormData): Promise<FormResult> {
+  const me = await requireShepherd();
+  if (!me) return { error: "Your session has expired — sign in again to continue." };
+  const ids = z.array(z.string().uuid()).min(1).max(400).safeParse(formData.getAll("id"));
+  if (!ids.success) return { error: "That time away couldn't be found." };
+  const parsed = availabilityBlockSchema.safeParse({
+    blockedDate: formData.get("blocked_date"),
+    untilDate: formData.get("until_date") || undefined,
+    note: formData.get("note") || undefined,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Please check the dates." };
+  const days = daysBetween(parsed.data.blockedDate, parsed.data.untilDate ?? parsed.data.blockedDate);
+  if (days.length > MAX_AWAY_DAYS) return { error: `That's more than ${MAX_AWAY_DAYS} days. Block it in shorter stretches.` };
+
+  const supabase = createClient();
+  const { data: old } = await supabase.from("pastor_availability_blocks").select("id, pastor_id, blocked_date, note").in("id", ids.data).eq("church_id", me.church_id);
+  if (!old?.length) return { error: "That time away couldn't be found — refresh the page." };
+  const pastorId = old[0].pastor_id;
+  if (old.some((r) => r.pastor_id !== pastorId)) return { error: "That time away couldn't be found — refresh the page." };
+  if (me.role === "pastor" && pastorId !== me.id) return { error: "You can only change your own time away." };
+
+  // Days already blocked by a different period stay as they are.
+  const { data: others } = await supabase
+    .from("pastor_availability_blocks")
+    .select("blocked_date")
+    .eq("pastor_id", pastorId)
+    .in("blocked_date", days)
+    .not("id", "in", `(${ids.data.join(",")})`);
+  const taken = new Set((others ?? []).map((r) => r.blocked_date));
+
+  const { error: delError } = await supabase.from("pastor_availability_blocks").delete().in("id", ids.data).eq("church_id", me.church_id);
+  if (delError) {
+    console.error("[availability] edit (remove old) failed:", delError.message);
+    return { error: "Couldn't save the changes — please try again." };
+  }
+  const rows = days.filter((d) => !taken.has(d)).map((d) => ({ church_id: me.church_id, pastor_id: pastorId, blocked_date: d, note: parsed.data.note ?? null }));
+  const { error } = rows.length ? await supabase.from("pastor_availability_blocks").insert(rows) : { error: null };
+  if (error) {
+    console.error("[availability] edit (add new) failed:", error.message);
+    // Put the old days back so nothing is lost.
+    await supabase.from("pastor_availability_blocks").insert(old.map((r) => ({ church_id: me.church_id, pastor_id: r.pastor_id, blocked_date: r.blocked_date, note: r.note })));
+    return { error: "Couldn't save the changes — please try again." };
+  }
+  revalidatePath("/dashboard/booking/availability");
+  return { ok: true };
+}

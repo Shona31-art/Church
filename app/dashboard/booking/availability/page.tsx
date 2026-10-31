@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
 import { PermissionDenied } from "@/components/ui/Gates";
-import { AddBlockForm, RemoveBlockForm } from "./AvailabilityForms";
+import { AddBlockForm, EditBlockForm, RemoveBlockForm } from "./AvailabilityForms";
 
 export default async function AvailabilityPage() {
   const gate = await moduleGate("pastor_booking");
@@ -64,7 +64,12 @@ export default async function AvailabilityPage() {
                     {first.note && ` · ${first.note}`}
                   </p>
                 </div>
-                {canRemove && <RemoveBlockForm ids={range.rows.map((r) => r.id)} label={`${when} (${first.name})`} />}
+                {canRemove && (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <EditBlockForm ids={range.rows.map((r) => r.id)} start={range.start} end={range.end} note={first.note} today={today} />
+                    <RemoveBlockForm ids={range.rows.map((r) => r.id)} label={`${when} (${first.name})`} />
+                  </div>
+                )}
               </li>
             );
           })}

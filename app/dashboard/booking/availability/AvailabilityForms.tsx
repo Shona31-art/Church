@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useFormState } from "react-dom";
-import { addAvailabilityBlock, removeAvailabilityBlock } from "./actions";
+import { addAvailabilityBlock, removeAvailabilityBlock, updateAvailabilityBlock } from "./actions";
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
 import { Alert } from "@/components/ui/Alert";
 import { FormField } from "@/components/ui/FormField";
@@ -88,5 +88,68 @@ export function RemoveBlockForm({ ids, label }: { ids: string[]; label: string }
       </ConfirmSubmitButton>
       {state?.error && <p role="alert" className="text-xs text-danger mt-1">{state.error}</p>}
     </form>
+  );
+}
+
+/** Change a blocked period's dates or note. */
+export function EditBlockForm({ ids, start, end, note, today }: { ids: string[]; start: string; end: string; note: string | null; today: string }) {
+  const [state, formAction] = useFormState(updateAvailabilityBlock, null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [from, setFrom] = useState(start);
+  const [until, setUntil] = useState(end === start ? "" : end);
+
+  useEffect(() => {
+    if (state?.ok) {
+      dialogRef.current?.close();
+      showToast("Time away updated.");
+    }
+  }, [state]);
+
+  return (
+    <>
+      <button type="button" className="btn-ghost btn-sm" onClick={() => dialogRef.current?.showModal()} aria-haspopup="dialog">
+        Edit
+      </button>
+      <dialog ref={dialogRef} aria-labelledby={`edit-${ids[0]}`} className="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-line p-0 text-ink shadow-pop backdrop:bg-ink/45 motion-safe:animate-modal-in">
+        <form action={formAction} className="space-y-4 p-6">
+          {ids.map((id) => (
+            <input key={id} type="hidden" name="id" value={id} />
+          ))}
+          <h2 id={`edit-${ids[0]}`} className="text-lg font-semibold">
+            Edit time away
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Away from" htmlFor={`from-${ids[0]}`} required>
+              <input
+                id={`from-${ids[0]}`}
+                type="date"
+                name="blocked_date"
+                min={today}
+                required
+                value={from}
+                onChange={(e) => {
+                  setFrom(e.target.value);
+                  if (until && until < e.target.value) setUntil(e.target.value);
+                }}
+                className="input"
+              />
+            </FormField>
+            <FormField label="Until" htmlFor={`until-${ids[0]}`} optional>
+              <input id={`until-${ids[0]}`} type="date" name="until_date" min={from || today} value={until} onChange={(e) => setUntil(e.target.value)} className="input" />
+            </FormField>
+          </div>
+          <FormField label="Note" htmlFor={`note-${ids[0]}`} optional>
+            <input id={`note-${ids[0]}`} name="note" maxLength={200} defaultValue={note ?? ""} placeholder="e.g. On leave" className="input" />
+          </FormField>
+          {state?.error && <Alert tone="error">{state.error}</Alert>}
+          <div className="flex justify-end gap-2">
+            <button type="button" className="btn-secondary" onClick={() => dialogRef.current?.close()}>
+              Cancel
+            </button>
+            <PendingButton pendingLabel="Saving…">Save changes</PendingButton>
+          </div>
+        </form>
+      </dialog>
+    </>
   );
 }

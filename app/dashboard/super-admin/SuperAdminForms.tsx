@@ -86,7 +86,7 @@ export function SubscriptionForm({
             <option value="free_trial">Free trial</option>
             <option value="basic">Basic</option>
             <option value="premium">Premium</option>
-            <option value="enterprise">Enterprise</option>
+            <option value="enterprise">Unlimited</option>
             <option value="sponsored">Sponsored (free)</option>
           </select>
         </FormField>

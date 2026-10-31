@@ -8,7 +8,8 @@ import {
   nextPeriodEnd,
   PAYMENT_GRACE_DAYS,
   planCodesFromEnv,
-  planForCode,
+  planIntervalForCode,
+  type BillingInterval,
   type BillingSettlement,
   type PendingBillingPayment,
 } from "@/lib/billing";
@@ -20,7 +21,7 @@ import {
 // transaction / read the subscription) and check it against what we expect.
 
 export function onlineBillingConfigured(): boolean {
-  return paystackConfigured() && Object.keys(planCodesFromEnv()).length > 0;
+  return paystackConfigured() && Object.keys(planCodesFromEnv()).length + Object.keys(planCodesFromEnv(process.env, "yearly")).length > 0;
 }
 
 /** A checkout started on the Billing page: activates (or renews) the plan once Paystack confirms it. */
@@ -29,7 +30,7 @@ export async function settleBillingCheckout(reference: string): Promise<BillingS
   const admin = createAdminClient();
   const { data: payment, error } = await admin
     .from("billing_payments")
-    .select("id, church_id, status, plan_key, amount_cents, reference, started_by")
+    .select("*") // includes "interval" once plans_v3.sql has run
     .eq("reference", reference)
     .maybeSingle();
   if (error) throw new Error(`billing payment lookup failed: ${error.message}`);
@@ -38,7 +39,8 @@ export async function settleBillingCheckout(reference: string): Promise<BillingS
   if (payment.status !== "pending") return "already_failed";
 
   const tx = await verifyTransaction(reference);
-  const codes = planCodesFromEnv();
+  const interval: BillingInterval = payment.interval === "yearly" ? "yearly" : "monthly";
+  const codes = planCodesFromEnv(process.env, interval);
   const outcome = decideBillingPayment(payment as PendingBillingPayment, tx, codes[payment.plan_key as keyof typeof codes]);
 
   if (outcome === "failed") {
@@ -55,8 +57,8 @@ export async function settleBillingCheckout(reference: string): Promise<BillingS
   if (outcome !== "paid") return outcome;
 
   const { data: sub } = await admin.from("church_subscriptions").select("billing_date, plan_key").eq("church_id", payment.church_id).maybeSingle();
-  // A different plan starts its month now; the same plan extends what's already paid.
-  const periodEnd = nextPeriodEnd(sub?.plan_key === payment.plan_key ? sub?.billing_date ?? null : null);
+  // A different plan starts its period now; the same plan extends what's already paid.
+  const periodEnd = nextPeriodEnd(sub?.plan_key === payment.plan_key ? sub?.billing_date ?? null : null, new Date(), interval);
   const now = new Date().toISOString();
 
   const { data: claimed, error: claimError } = await admin
@@ -77,6 +79,7 @@ export async function settleBillingCheckout(reference: string): Promise<BillingS
       grace_period_end: null,
       suspended_at: null,
       cancelled_at: null,
+      ...("interval" in payment ? { billing_interval: interval } : {}),
       ...(tx.customerCode ? { paystack_customer_code: tx.customerCode } : {}),
     })
     .eq("church_id", payment.church_id);
@@ -105,8 +108,9 @@ export async function settleBillingCheckout(reference: string): Promise<BillingS
 export async function recordRenewal(reference: string): Promise<"renewed" | "ignored" | "duplicate"> {
   if (!reference || isBillingReference(reference) || reference.startsWith("gb-")) return "ignored";
   const tx = await verifyTransaction(reference);
-  const plan = planForCode(tx.planCode, planCodesFromEnv());
-  if (tx.status !== "success" || tx.currency !== "ZAR" || !plan || !tx.customerCode) return "ignored";
+  const match = planIntervalForCode(tx.planCode);
+  if (tx.status !== "success" || tx.currency !== "ZAR" || !match || !tx.customerCode) return "ignored";
+  const { plan, interval } = match;
 
   const admin = createAdminClient();
   const { data: sub, error } = await admin
@@ -120,8 +124,9 @@ export async function recordRenewal(reference: string): Promise<"renewed" | "ign
     return "ignored";
   }
 
-  const periodEnd = nextPeriodEnd(sub.billing_date);
+  const periodEnd = nextPeriodEnd(sub.billing_date, new Date(), interval);
   const { error: insertError } = await admin.from("billing_payments").insert({
+    ...(interval === "yearly" ? { interval } : {}),
     church_id: sub.church_id,
     plan_key: plan,
     amount_cents: tx.amountCents,
@@ -149,7 +154,7 @@ export async function recordRenewal(reference: string): Promise<"renewed" | "ign
 export async function linkSubscription(code: string): Promise<"linked" | "ignored"> {
   if (!/^SUB_[A-Za-z0-9]+$/.test(code)) return "ignored";
   const subscription = await fetchSubscription(code);
-  if (!planForCode(subscription.planCode, planCodesFromEnv()) || !subscription.customerCode) return "ignored";
+  if (!planIntervalForCode(subscription.planCode) || !subscription.customerCode) return "ignored";
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("church_subscriptions")

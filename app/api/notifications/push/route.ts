@@ -3,11 +3,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { pushConfigured, sendPushToUser } from "@/lib/push";
 import { CATEGORIES } from "@/lib/notifications";
+import { deliverAlert, makeConfigured } from "@/lib/alert-delivery";
 
 /**
  * POST /api/notifications/push — called by a Supabase Database Webhook each
  * time a row is INSERTED into `notifications` (set-up steps in the README).
- * Sends that notification as a phone pop-up to the person's devices.
+ * Sends that notification as a phone pop-up to the person's devices, and —
+ * for pastor & admin alerts — by WhatsApp through Make.com (lib/alert-delivery.ts).
  *
  * Grouped chat/prayer items count up with UPDATEs, which the webhook doesn't
  * send — so a busy chat pops up once, not once per message, until it's read.
@@ -41,17 +43,25 @@ function authorized(request: Request): boolean {
 
 export async function POST(request: Request) {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  if (!pushConfigured()) return NextResponse.json({ error: "Push isn't configured on this server." }, { status: 503 });
+  const external = makeConfigured();
+  if (!pushConfigured() && !external) return NextResponse.json({ error: "Push isn't configured on this server." }, { status: 503 });
 
   const parsed = Payload.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Expected a notifications INSERT payload." }, { status: 400 });
 
   const { record } = parsed.data;
-  const sent = await sendPushToUser(record.user_id, record.category, {
-    title: record.title,
-    body: record.body,
-    link: record.link,
-    tag: record.group_key ?? undefined,
-  });
-  return NextResponse.json({ sent });
+  const [sent, delivered] = await Promise.all([
+    pushConfigured()
+      ? sendPushToUser(record.user_id, record.category, {
+          title: record.title,
+          body: record.body,
+          link: record.link,
+          tag: record.group_key ?? undefined,
+        })
+      : Promise.resolve(0),
+    record.category === "alerts" && external
+      ? deliverAlert(record.user_id, { title: record.title, body: record.body, link: record.link })
+      : Promise.resolve({ sent: false }),
+  ]);
+  return NextResponse.json({ sent, alertSentToMake: delivered.sent });
 }

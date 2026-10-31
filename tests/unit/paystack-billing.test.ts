@@ -69,3 +69,23 @@ describe("online billing rules", () => {
     expect(onlineBillingState({ price_override: null, paystack_subscription_code: "SUB_x", cancelled_at: "2026-10-01" })).toBe("cancelled");
   });
 });
+
+describe("yearly billing", () => {
+  test("a year on lands on the same date (29 Feb → 28 Feb)", async () => {
+    const { addOneYear, nextPeriodEnd } = await import("@/lib/billing");
+    expect(addOneYear(new Date("2026-01-31T00:00:00Z")).toISOString()).toBe("2027-01-31T00:00:00.000Z");
+    expect(addOneYear(new Date("2028-02-29T00:00:00Z")).toISOString()).toBe("2029-02-28T00:00:00.000Z");
+    expect(nextPeriodEnd(null, new Date("2026-10-31T00:00:00Z"), "yearly").toISOString()).toBe("2027-10-31T00:00:00.000Z");
+    // Paying early never shortens time already paid for.
+    expect(nextPeriodEnd("2026-12-15T00:00:00Z", new Date("2026-10-31T00:00:00Z"), "yearly").toISOString()).toBe("2027-12-15T00:00:00.000Z");
+  });
+
+  test("monthly and yearly Paystack plans are told apart", async () => {
+    const { planCodesFromEnv, planIntervalForCode } = await import("@/lib/billing");
+    const env = { PAYSTACK_PLAN_BASIC: "PLN_bm", PAYSTACK_PLAN_BASIC_YEARLY: "PLN_by", PAYSTACK_PLAN_ENTERPRISE: "PLN_em" };
+    expect(planCodesFromEnv(env, "yearly")).toEqual({ basic: "PLN_by" });
+    expect(planIntervalForCode("PLN_by", env)).toEqual({ plan: "basic", interval: "yearly" });
+    expect(planIntervalForCode("PLN_em", env)).toEqual({ plan: "enterprise", interval: "monthly" });
+    expect(planIntervalForCode("PLN_other", env)).toBeNull();
+  });
+});

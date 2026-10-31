@@ -3,8 +3,11 @@
 // tests/unit/paystack-billing.test.ts.
 
 /** Plans shown to church admins on the Billing page (others are arranged by the platform team). */
-export const SELF_SERVE_PLANS = ["basic", "premium"] as const;
+export const SELF_SERVE_PLANS = ["basic", "premium", "enterprise"] as const;
 export type SelfServePlan = (typeof SELF_SERVE_PLANS)[number];
+
+export const BILLING_INTERVALS = ["monthly", "yearly"] as const;
+export type BillingInterval = (typeof BILLING_INTERVALS)[number];
 
 /** Days a church keeps access after a renewal payment fails, while Paystack retries. */
 export const PAYMENT_GRACE_DAYS = 7;
@@ -14,13 +17,14 @@ export const billingReference = (paymentId: string) => `gbsub-${paymentId}`;
 export const isBillingReference = (reference: string) => /^gbsub-[0-9a-f-]{36}$/.test(reference);
 
 /**
- * Paystack plan codes (PLN_…) from the environment, one per self-serve plan.
- * Online billing is offered for a plan only when its code is set.
+ * Paystack plan codes (PLN_…) from the environment, one per self-serve plan:
+ * PAYSTACK_PLAN_BASIC (monthly) and PAYSTACK_PLAN_BASIC_YEARLY (yearly), etc.
+ * Online billing is offered for a plan and interval only when its code is set.
  */
-export function planCodesFromEnv(env: Record<string, string | undefined> = process.env): Partial<Record<SelfServePlan, string>> {
+export function planCodesFromEnv(env: Record<string, string | undefined> = process.env, interval: BillingInterval = "monthly"): Partial<Record<SelfServePlan, string>> {
   const codes: Partial<Record<SelfServePlan, string>> = {};
   for (const plan of SELF_SERVE_PLANS) {
-    const code = env[`PAYSTACK_PLAN_${plan.toUpperCase()}`]?.trim();
+    const code = env[`PAYSTACK_PLAN_${plan.toUpperCase()}${interval === "yearly" ? "_YEARLY" : ""}`]?.trim();
     if (code && /^PLN_[A-Za-z0-9]+$/.test(code)) codes[plan] = code;
   }
   return codes;
@@ -30,6 +34,15 @@ export function planCodesFromEnv(env: Record<string, string | undefined> = proce
 export function planForCode(code: string | undefined, codes: Partial<Record<SelfServePlan, string>>): SelfServePlan | null {
   if (!code) return null;
   return (Object.entries(codes).find(([, c]) => c === code)?.[0] as SelfServePlan | undefined) ?? null;
+}
+
+/** Which plan and interval a Paystack plan code belongs to (null = not one of ours). */
+export function planIntervalForCode(code: string | undefined, env: Record<string, string | undefined> = process.env): { plan: SelfServePlan; interval: BillingInterval } | null {
+  for (const interval of BILLING_INTERVALS) {
+    const plan = planForCode(code, planCodesFromEnv(env, interval));
+    if (plan) return { plan, interval };
+  }
+  return null;
 }
 
 /** Rand price (numeric from Postgres, e.g. "299.00") to cents. */
@@ -49,14 +62,26 @@ export function addOneMonth(from: Date): Date {
   return d;
 }
 
+/** Same date next year (29 Feb → 28 Feb). */
+export function addOneYear(from: Date): Date {
+  const d = new Date(from);
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCFullYear(d.getUTCFullYear() + 1);
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, lastDay));
+  return d;
+}
+
 /**
- * When a newly paid month ends: a month after the later of "now" and the
- * current paid-up date, so paying early (or a renewal arriving a day early)
- * never shortens the time already paid for.
+ * When a newly paid month (or year) ends: one period after the later of "now"
+ * and the current paid-up date, so paying early (or a renewal arriving a day
+ * early) never shortens the time already paid for.
  */
-export function nextPeriodEnd(currentBillingDate: string | null, now: Date = new Date()): Date {
+export function nextPeriodEnd(currentBillingDate: string | null, now: Date = new Date(), interval: BillingInterval = "monthly"): Date {
   const current = currentBillingDate ? new Date(currentBillingDate) : null;
-  return addOneMonth(current && current > now ? current : now);
+  const from = current && current > now ? current : now;
+  return interval === "yearly" ? addOneYear(from) : addOneMonth(from);
 }
 
 export interface PendingBillingPayment {

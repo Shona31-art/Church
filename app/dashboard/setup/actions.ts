@@ -2,6 +2,7 @@
 
 import { planIncludes } from "@/lib/features";
 import { aiProvider, generateText, lastAiFailure } from "@/lib/ai";
+import { geminiKeyName } from "@/lib/ai-key";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -271,14 +272,15 @@ export async function testAiConnection(): Promise<AiCheck> {
       onPlan,
       ok: false,
       message:
-        "This live site can't see an AI key. In Vercel → Settings → Environment Variables, add GEMINI_API_KEY (exactly that name, ticked for Production), then Deployments → ⋯ → Redeploy.",
+        "This live site can't see an AI key. In Vercel → your project → Settings → Environment Variables, add GEMINI_API_KEY (that exact name, ticked for Production), then Deployments → ⋯ → Redeploy. Adding it to your laptop's .env.local file doesn't reach the live site.",
     };
   }
   const reply = await generateText({ prompt: "Reply with exactly one word: ready", maxTokens: 20 });
   if (!reply) return { provider, model, onPlan, ok: false, message: `The key is there, but the AI didn't answer. ${lastAiFailure() ?? "Check the key in Google AI Studio and try again."}` };
+  const found = provider === "gemini" ? geminiKeyName() : null;
   return {
     provider,
-    model,
+    model: found && found !== "GEMINI_API_KEY" ? `${model}, key found as ${found}` : model,
     onPlan,
     ok: true,
     message: onPlan

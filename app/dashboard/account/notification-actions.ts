@@ -86,3 +86,17 @@ export async function sendTestPush(): Promise<{ ok: true; sent: number } | { ok:
     ? { ok: true, sent }
     : { ok: false, error: "No device accepted the test. Turn pop-ups off and on again on this device, then retry." };
 }
+
+/** Input: enabled. Whether my pastor & admin alerts also come by WhatsApp. */
+export async function setWhatsAppAlerts(enabled: boolean): Promise<Result> {
+  const me = await getCurrentAppUser();
+  if (!me) return SIGNED_OUT;
+  if (typeof enabled !== "boolean") return { ok: false, error: "That didn't look right. Refresh and try again." };
+
+  const { error } = await createClient().from("notification_preferences").upsert({ user_id: me.id, whatsapp_alerts: enabled }, { onConflict: "user_id" });
+  if (error) {
+    console.error("[alerts] save WhatsApp setting failed:", error.message);
+    return { ok: false, error: "Couldn't save that setting. Try again." };
+  }
+  return { ok: true };
+}

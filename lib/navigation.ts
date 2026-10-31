@@ -88,6 +88,8 @@ const PLATFORM_NAV: NavGroup[] = [
       { href: "/dashboard/super-admin", label: "Overview", icon: "overview" },
       { href: "/dashboard/super-admin/churches", label: "Churches", icon: "churches" },
       { href: "/dashboard/super-admin/users", label: "Platform users", icon: "user" },
+      { href: "/dashboard/super-admin/activity", label: "Audit log", icon: "activity" },
+      { href: "/dashboard/super-admin/plans", label: "Plans & prices", icon: "plans" },
       { href: "/dashboard/support", label: "Support tickets", icon: "support" },
     ],
   },

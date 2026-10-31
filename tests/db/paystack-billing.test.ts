@@ -50,8 +50,10 @@ describe("billing_payments", () => {
     ).rejects.toThrow();
   });
 
-  test("only Basic and Premium can be paid online, in rand", async () => {
-    await expect(rows(`insert into billing_payments (church_id, plan_key, amount_cents, reference) values ($1, 'enterprise', 1, 'gbsub-x-enterprise')`, [CHURCH_A])).rejects.toThrow();
+  test("only the self-serve plans (Basic, Premium, Unlimited) can be paid online, in rand", async () => {
+    await expect(rows(`insert into billing_payments (church_id, plan_key, amount_cents, reference) values ($1, 'sponsored', 1, 'gbsub-x-sponsored')`, [CHURCH_A])).rejects.toThrow();
+    await expect(rows(`insert into billing_payments (church_id, plan_key, amount_cents, reference) values ($1, 'free_trial', 1, 'gbsub-x-trial')`, [CHURCH_A])).rejects.toThrow();
+    expect(await rows(`insert into billing_payments (church_id, plan_key, amount_cents, reference, interval) values ($1, 'enterprise', 1300000, 'gbsub-x-unlimited', 'yearly') returning plan_key`, [CHURCH_A])).toHaveLength(1);
     await expect(rows(`insert into billing_payments (church_id, plan_key, amount_cents, reference, currency) values ($1, 'basic', 1, 'gbsub-x-usd', 'USD')`, [CHURCH_A])).rejects.toThrow();
   });
 });

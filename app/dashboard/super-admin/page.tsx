@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
+import { describeAction } from "@/lib/audit-labels";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { resolveAccountStatus, PLAN_LABELS } from "@/lib/subscription";
@@ -19,7 +21,7 @@ export default async function SuperAdminHome() {
     supabase.from("church_subscriptions").select("church_id, plan_key, status, is_lifetime, trial_expires_at, grace_period_end, churches(name)").limit(10000),
     supabase.from("support_tickets").select("id", { count: "exact", head: true }).neq("status", "closed"),
     supabase.from("churches").select("id, name, created_at").order("created_at", { ascending: false }).limit(5),
-    supabase.from("audit_logs").select("id, action, created_at, churches(name), actor:app_users!audit_logs_actor_id_fkey(name)").order("created_at", { ascending: false }).limit(8),
+    supabase.from("audit_logs").select("id, action, created_at, churches(name), actor:app_users!audit_logs_actor_id_fkey(name)").order("created_at", { ascending: false }).limit(10),
   ]);
 
   const effective = (subs ?? []).map((s: any) => ({ ...s, effective: resolveAccountStatus(s) }));
@@ -44,6 +46,9 @@ export default async function SuperAdminHome() {
         description="Every church on the platform. Church content (prayers, care notes, journals) is never visible here."
         actions={
           <>
+            <Link href="/dashboard/super-admin/plans" className="btn-secondary">
+              Plans &amp; prices
+            </Link>
             <Link href="/dashboard/super-admin/users/new" className="btn-secondary">
               Add user
             </Link>
@@ -103,24 +108,34 @@ export default async function SuperAdminHome() {
         </Section>
       </div>
 
-      <Section title="Recent platform activity" description="From the audit log.">
+      <details className="card group">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+          <span>
+            <span className="block font-display text-xl">Recent platform activity</span>
+            <span className="text-sm text-ink/60">The latest sign-ins and changes across all churches.</span>
+          </span>
+          <ChevronDown aria-hidden className="h-5 w-5 shrink-0 text-ink/50 transition-transform group-open:rotate-180" />
+        </summary>
         {!activity?.length ? (
-          <p className="text-sm text-ink/60">No activity recorded yet.</p>
+          <p className="mt-4 text-sm text-ink/60">No activity recorded yet.</p>
         ) : (
-          <ul className="divide-y divide-line text-sm">
+          <ul className="mt-4 divide-y divide-line text-sm">
             {activity.map((a: any) => (
-              <li key={a.id} className="py-2 flex flex-wrap items-center justify-between gap-2">
+              <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                 <span>
-                  <code className="text-xs">{a.action}</code>
+                  {a.actor?.name ? <span className="font-medium">{a.actor.name} </span> : null}
+                  <span>{describeAction(a.action).replace(/^./, (c) => (a.actor?.name ? c.toLowerCase() : c))}</span>
                   {a.churches?.name ? <span className="text-ink/60"> · {a.churches.name}</span> : null}
-                  {a.actor?.name ? <span className="text-ink/60"> · {a.actor.name}</span> : null}
                 </span>
                 <span className="text-xs text-ink/60">{formatRelative(a.created_at)}</span>
               </li>
             ))}
           </ul>
         )}
-      </Section>
+        <Link href="/dashboard/super-admin/activity" className="btn-secondary mt-4">
+          Open full audit log
+        </Link>
+      </details>
 
       <p className="text-xs text-ink/60">Plans: {Object.values(PLAN_LABELS).join(" · ")}</p>
     </div>

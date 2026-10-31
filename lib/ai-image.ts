@@ -1,4 +1,5 @@
 import "server-only";
+import { geminiApiKey } from "@/lib/ai-key";
 
 /**
  * AI-designed posters: Google's Gemini image model draws a finished poster
@@ -19,7 +20,7 @@ import { POSTER_SIZES, type ImageInput, type PosterSize } from "@/lib/ai-image-s
 export { POSTER_SIZES, type ImageInput, type PosterSize };
 
 export function isPosterAiConfigured(): boolean {
-  return Boolean(process.env.GEMINI_API_KEY);
+  return Boolean(geminiApiKey());
 }
 
 /** The instructions sent with every request. Exported for tests. */
@@ -96,7 +97,7 @@ export async function generatePosterImage(input: {
   previous?: ImageInput;
   refine?: string;
 }): Promise<{ image: ImageInput } | { error: string }> {
-  const key = process.env.GEMINI_API_KEY;
+  const key = geminiApiKey();
   if (!key) return { error: "AI posters need a Gemini API key (GEMINI_API_KEY). Ask your platform admin." };
 
   const prompt = posterPrompt({
@@ -113,7 +114,7 @@ export async function generatePosterImage(input: {
 
 /** Sends one image request to Gemini (one retry for busy/temporary errors). */
 async function requestImage(requestBody: unknown, what: string): Promise<{ image: ImageInput } | { error: string }> {
-  const key = process.env.GEMINI_API_KEY;
+  const key = geminiApiKey();
   if (!key) return { error: "AI pictures need a Gemini API key (GEMINI_API_KEY). Ask your platform admin." };
   const body = JSON.stringify(requestBody);
   const url = `${GEMINI_URL}/${encodeURIComponent(IMAGE_MODEL)}:generateContent`;

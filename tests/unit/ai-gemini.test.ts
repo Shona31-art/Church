@@ -57,3 +57,14 @@ describe("Gemini provider", () => {
     quiet.mockRestore();
   });
 });
+
+describe("Gemini key names", () => {
+  test("finds the key under GEMINI_API_KEY or a common variation, quotes trimmed", async () => {
+    const { geminiApiKey, geminiKeyName } = await import("@/lib/ai-key");
+    expect(geminiApiKey({ GEMINI_API_KEY: "k1" })).toBe("k1");
+    expect(geminiApiKey({ GEMINI_API: '"k2"' })).toBe("k2");
+    expect(geminiApiKey({ GOOGLE_API_KEY: " k3 " })).toBe("k3");
+    expect(geminiKeyName({ GEMINI_API: "x" })).toBe("GEMINI_API");
+    expect(geminiApiKey({})).toBeUndefined();
+  });
+});

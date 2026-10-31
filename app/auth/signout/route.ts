@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logAudit } from "@/lib/audit";
 
 /**
  * GET /auth/signout?reason=disabled|no_profile
@@ -12,6 +13,13 @@ const REASONS = new Set(["disabled", "no_profile"]);
 
 export async function GET(request: NextRequest) {
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    const { data: profile } = await supabase.from("app_users").select("id, church_id").eq("id", user.id).maybeSingle();
+    if (profile) await logAudit({ churchId: profile.church_id, actorId: profile.id, action: "auth.signed_out" });
+  }
   await supabase.auth.signOut();
 
   const reason = request.nextUrl.searchParams.get("reason");

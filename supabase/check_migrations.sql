@@ -24,6 +24,10 @@ from (values
   (36, 'songs.sql',                to_regclass('public.songs') is not null),
   (37, 'counseling_delete.sql',    exists (select 1 from pg_policies where tablename = 'counseling_conversations' and policyname = 'counseling_conversations_delete_own')),
   (38, 'games_jigsaw.sql',         exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'game_sessions' and column_name = 'answers')),
-  (39, 'jigsaw_pictures.sql',      to_regclass('public.jigsaw_pictures') is not null)
+  (39, 'jigsaw_pictures.sql',      to_regclass('public.jigsaw_pictures') is not null),
+  (40, 'sermon_audio.sql',         exists (select 1 from storage.buckets where id = 'sermon-audio')),
+  (41, 'plans_v3.sql',             exists (select 1 from public.plans where key = 'enterprise' and name = 'Unlimited')),
+  (42, 'activity_log.sql',         exists (select 1 from pg_proc where proname = 'audit_row_change')),
+  (43, 'pastor_alerts.sql',        exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'notification_preferences' and column_name = 'whatsapp_alerts'))
 ) as t(n, file, ok)
 order by n;

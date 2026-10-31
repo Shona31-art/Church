@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { useFormState } from "react-dom";
 import { saveSermon } from "./actions";
+import { AudioField } from "./AudioField";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { Alert } from "@/components/ui/Alert";
 import { FormActions, FormField, RequiredNote } from "@/components/ui/FormField";
@@ -55,13 +57,25 @@ export function SermonForm({ sermon, aiAvailable, today }: { sermon?: SermonValu
         <FormField label="Video link" htmlFor="video_url" optional error={fe.video_url} hint="YouTube links play right on the sermon page.">
           <input id="video_url" name="video_url" type="url" inputMode="url" placeholder="https://www.youtube.com/watch?v=…" defaultValue={v("video_url", sermon?.video_url)} className="input" aria-invalid={Boolean(fe.video_url)} />
         </FormField>
-        <FormField label="Audio link" htmlFor="audio_url" optional error={fe.audio_url}>
-          <input id="audio_url" name="audio_url" type="url" inputMode="url" placeholder="https://…/sermon.mp3" defaultValue={v("audio_url", sermon?.audio_url)} className="input" aria-invalid={Boolean(fe.audio_url)} />
-        </FormField>
+        <AudioField initial={v("audio_url", sermon?.audio_url)} error={fe.audio_url} />
       </fieldset>
 
-      <fieldset className="card-elevated rounded-2xl p-5 sm:p-6 space-y-5">
-        <legend className="px-1 text-sm font-semibold">Study notes for small groups</legend>
+      {/* Opens and closes; open already when there are notes or a problem to fix. */}
+      <details
+        className="card-elevated group rounded-2xl p-5 sm:p-6 [&_summary::-webkit-details-marker]:hidden"
+        open={Boolean(
+          fe.transcript || fe.summary || fe.scripture_refs || fe.discussion_questions || fe.prayer_points ||
+            sermon?.transcript || sermon?.ai_summary || (sermon?.scripture_refs?.length ?? 0) > 0 || (sermon?.discussion_questions?.length ?? 0) > 0 || (sermon?.prayer_points?.length ?? 0) > 0
+        )}
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+          <span>
+            <span className="block font-semibold">Study notes for small groups</span>
+            <span className="block text-xs text-ink/60">Transcript, summary, scriptures, discussion questions and prayer points (optional)</span>
+          </span>
+          <ChevronDown aria-hidden className="h-5 w-5 shrink-0 text-ink/60 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="mt-5 space-y-5">
         <FormField label="Transcript" htmlFor="transcript" optional error={fe.transcript}>
           <textarea id="transcript" name="transcript" rows={6} maxLength={100000} defaultValue={v("transcript", sermon?.transcript)} className="input" />
         </FormField>
@@ -88,7 +102,8 @@ export function SermonForm({ sermon, aiAvailable, today }: { sermon?: SermonValu
         <FormField label="Prayer points" htmlFor="prayer_points" optional hint="One per line">
           <textarea id="prayer_points" name="prayer_points" rows={4} defaultValue={v("prayer_points", joined(sermon?.prayer_points))} className="input" />
         </FormField>
-      </fieldset>
+        </div>
+      </details>
 
       <FormActions>
         <PendingButton pendingLabel="Saving…">{sermon ? "Save changes" : "Publish sermon"}</PendingButton>

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 // lib/push is mocked: these tests cover the route's checks, not Web Push itself.
 const sendPushToUser = vi.fn(async () => 1);
 vi.mock("@/lib/push", () => ({ pushConfigured: () => true, sendPushToUser }));
+vi.mock("@/lib/alert-delivery", () => ({ deliverAlert: vi.fn(async () => ({ sent: false })), makeConfigured: () => false }));
 const { POST } = await import("@/app/api/notifications/push/route");
 
 const SECRET = "test-secret-123";
@@ -50,7 +51,7 @@ describe("POST /api/notifications/push", () => {
   test("sends the notification to its owner's devices, grouped by chat", async () => {
     const res = await call({ type: "INSERT", table: "notifications", schema: "public", record, old_record: null });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ sent: 1 });
+    expect(await res.json()).toEqual({ sent: 1, alertSentToMake: false });
     expect(sendPushToUser).toHaveBeenCalledWith(record.user_id, "messages", {
       title: "Alice",
       body: "Sent you a message",

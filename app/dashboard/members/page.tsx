@@ -2,7 +2,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
-import { CHURCH_ROLES, ROLE_LABELS, can, roleLabel, type AccountStatus } from "@/lib/permissions";
+import { CHURCH_ROLES, ROLE_LABELS, can, canEditMemberRole, roleLabel, type AccountStatus } from "@/lib/permissions";
+import { Pencil } from "lucide-react";
+import { DeleteMember, SetPassword } from "./[id]/MemberAccountActions";
 import { PAGE_SIZE, buildQuery, orFilterPattern, pageFrom } from "@/lib/list";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FilterBar, FilterSelect } from "@/components/ui/FilterBar";
@@ -156,10 +158,19 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
                     <td className="px-4 py-3">
                       <MemberStatusBadge status={m.status as AccountStatus} />
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link href={`/dashboard/members/${m.id}`} className="btn-ghost btn-sm">
-                        View<span className="sr-only"> {m.name}</span>
-                      </Link>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <Link href={`/dashboard/members/${m.id}`} className="btn-ghost btn-sm">
+                          View<span className="sr-only"> {m.name}</span>
+                        </Link>
+                        {canEditMemberRole(me, m) && (
+                          <Link href={`/dashboard/members/${m.id}/edit`} className="btn-ghost btn-sm">
+                            <Pencil aria-hidden className="h-4 w-4" /> Edit
+                          </Link>
+                        )}
+                        {canEditMemberRole(me, m) && m.status !== "disabled" && <SetPassword memberId={m.id} memberName={m.name} compact />}
+                        {m.id !== me.id && can(me.role, "deleteMembers") && <DeleteMember memberId={m.id} memberName={m.name} compact />}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -168,22 +179,37 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
           </div>
 
           <ul className="md:hidden space-y-2">
-            {members.map((m: any) => (
-              <li key={m.id}>
-                <Link href={`/dashboard/members/${m.id}`} className="card-elevated rounded-2xl p-4 flex items-start justify-between gap-3">
-                  <Avatar name={m.name} src={photos.get(m.id)} />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate">{m.name}</p>
-                    <p className="text-xs text-ink/60 truncate">{m.email}</p>
-                    <p className="text-xs text-ink/60 mt-1">
-                      {roleLabel(m.role)}
-                      {m.departments?.name ? ` · ${m.departments.name}` : ""}
-                    </p>
-                  </div>
-                  <MemberStatusBadge status={m.status as AccountStatus} />
-                </Link>
-              </li>
-            ))}
+            {members.map((m: any) => {
+              const manage = canEditMemberRole(me, m);
+              const remove = m.id !== me.id && can(me.role, "deleteMembers");
+              return (
+                <li key={m.id} className="card-elevated rounded-2xl">
+                  <Link href={`/dashboard/members/${m.id}`} className="flex items-start justify-between gap-3 p-4">
+                    <Avatar name={m.name} src={photos.get(m.id)} />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{m.name}</p>
+                      <p className="text-xs text-ink/60 truncate">{m.email}</p>
+                      <p className="text-xs text-ink/60 mt-1">
+                        {roleLabel(m.role)}
+                        {m.departments?.name ? ` · ${m.departments.name}` : ""}
+                      </p>
+                    </div>
+                    <MemberStatusBadge status={m.status as AccountStatus} />
+                  </Link>
+                  {(manage || remove) && (
+                    <div className="flex flex-wrap items-center gap-1 border-t border-line px-2 py-1.5">
+                      {manage && (
+                        <Link href={`/dashboard/members/${m.id}/edit`} className="btn-ghost btn-sm">
+                          <Pencil aria-hidden className="h-4 w-4" /> Edit
+                        </Link>
+                      )}
+                      {manage && m.status !== "disabled" && <SetPassword memberId={m.id} memberName={m.name} compact />}
+                      {remove && <DeleteMember memberId={m.id} memberName={m.name} compact />}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
 
           <Pagination page={page} hasMore={to < total} hrefFor={href} summary={`Page ${page + 1} of ${Math.max(1, Math.ceil(total / PAGE_SIZE))}`} />

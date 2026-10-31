@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CircleCheck, Download } from "lucide-react";
+import { ChevronDown, CircleCheck, Download } from "lucide-react";
 import { showToast } from "@/components/ui/Toaster";
 import { VERSIONS } from "@/lib/bible/versions";
 import { downloadStatus, downloadVersion, offlineSupported, removeVersion, type DownloadStatus } from "@/lib/bible/offline";
@@ -58,12 +58,20 @@ export function OfflineDownloads() {
     update(id, { confirmRemove: false, status: await downloadStatus(id) });
   }
 
+  const anyDownloading = Object.values(rows).some((r) => r.downloading);
+
   return (
-    <section aria-labelledby="offline-title" className="card-elevated rounded-2xl p-5 sm:p-6">
-      <h2 id="offline-title" className="text-xl font-semibold">
-        Offline reading
-      </h2>
-      <p className="mt-1 text-sm text-ink/60">Download a version to read and search it with no internet connection, on this device.</p>
+    // A dropdown: closed by default, opens itself while a download is running.
+    <details open={anyDownloading || undefined} className="card-elevated group rounded-2xl p-5 sm:p-6">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+        <span>
+          <span id="offline-title" className="block text-xl font-semibold">
+            Offline reading
+          </span>
+          <span className="mt-1 block text-sm text-ink/60">Download a version to read and search it with no internet connection, on this device.</span>
+        </span>
+        <ChevronDown aria-hidden className="h-5 w-5 shrink-0 text-ink/50 transition-transform group-open:rotate-180" />
+      </summary>
 
       {!supported ? (
         <p className="mt-4 text-sm text-ink/60">This browser can&apos;t save the Bible for offline use. Try an up-to-date Chrome, Edge, Safari or Firefox.</p>
@@ -152,6 +160,6 @@ export function OfflineDownloads() {
           haven&apos;t used for a few weeks.
         </p>
       )}
-    </section>
+    </details>
   );
 }

@@ -11,7 +11,7 @@ import { logAudit } from "@/lib/audit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { disableSubscription, initializeSubscriptionCheckout } from "@/lib/paystack";
 import { onlineBillingConfigured } from "@/lib/subscription-billing";
-import { billingReference, onlineBillingState, planCodesFromEnv, priceToCents, SELF_SERVE_PLANS } from "@/lib/billing";
+import { billingReference, onlineBillingState, planCodesFromEnv, priceToCents, SELF_SERVE_PLANS, type BillingInterval } from "@/lib/billing";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -27,7 +27,8 @@ export async function startSubscription(formData: FormData) {
     redirect("/dashboard/billing");
   }
   const plan = z.enum(SELF_SERVE_PLANS).safeParse(formData.get("plan"));
-  const planCode = plan.success ? planCodesFromEnv()[plan.data] : undefined;
+  const interval: BillingInterval = formData.get("interval") === "yearly" ? "yearly" : "monthly";
+  const planCode = plan.success ? planCodesFromEnv(process.env, interval)[plan.data] : undefined;
   if (!plan.success || !planCode || !onlineBillingConfigured()) {
     flash("Online payment isn't available for that plan. Open a support ticket and we'll set it up for you.", "error");
     redirect("/dashboard/billing");
@@ -36,7 +37,7 @@ export async function startSubscription(formData: FormData) {
   const admin = createAdminClient();
   const [{ data: sub }, { data: planRow }] = await Promise.all([
     admin.from("church_subscriptions").select("is_lifetime, price_override, paystack_subscription_code, cancelled_at, plan_key").eq("church_id", me.church_id).maybeSingle(),
-    admin.from("plans").select("monthly_price").eq("key", plan.data).maybeSingle(),
+    admin.from("plans").select("*").eq("key", plan.data).maybeSingle(),
   ]);
   const state = onlineBillingState(sub);
   if (state === "arranged") {
@@ -47,7 +48,8 @@ export async function startSubscription(formData: FormData) {
     flash("You already pay online. To change plan, cancel the current subscription first, then choose the new plan.", "info");
     redirect("/dashboard/billing");
   }
-  const amountCents = planRow ? priceToCents(planRow.monthly_price) : 0;
+  const price = interval === "yearly" ? planRow?.yearly_price : planRow?.monthly_price;
+  const amountCents = price ? priceToCents(price) : 0;
   if (amountCents <= 0) {
     flash("That plan has no price set yet. Open a support ticket and we'll set it up for you.", "error");
     redirect("/dashboard/billing");
@@ -62,6 +64,7 @@ export async function startSubscription(formData: FormData) {
     amount_cents: amountCents,
     reference,
     started_by: me.id,
+    ...(interval === "yearly" ? { interval } : {}),
   });
   if (insertError) {
     console.error("[billing] pending payment failed:", insertError.message);
@@ -77,7 +80,7 @@ export async function startSubscription(formData: FormData) {
       reference,
       callbackUrl: `${APP_URL}/api/billing/paystack/return`,
       planCode,
-      metadata: { billing_payment_id: paymentId, church_id: me.church_id, plan: plan.data },
+      metadata: { billing_payment_id: paymentId, church_id: me.church_id, plan: plan.data, interval },
     }));
   } catch (error) {
     console.error("[billing] Paystack initialize failed:", error instanceof Error ? error.message : error);
@@ -88,7 +91,7 @@ export async function startSubscription(formData: FormData) {
   redirect(authorizationUrl);
 }
 
-/** Stops future charges. Access continues until the end of the month already paid for. */
+/** Stops future charges. Access continues until the end of the period already paid for. */
 export async function cancelSubscription() {
   const me = await getCurrentAppUser();
   if (!me?.church_id || !can(me.role, "manageBilling")) {
@@ -115,6 +118,6 @@ export async function cancelSubscription() {
   await admin.from("church_subscriptions").update({ cancelled_at: new Date().toISOString() }).eq("church_id", me.church_id);
   await logAudit({ churchId: me.church_id, actorId: me.id, action: "billing.cancelled", targetTable: "church_subscriptions", targetId: me.church_id });
   revalidatePath("/dashboard/billing");
-  flash("Subscription cancelled. You won't be charged again, and your plan stays active until the end of the month you've paid for.");
+  flash("Subscription cancelled. You won't be charged again, and your plan stays active until the end of the time you've paid for.");
   redirect("/dashboard/billing");
 }

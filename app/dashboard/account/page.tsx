@@ -9,6 +9,8 @@ import { ChatPrivacyForm } from "./ChatPrivacyForm";
 import { getAvatarUrls } from "@/lib/avatars";
 import { Alert } from "@/components/ui/Alert";
 import { PushSettings } from "@/components/notifications/PushSettings";
+import { AlertChannels } from "@/components/notifications/AlertChannels";
+import { makeConfigured } from "@/lib/alert-delivery";
 import { InstallApp } from "@/components/install/InstallApp";
 import { EmailChangeForm } from "./EmailChangeForm";
 
@@ -43,6 +45,11 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
     prayer_care: prefsRes.data?.push_prayer_care ?? true,
     alerts: prefsRes.data?.push_alerts ?? true,
   };
+
+  // WhatsApp alerts are for the people who get pastor & admin alerts, and only
+  // show once the platform has them switched on (MAKE_WEBHOOK_URL).
+  const getsAlerts = (me.role === "pastor" || me.role === "church_admin") && makeConfigured();
+  const channelRes = getsAlerts ? await supabase.from("notification_preferences").select("whatsapp_alerts").eq("user_id", me.id).maybeSingle() : null;
 
   const blocked = (blockRows ?? []).map((b: any) => ({ id: b.blocked_id, name: b.app_users?.name ?? "Former member", photoUrl: blockedPhotos.get(b.blocked_id) ?? null }));
 
@@ -92,6 +99,13 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
         <div id="notifications" className="scroll-mt-24">
           <Section title="Notifications" description="Get a pop-up on your phone or computer when something happens, even when the app is closed.">
             <PushSettings initialPreferences={pushPrefs} />
+            {channelRes && !channelRes.error && (
+              <AlertChannels
+                initial={channelRes.data?.whatsapp_alerts ?? true}
+                phone={profile?.phone ?? null}
+                available
+              />
+            )}
           </Section>
         </div>
       )}

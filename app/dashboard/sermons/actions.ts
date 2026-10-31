@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentAppUser, type AppUser } from "@/lib/current-user";
 import { checkModuleAccess } from "@/lib/paywall";
 import { flash } from "@/lib/flash";
@@ -189,17 +190,59 @@ export async function saveSermon(_prev: FormState, formData: FormData): Promise<
 }
 
 /** Form fields: sermon_id */
+const AUDIO_BUCKET = "sermon-audio";
+const AUDIO_TYPES: Record<string, string> = {
+  "audio/mpeg": "mp3",
+  "audio/mp3": "mp3",
+  "audio/mp4": "m4a",
+  "audio/x-m4a": "m4a",
+  "audio/m4a": "m4a",
+  "audio/aac": "aac",
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
+  "audio/ogg": "ogg",
+  "audio/webm": "webm",
+  "audio/opus": "opus",
+};
+const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
+
+/**
+ * A one-time upload link for a sermon recording, after checking who's asking.
+ * The browser uploads the file straight to storage (no size limit from the app
+ * server) and puts the returned public link in the sermon's Audio field.
+ */
+export async function requestSermonAudioUpload(input: { contentType: string; bytes: number }): Promise<{ ok: true; path: string; token: string; url: string } | { ok: false; error: string }> {
+  const me = await requireSermonEditor();
+  if (!me) return { ok: false, error: "Only people who can add sermons can upload recordings." };
+  const ext = AUDIO_TYPES[(input.contentType || "").toLowerCase()];
+  if (!ext) return { ok: false, error: "That file type can't be played in a browser. Use MP3, M4A, WAV, AAC or OGG." };
+  if (!Number.isFinite(input.bytes) || input.bytes <= 0) return { ok: false, error: "That file looks empty." };
+  if (input.bytes > MAX_AUDIO_BYTES) return { ok: false, error: "That recording is over 50 MB. Save it as MP3 or M4A (smaller), or split it in two." };
+  const path = `${me.church_id}/${crypto.randomUUID()}.${ext}`;
+  const admin = createAdminClient();
+  const { data, error } = await admin.storage.from(AUDIO_BUCKET).createSignedUploadUrl(path);
+  if (error || !data) {
+    console.error("[sermons] audio upload link failed:", error?.message);
+    return { ok: false, error: /not.*found/i.test(error?.message ?? "") ? "Audio uploads need a database update: run supabase/sermon_audio.sql." : "Couldn't start the upload — please try again." };
+  }
+  return { ok: true, path, token: data.token, url: admin.storage.from(AUDIO_BUCKET).getPublicUrl(path).data.publicUrl };
+}
+
 export async function deleteSermon(_prev: FormState, formData: FormData): Promise<FormState> {
   const me = await requireSermonEditor();
   if (!me) return { error: SESSION_EXPIRED };
   const id = z.string().uuid().safeParse(formData.get("sermon_id"));
   if (!id.success) return { error: "That sermon couldn't be found." };
 
-  const { data: deleted, error } = await createClient().from("sermons").delete().eq("id", id.data).eq("church_id", me.church_id).select("id");
+  const { data: deleted, error } = await createClient().from("sermons").delete().eq("id", id.data).eq("church_id", me.church_id).select("id, audio_url");
   if (error || !deleted?.length) {
     if (error) console.error("[sermons] delete failed:", error.message);
     return { error: "Couldn't delete the sermon — please try again." };
   }
+  // An uploaded recording goes with the sermon.
+  const marker = `/storage/v1/object/public/${AUDIO_BUCKET}/`;
+  const audioUrl = deleted[0].audio_url as string | null;
+  if (audioUrl?.includes(marker)) await createAdminClient().storage.from(AUDIO_BUCKET).remove([audioUrl.split(marker)[1].split("?")[0]]);
   revalidatePath("/dashboard/sermons");
   flash("Sermon deleted.");
   redirect("/dashboard/sermons");

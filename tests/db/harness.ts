@@ -52,6 +52,10 @@ export const MIGRATION_ORDER = [
   "counseling_delete.sql",
   "games_jigsaw.sql",
   "jigsaw_pictures.sql",
+  "sermon_audio.sql",
+  "plans_v3.sql",
+  "activity_log.sql",
+  "pastor_alerts.sql",
 ];
 
 const SUPABASE_STUBS = `

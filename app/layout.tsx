@@ -7,6 +7,7 @@ import { displayPrefsScript } from "@/lib/display-prefs";
 import "./globals.css";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { ErrorReporter } from "@/components/ErrorReporter";
+import { LaunchSplash } from "@/components/brand/LaunchSplash";
 
 // Self-hosted by next/font: no request to Google at runtime and no layout
 // shift while the font loads.
@@ -51,6 +52,8 @@ export const viewport: Viewport = {
 // Runs before the page paints, so someone who chose "Dark" (or "Light")
 // never sees a flash of the other theme. "system" leaves the attribute off
 // and the CSS media query decides. Wrapped in try: storage can be blocked.
+// Installed app, first page of this launch: show the name splash (see LaunchSplash).
+const launchSplash = `try{if((matchMedia("(display-mode: standalone)").matches||navigator.standalone)&&!sessionStorage.getItem("grace-launched")){sessionStorage.setItem("grace-launched","1");document.documentElement.dataset.launch=""}}catch(e){}`;
 const applySavedTheme = `try{var t=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -58,9 +61,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // suppressHydrationWarning: the script above may set data-theme before React hydrates.
     <html lang="en" className={`${sans.variable} ${display.variable} ${script.variable}`} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: applySavedTheme + displayPrefsScript }} />
+        <script dangerouslySetInnerHTML={{ __html: applySavedTheme + displayPrefsScript + launchSplash }} />
       </head>
       <body>
+        <LaunchSplash />
         {children}
         {/* On every page (not just the dashboard), so an installed app opened
             offline on the sign-in screen still gets the offline page. */}

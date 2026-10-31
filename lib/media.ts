@@ -30,7 +30,7 @@ export function youtubeEmbedUrl(url: string | null | undefined): string | null {
 export function isDirectMediaFile(url: string | null | undefined): boolean {
   if (!url) return false;
   try {
-    return /\.(mp4|webm|ogg|mov|m4v|mp3|m4a|wav|aac)$/i.test(new URL(url).pathname);
+    return /\.(mp4|webm|ogg|opus|mov|m4v|mp3|m4a|wav|aac)$/i.test(new URL(url).pathname);
   } catch {
     return false;
   }

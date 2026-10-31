@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
+import { KeyRound, Trash2 } from "lucide-react";
 import { useFormState } from "react-dom";
 import { deleteMemberPermanently, resendInvite, setMemberPassword, setMemberStatus } from "../actions";
 import { PasswordField } from "../MemberForm";
@@ -98,9 +99,10 @@ export function MemberAccountActions({
   );
 }
 
-function SetPassword({ memberId, memberName }: { memberId: string; memberName: string }) {
+export function SetPassword({ memberId, memberName, compact = false }: { memberId: string; memberName: string; compact?: boolean }) {
   const [state, action] = useFormState(setMemberPassword, null);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     if (state?.ok) {
       dialogRef.current?.close();
@@ -110,18 +112,24 @@ function SetPassword({ memberId, memberName }: { memberId: string; memberName: s
 
   return (
     <div>
-      <button type="button" className="btn-secondary" onClick={() => dialogRef.current?.showModal()} aria-haspopup="dialog">
-        Set a new password…
+      <button type="button" className={compact ? "btn-ghost btn-sm" : "btn-secondary"} onClick={() => dialogRef.current?.showModal()} aria-haspopup="dialog">
+        {compact ? (
+          <>
+            <KeyRound aria-hidden className="h-4 w-4" /> Reset password
+          </>
+        ) : (
+          "Set a new password…"
+        )}
       </button>
       <dialog
         ref={dialogRef}
-        aria-labelledby="set-password-title"
+        aria-labelledby={titleId}
         className="w-[calc(100%-2rem)] max-w-md rounded-2xl p-0 text-ink shadow-xl backdrop:bg-ink/40"
       >
         {/* Re-keyed after success so the next open starts empty. */}
         <form key={state?.ok ? "done" : "open"} action={action} className="p-6 space-y-4">
           <input type="hidden" name="member_id" value={memberId} />
-          <h2 id="set-password-title" className="text-lg font-semibold">
+          <h2 id={titleId} className="text-lg font-semibold">
             Set a new password for {memberName}
           </h2>
           <p className="text-sm text-ink/70">
@@ -141,23 +149,31 @@ function SetPassword({ memberId, memberName }: { memberId: string; memberName: s
   );
 }
 
-function DeleteMember({ memberId, memberName }: { memberId: string; memberName: string }) {
+export function DeleteMember({ memberId, memberName, compact = false }: { memberId: string; memberName: string; compact?: boolean }) {
   const [state, action] = useFormState(deleteMemberPermanently, null);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const confirmId = useId();
 
   return (
-    <div className="border-t border-line pt-3">
+    <div className={compact ? "" : "border-t border-line pt-3"}>
       <button type="button" className="btn-ghost btn-sm text-danger" onClick={() => dialogRef.current?.showModal()} aria-haspopup="dialog">
-        Delete permanently…
+        {compact ? (
+          <>
+            <Trash2 aria-hidden className="h-4 w-4" /> Delete
+          </>
+        ) : (
+          "Delete permanently…"
+        )}
       </button>
       <dialog
         ref={dialogRef}
-        aria-labelledby="delete-member-title"
+        aria-labelledby={titleId}
         className="w-[calc(100%-2rem)] max-w-md rounded-2xl p-0 text-ink shadow-xl backdrop:bg-ink/40"
       >
         <form action={action} className="p-6 space-y-4">
           <input type="hidden" name="member_id" value={memberId} />
-          <h2 id="delete-member-title" className="text-lg font-semibold">
+          <h2 id={titleId} className="text-lg font-semibold">
             Permanently delete {memberName}?
           </h2>
           <div className="text-sm text-ink/70 space-y-2">
@@ -169,8 +185,8 @@ function DeleteMember({ memberId, memberName }: { memberId: string; memberName: 
             <p>If they&apos;ve simply left the church, deactivate them instead.</p>
           </div>
           {state?.error && !state.fieldErrors && <Alert tone="error">{state.error}</Alert>}
-          <FormField label="Type DELETE to confirm" htmlFor="confirm_text" error={state?.fieldErrors?.confirm_text}>
-            <input id="confirm_text" name="confirm_text" autoComplete="off" className="input" aria-invalid={Boolean(state?.fieldErrors?.confirm_text)} />
+          <FormField label="Type DELETE to confirm" htmlFor={confirmId} error={state?.fieldErrors?.confirm_text}>
+            <input id={confirmId} name="confirm_text" autoComplete="off" className="input" aria-invalid={Boolean(state?.fieldErrors?.confirm_text)} />
           </FormField>
           <div className="flex flex-wrap justify-end gap-2">
             <button type="button" autoFocus className="btn-secondary" onClick={() => dialogRef.current?.close()}>

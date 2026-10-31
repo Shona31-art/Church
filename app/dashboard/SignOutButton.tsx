@@ -7,6 +7,7 @@ import { LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { clearOfflinePages } from "@/lib/bible/offline";
 import { showToast } from "@/components/ui/Toaster";
+import { recordSignOut } from "@/app/login/actions";
 
 export function SignOutButton({ className }: { className?: string }) {
   const router = useRouter();
@@ -19,6 +20,7 @@ export function SignOutButton({ className }: { className?: string }) {
     // If the sign-out request fails (e.g. offline), Supabase keeps the
     // session — so say so instead of showing the login page while the person
     // is in fact still signed in.
+    await recordSignOut().catch(() => undefined);
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error("[sign-out]", error.message);

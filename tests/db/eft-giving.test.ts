@@ -136,7 +136,7 @@ describe("confirming a transfer", () => {
     expect(await asUser(db, ADMIN_A, () => confirm(gift.id, "received", 24000, gift.updated_at))).toBe("ok");
     const [after] = await rows(`select status, amount_cents, confirmed_by from givings where id = $1`, [gift.id]);
     expect(after).toEqual({ status: "succeeded", amount_cents: 24000, confirmed_by: ADMIN_A });
-    const [audit] = await rows(`select metadata from audit_logs where target_id = $1`, [gift.id]);
+    const [audit] = await rows(`select metadata from audit_logs where target_id = $1 and metadata->>'auto' is null`, [gift.id]);
     expect(audit.metadata).toMatchObject({ reported_cents: 25000, received_cents: 24000 });
     // ...and once confirmed, the member can no longer delete it.
     expect(await asUser(db, MEMBER_A, () => rows(`delete from givings where id = $1 returning id`, [gift.id]))).toEqual([]);

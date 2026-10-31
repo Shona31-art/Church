@@ -73,6 +73,7 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 36 | `songs.sql` | Songs: each church's song list (title, writer, key, lyrics) readable by the whole church; pastors, church admins and the chosen worship-team department can add, edit and delete; one song per title per church |
 | 37 | `counseling_delete.sql` | Members can delete their own counseling conversations (with all messages); not while a safety flag is still waiting for a pastor's follow-up |
 | 38 | `games_jigsaw.sql` | Lets the scoreboard record the Bible jigsaw game; keeps each finished game's answers so a past game can be opened again |
+| 39 | `jigsaw_pictures.sql` | Each church's own jigsaw pictures (AI-painted or uploaded): members play them, pastors and church admins add/remove; files in a private `jigsaw-pictures` bucket that only the server reads |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so

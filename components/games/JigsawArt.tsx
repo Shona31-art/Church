@@ -5,11 +5,20 @@ import type { JigsawSceneKey } from "@/lib/games/jigsaw";
  * Original Bible pictures for the jigsaw (300×300). Each has plenty of colour
  * and detail in every corner so the pieces can be told apart.
  */
-export function JigsawArt({ scene, className = "" }: { scene: JigsawSceneKey; className?: string }) {
+export function JigsawArt({
+  scene,
+  className = "",
+  frame,
+}: {
+  scene: JigsawSceneKey;
+  className?: string;
+  /** Position inside a parent SVG (used to cut jigsaw pieces). */
+  frame?: { x: number; y: number; width: number; height: number };
+}) {
   const id = useId().replace(/:/g, "");
   const g = (name: string) => `url(#${id}-${name})`;
   return (
-    <svg viewBox="0 0 300 300" className={`block h-full w-full ${className}`} aria-hidden preserveAspectRatio="xMidYMid slice">
+    <svg viewBox="0 0 300 300" className={frame ? undefined : `block h-full w-full ${className}`} aria-hidden preserveAspectRatio="xMidYMid slice" {...frame}>
       <defs>
         <linearGradient id={`${id}-dusk`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#2b1d5c" />
@@ -174,32 +183,99 @@ export function JigsawArt({ scene, className = "" }: { scene: JigsawSceneKey; cl
       {scene === "sea" && (
         <>
           <rect width="300" height="300" fill={g("dusk")} />
-          <circle cx="150" cy="60" r="28" fill="#fff3b0" opacity="0.9" />
-          {/* parted walls of water */}
-          <path d="M0 80 q 60 10 100 40 q 10 90 15 180 h-115 z" fill="#1f7a9c" />
-          <path d="M300 80 q -60 10 -100 40 q -10 90 -15 180 h115 z" fill="#1f7a9c" />
-          <path d="M0 110 q 55 10 92 40 q 8 70 12 150 h-104 z" fill="#2a95b8" />
-          <path d="M300 110 q -55 10 -92 40 q -8 70 -12 150 h104 z" fill="#2a95b8" />
-          {[130, 160, 190, 220, 250].map((y) => (
-            <g key={y} stroke="#bdeef5" strokeWidth="2" fill="none" opacity="0.6">
-              <path d={`M10 ${y} q 20 -6 40 0 t 40 0`} />
-              <path d={`M210 ${y} q 20 -6 40 0 t 40 0`} />
+          <circle cx="150" cy="42" r="20" fill="#fff3b0" opacity="0.9" />
+          {/* pillar of cloud leading the way */}
+          <path d="M150 58 q -16 8 -8 22 q -14 10 -4 24 q -10 14 4 24 h16 q 14 -10 4 -24 q 10 -14 -4 -24 q 8 -14 -8 -22 z" fill="#fff8ec" opacity="0.75" />
+          {/* parted walls of water, taller and foaming */}
+          <path d="M0 60 q 70 6 108 52 q 8 90 10 188 h-118 z" fill="#17607d" />
+          <path d="M300 60 q -70 6 -108 52 q -8 90 -10 188 h118 z" fill="#17607d" />
+          <path d="M0 86 q 62 8 98 46 q 6 80 8 168 h-106 z" fill="#2a95b8" />
+          <path d="M300 86 q -62 8 -98 46 q -6 80 -8 168 h106 z" fill="#2a95b8" />
+          <path d="M0 60 q 70 6 108 52" stroke="#e8fbff" strokeWidth="5" fill="none" strokeLinecap="round" />
+          <path d="M300 60 q -70 6 -108 52" stroke="#e8fbff" strokeWidth="5" fill="none" strokeLinecap="round" />
+          {[[12, 70], [40, 66], [70, 76], [228, 76], [258, 66], [286, 70]].map(([x, y], i) => (
+            <circle key={i} cx={x} cy={y} r="4" fill="#e8fbff" />
+          ))}
+          {[120, 150, 180, 210, 240, 270].map((y) => (
+            <g key={y} stroke="#bdeef5" strokeWidth="2" fill="none" opacity="0.55">
+              <path d={`M8 ${y} q 18 -6 36 0 t 36 0`} />
+              <path d={`M220 ${y} q 18 -6 36 0 t 36 0`} />
             </g>
           ))}
-          {/* dry path */}
-          <path d="M100 300 L118 130 h64 L200 300 z" fill="#e6c98a" />
-          <path d="M150 300 L150 135" stroke="#cfae6a" strokeWidth="2" strokeDasharray="6 8" />
-          {/* Moses with staff */}
-          <circle cx="150" cy="205" r="7" fill="#f2c48d" />
-          <path d="M141 213 h18 l5 30 h-28 z" fill="#7b3f8c" />
-          <line x1="166" y1="185" x2="162" y2="245" stroke="#6e4520" strokeWidth="3" />
-          {/* people following */}
-          {[[130, 255], [170, 258], [150, 270], [120, 280], [180, 282]].map(([x, y], i) => (
-            <g key={i}>
-              <circle cx={x} cy={y - 8} r="4" fill="#f2c48d" />
-              <path d={`M${x - 5} ${y - 4} h10 l3 14 h-16 z`} fill={["#c0507a", "#e67e22", "#2e86c1", "#27ae60", "#8e44ad"][i]} />
+          {/* fish in the walls */}
+          {[[40, 140, "#f39c12", 1], [70, 230, "#e74c3c", 1], [250, 160, "#f7dc6f", -1], [228, 250, "#5dade2", -1]].map(([x, y, c, d], i) => (
+            <g key={i} transform={`translate(${x} ${y}) scale(${d} 1)`}>
+              <ellipse cx="0" cy="0" rx="10" ry="5" fill={c as string} />
+              <path d="M8 0 l8 -6 v12 z" fill={c as string} />
+              <circle cx="-5" cy="-1" r="1.3" fill="#1d1d1d" />
             </g>
           ))}
+          {/* the dry path through the sea */}
+          <path d="M104 300 L120 112 h60 L196 300 z" fill="#e6c98a" />
+          <path d="M112 300 L124 112 h52 L188 300 z" fill="#efd8a0" />
+          {[[130, 150], [168, 175], [140, 210], [160, 260]].map(([x, y], i) => (
+            <ellipse key={i} cx={x} cy={y} rx="4" ry="2" fill="#cfae6a" />
+          ))}
+          {/* the people following (smaller, further back) */}
+          {(
+            [
+              [138, 150, 0.55, "#c0507a", "#7a3a1a", "scarf"],
+              [160, 152, 0.55, "#2e86c1", "#3a2a1a", "hair"],
+              [128, 172, 0.65, "#27ae60", "#3a2a1a", "hair"],
+              [150, 170, 0.65, "#e67e22", "#5a3a2a", "scarf"],
+              [172, 174, 0.65, "#8e44ad", "#3a2a1a", "bundle"],
+            ] as const
+          ).map(([x, y, sc, robe, hair, kind], i) => (
+            <g key={i} transform={`translate(${x} ${y}) scale(${sc})`}>
+              <path d="M-9 8 L-12 34 H12 L9 8 Q0 3 -9 8 z" fill={robe} />
+              <path d="M-9 10 l-6 14 M9 10 l6 14" stroke={robe} strokeWidth="5" strokeLinecap="round" />
+              <circle cx="0" cy="0" r="7" fill="#e9b98a" />
+              {kind === "scarf" ? (
+                <path d="M-8 2 q 8 -14 16 0 v8 h-3 v-6 q-5 -6 -10 0 v6 h-3 z" fill={hair} />
+              ) : (
+                <path d="M-7 -2 q 7 -9 14 0 q -7 -4 -14 0 z" fill={hair} />
+              )}
+              {kind === "bundle" && <rect x="6" y="2" width="12" height="10" rx="3" fill="#a0784a" />}
+              <rect x="-6" y="34" width="4" height="4" fill="#5e3a17" />
+              <rect x="2" y="34" width="4" height="4" fill="#5e3a17" />
+            </g>
+          ))}
+          {/* a family: mother and child */}
+          <g transform="translate(176 222) scale(0.85)">
+            <path d="M-9 8 L-13 36 H13 L9 8 Q0 3 -9 8 z" fill="#d35400" />
+            <circle cx="0" cy="0" r="7" fill="#c98f62" />
+            <path d="M-8 2 q 8 -14 16 0 v10 h-3 v-8 q-5 -6 -10 0 v8 h-3 z" fill="#f5efe0" />
+            <path d="M-9 14 l-12 8" stroke="#d35400" strokeWidth="5" strokeLinecap="round" />
+          </g>
+          <g transform="translate(158 236) scale(0.55)">
+            <path d="M-8 8 L-10 30 H10 L8 8 Q0 3 -8 8 z" fill="#f7dc6f" />
+            <circle cx="0" cy="0" r="7" fill="#c98f62" />
+            <path d="M-7 -2 q 7 -9 14 0 q -7 -4 -14 0 z" fill="#2a1a10" />
+          </g>
+          {/* Moses at the front, staff raised over the sea */}
+          <g transform="translate(130 228)">
+            {/* robe and sash */}
+            <path d="M-13 12 L-19 66 H19 L13 12 Q0 4 -13 12 z" fill="#7b3f8c" />
+            <path d="M-13 12 L-8 66 H-2 L-6 12 z" fill="#5e2d6d" />
+            <path d="M-15 32 H15" stroke="#e6c35a" strokeWidth="4" />
+            {/* raised arm holding the staff */}
+            <path d="M10 16 L26 -6" stroke="#7b3f8c" strokeWidth="8" strokeLinecap="round" />
+            <circle cx="27" cy="-8" r="4" fill="#e9b98a" />
+            <line x1="22" y1="-46" x2="32" y2="64" stroke="#6e4520" strokeWidth="4" strokeLinecap="round" />
+            <path d="M22 -46 q -6 -6 2 -10" stroke="#6e4520" strokeWidth="4" fill="none" strokeLinecap="round" />
+            {/* other arm */}
+            <path d="M-11 16 L-20 40" stroke="#7b3f8c" strokeWidth="8" strokeLinecap="round" />
+            {/* head: headcloth, face, long white beard */}
+            <circle cx="0" cy="0" r="10" fill="#e9b98a" />
+            <path d="M-12 2 q 12 -22 24 0 v12 h-4 v-10 q-8 -9 -16 0 v10 h-4 z" fill="#f5efe0" />
+            <path d="M-12 -2 h24" stroke="#c9a26b" strokeWidth="2.5" />
+            <path d="M-7 4 q 7 24 14 0 q -7 6 -14 0 z" fill="#f8f8f8" />
+            <circle cx="-3.5" cy="0" r="1.2" fill="#2a1a10" />
+            <circle cx="3.5" cy="0" r="1.2" fill="#2a1a10" />
+            {/* feet */}
+            <rect x="-11" y="65" width="7" height="5" rx="1.5" fill="#5e3a17" />
+            <rect x="4" y="65" width="7" height="5" rx="1.5" fill="#5e3a17" />
+          </g>
         </>
       )}
       {scene === "cross" && (

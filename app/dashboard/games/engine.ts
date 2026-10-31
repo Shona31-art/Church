@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { GameKey, Level } from "@/lib/games/catalog";
 import { createRng, shuffle } from "@/lib/games/random";
 import { QUIZ_LENGTH, checkQuiz, type QuizKey, type QuizProgress } from "@/lib/games/quiz";
@@ -22,7 +23,7 @@ import {
   type SetQuestion,
 } from "@/lib/games/word-games";
 import { MAZE_POINTS, MAZE_THEMES, buildMaze, checkMaze, type Maze } from "@/lib/games/maze";
-import { JIGSAW_SCENES, buildJigsaw, checkJigsaw, type JigsawPuzzle, type JigsawSceneKey } from "@/lib/games/jigsaw";
+import { JIGSAW_BUCKET, JIGSAW_SCENES, buildJigsaw, checkJigsaw, type JigsawPuzzle, type JigsawSceneKey } from "@/lib/games/jigsaw";
 
 // One entry per game: how to build a puzzle (the full answer key, kept in
 // the server-only game_sessions row, plus the "view" the player is sent),
@@ -251,6 +252,8 @@ const maze: GameEngine = {
 
 export interface JigsawView {
   scene: JigsawSceneKey;
+  /** The church's own picture (short-lived link); without it, the built-in drawing. */
+  imageUrl?: string;
   title: string;
   reference: string;
   size: number;
@@ -258,10 +261,22 @@ export interface JigsawView {
 }
 
 const jigsaw: GameEngine = {
-  async build(level, seed) {
+  async build(level, seed, { supabase, churchId }) {
     const puzzle = buildJigsaw(level, createRng(seed));
     const info = JIGSAW_SCENES.find((s) => s.key === puzzle.scene)!;
     const view: JigsawView = { scene: puzzle.scene, title: info.title, reference: info.reference, size: puzzle.size, order: puzzle.order };
+
+    // The church's own pictures (jigsaw_pictures.sql), when it has any. The same
+    // seed picks the same picture, so numbered levels stay the same puzzle.
+    const { data: pictures } = await supabase.from("jigsaw_pictures").select("id, title, reference, storage_path").eq("church_id", churchId).order("created_at");
+    if (pictures?.length) {
+      const picture = pictures[Math.floor(createRng(seed ^ 0x5bd1e995)() * pictures.length)];
+      const { data: signed } = await createAdminClient().storage.from(JIGSAW_BUCKET).createSignedUrl(picture.storage_path, 4 * 3600);
+      if (signed?.signedUrl) {
+        puzzle.pictureId = picture.id;
+        Object.assign(view, { imageUrl: signed.signedUrl, title: picture.title, reference: picture.reference ?? "" });
+      }
+    }
     return { puzzle, view, maxCorrect: puzzle.size * puzzle.size };
   },
   // The final arrangement: arrangement[slot] = piece.

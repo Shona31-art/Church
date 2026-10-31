@@ -23,6 +23,7 @@ from (values
   (35, 'church_logo.sql',          exists (select 1 from storage.buckets where id = 'church-logos')),
   (36, 'songs.sql',                to_regclass('public.songs') is not null),
   (37, 'counseling_delete.sql',    exists (select 1 from pg_policies where tablename = 'counseling_conversations' and policyname = 'counseling_conversations_delete_own')),
-  (38, 'games_jigsaw.sql',         exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'game_sessions' and column_name = 'answers'))
+  (38, 'games_jigsaw.sql',         exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'game_sessions' and column_name = 'answers')),
+  (39, 'jigsaw_pictures.sql',      to_regclass('public.jigsaw_pictures') is not null)
 ) as t(n, file, ok)
 order by n;

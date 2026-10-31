@@ -1,12 +1,51 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { JigsawArt } from "@/components/games/JigsawArt";
 import { swapPieces } from "@/lib/games/jigsaw";
+import { TAB, piecePath } from "@/lib/games/jigsaw-shape";
 import { haptic } from "@/lib/haptics";
 import type { JigsawView } from "../engine";
 import type { BoardProps } from "../GameShell";
+
+/** The whole picture: the church's own image, or the built-in drawing. */
+function Picture({ view }: { view: JigsawView }) {
+  return view.imageUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element -- short-lived signed link to the church's picture
+    <img src={view.imageUrl} alt="" draggable={false} className="block h-full w-full select-none object-cover" />
+  ) : (
+    <JigsawArt scene={view.scene} />
+  );
+}
+
+/** One jigsaw-shaped piece: the picture cut along the piece's outline. */
+function Piece({ view, piece, uid, home, selected }: { view: JigsawView; piece: number; uid: string; home: boolean; selected: boolean }) {
+  const n = view.size;
+  const pr = Math.floor(piece / n);
+  const pc = piece % n;
+  const d = piecePath(pr, pc, n);
+  const clip = `${uid}-p${piece}`;
+  const frame = { x: -pc * 100, y: -pr * 100, width: n * 100, height: n * 100 };
+  return (
+    <svg
+      aria-hidden
+      viewBox={`${-TAB} ${-TAB} ${100 + 2 * TAB} ${100 + 2 * TAB}`}
+      className="pointer-events-none absolute overflow-visible"
+      style={{ left: `${-TAB}%`, top: `${-TAB}%`, width: `${100 + 2 * TAB}%`, height: `${100 + 2 * TAB}%`, filter: selected ? "drop-shadow(0 6px 10px rgb(0 0 0 / 0.35))" : "drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.3))" }}
+    >
+      <defs>
+        <clipPath id={clip}>
+          <path d={d} />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${clip})`}>
+        {view.imageUrl ? <image href={view.imageUrl} {...frame} preserveAspectRatio="xMidYMid slice" /> : <JigsawArt scene={view.scene} frame={frame} />}
+      </g>
+      <path d={d} fill="none" stroke={home ? "rgb(246 205 106 / 0.95)" : selected ? "#ffffff" : "rgb(255 255 255 / 0.6)"} strokeWidth={home || selected ? 2.4 : 1.4} />
+    </svg>
+  );
+}
 
 /**
  * Tap two pieces to swap them, or drag one onto another. Pieces in their
@@ -19,6 +58,7 @@ export function JigsawBoard({ view, finish, finishing }: BoardProps<JigsawView>)
   const [peek, setPeek] = useState(false);
   const drag = useRef<{ from: number; moved: boolean } | null>(null);
   const n = view.size;
+  const uid = useId().replace(/:/g, "");
   const placed = order.filter((p, i) => p === i).length;
   const done = placed === n * n;
 
@@ -77,7 +117,7 @@ export function JigsawBoard({ view, finish, finishing }: BoardProps<JigsawView>)
           className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-line"
           aria-label="Hold to see the whole picture"
         >
-          <JigsawArt scene={view.scene} />
+          <Picture view={view} />
         </button>
         <div className="min-w-0 flex-1">
           <p className="font-semibold">{view.title}</p>
@@ -94,8 +134,7 @@ export function JigsawBoard({ view, finish, finishing }: BoardProps<JigsawView>)
 
       <div className="relative mx-auto aspect-square w-full max-w-[26rem]">
         <div
-          className="grid h-full w-full touch-none select-none gap-[2px] rounded-xl bg-line p-[2px]"
-          style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}
+          className="relative h-full w-full touch-none select-none rounded-xl bg-ink/10"
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={() => (drag.current = null)}
@@ -118,24 +157,17 @@ export function JigsawBoard({ view, finish, finishing }: BoardProps<JigsawView>)
                   else swap(selected, slot);
                 }}
                 aria-label={`Piece ${piece + 1} in space ${slot + 1}${home ? ", in the right place" : ""}${isSelected ? ", chosen" : ""}`}
-                className={`relative overflow-hidden rounded-[4px] transition-transform ${isSelected ? "z-10 scale-[1.06] ring-4 ring-gold shadow-lg" : ""} ${
-                  home && !done ? "ring-2 ring-inset ring-[#f6cd6a]" : ""
-                } ${home ? "cursor-default" : "cursor-grab"}`}
+                className={`absolute transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${isSelected ? "z-20 scale-[1.08]" : home ? "z-0" : "z-10"} ${home ? "cursor-default" : "cursor-grab"}`}
+                style={{ left: `${((slot % n) * 100) / n}%`, top: `${(Math.floor(slot / n) * 100) / n}%`, width: `${100 / n}%`, height: `${100 / n}%` }}
               >
-                <span
-                  aria-hidden
-                  className="absolute block"
-                  style={{ width: `${n * 100}%`, height: `${n * 100}%`, left: `${-(piece % n) * 100}%`, top: `${-Math.floor(piece / n) * 100}%` }}
-                >
-                  <JigsawArt scene={view.scene} />
-                </span>
+                <Piece view={view} piece={piece} uid={uid} home={home && !done} selected={isSelected} />
               </button>
             );
           })}
         </div>
         {peek && (
           <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl shadow-xl">
-            <JigsawArt scene={view.scene} />
+            <Picture view={view} />
           </div>
         )}
       </div>

@@ -423,3 +423,17 @@ describe("deleting counseling conversations (counseling_delete.sql)", () => {
     expect(await asUser(db, MEMBER_A, () => rows(`delete from counseling_conversations where id = $1 returning id`, [convo]))).toHaveLength(1);
   });
 });
+
+describe("jigsaw pictures (jigsaw_pictures.sql)", () => {
+  test("pastors add pictures; members see them but can't add or remove; other churches can't see them", async () => {
+    const [{ id }] = await asUser(db, PASTOR_A, () =>
+      rows(`insert into jigsaw_pictures (church_id, title, storage_path) values ($1, 'Noah', $2) returning id`, [CHURCH_A, `${CHURCH_A}/x.webp`])
+    );
+    expect(await asUser(db, MEMBER_A, () => rows(`select id from jigsaw_pictures where id = $1`, [id]))).toHaveLength(1);
+    expect(await asUser(db, MEMBER_B, () => rows(`select id from jigsaw_pictures where id = $1`, [id]))).toHaveLength(0);
+    await expect(asUser(db, MEMBER_A, () => rows(`insert into jigsaw_pictures (church_id, title, storage_path) values ($1, 'x', $2)`, [CHURCH_A, `${CHURCH_A}/y.webp`]))).rejects.toThrow();
+    expect(await asUser(db, MEMBER_A, () => rows(`delete from jigsaw_pictures where id = $1 returning id`, [id]))).toHaveLength(0);
+    // A file path in another church's folder is refused.
+    await expect(asUser(db, PASTOR_A, () => rows(`insert into jigsaw_pictures (church_id, title, storage_path) values ($1, 'x', $2)`, [CHURCH_A, `${CHURCH_B}/z.webp`]))).rejects.toThrow();
+  });
+});

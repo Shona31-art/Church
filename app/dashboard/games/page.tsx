@@ -93,9 +93,14 @@ export default async function GamesHubPage({ searchParams }: { searchParams: { k
               <Smile aria-hidden className="h-4 w-4" /> Kids mode
             </Link>
             {can(me.role, "manageQuizQuestions") && (
-              <Link href="/dashboard/games/questions" className="btn-secondary">
-                Manage quiz questions
-              </Link>
+              <>
+                <Link href="/dashboard/games/questions" className="btn-secondary">
+                  Manage quiz questions
+                </Link>
+                <Link href="/dashboard/games/pictures" className="btn-secondary">
+                  Jigsaw pictures
+                </Link>
+              </>
             )}
           </>
         }

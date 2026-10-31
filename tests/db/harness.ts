@@ -51,6 +51,7 @@ export const MIGRATION_ORDER = [
   "songs.sql",
   "counseling_delete.sql",
   "games_jigsaw.sql",
+  "jigsaw_pictures.sql",
 ];
 
 const SUPABASE_STUBS = `

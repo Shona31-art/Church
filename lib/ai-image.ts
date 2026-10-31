@@ -108,7 +108,14 @@ export async function generatePosterImage(input: {
     refine: input.previous ? input.refine : undefined,
   });
   const images = [...(input.previous ? [input.previous] : []), ...input.photos, ...(input.logo ? [input.logo] : [])];
-  const body = JSON.stringify(posterRequestBody(prompt, images, input.size));
+  return requestImage(posterRequestBody(prompt, images, input.size), "poster");
+}
+
+/** Sends one image request to Gemini (one retry for busy/temporary errors). */
+async function requestImage(requestBody: unknown, what: string): Promise<{ image: ImageInput } | { error: string }> {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return { error: "AI pictures need a Gemini API key (GEMINI_API_KEY). Ask your platform admin." };
+  const body = JSON.stringify(requestBody);
   const url = `${GEMINI_URL}/${encodeURIComponent(IMAGE_MODEL)}:generateContent`;
 
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -128,12 +135,28 @@ export async function generatePosterImage(input: {
       if (res.status === 400 && /billing|quota|free tier|limit: 0/i.test(detail)) {
         return { error: "Your Gemini account can't make images yet: turn on billing for the API key in Google AI Studio." };
       }
-      return { error: "Couldn't create the poster just now. Please try again." };
+      return { error: `Couldn't create the ${what} just now. Please try again.` };
     } catch (error) {
       if (attempt === 0) continue;
       console.error("[ai-image] request failed:", error);
       return { error: "The AI took too long to answer. Please try again." };
     }
   }
-  return { error: "Couldn't create the poster just now. Please try again." };
+  return { error: `Couldn't create the ${what} just now. Please try again.` };
+}
+
+/** The instructions for a jigsaw picture. Exported for tests. */
+export function jigsawPicturePrompt(story: string): string {
+  return [
+    `A beautiful, richly detailed painting of the Bible story: ${story}.`,
+    "Style: reverent classical oil painting with warm, glowing light and vivid colour, like a fine illustrated Bible.",
+    "People look natural and dignified, in clothing of Bible times. Respectful; nothing frightening or violent.",
+    "Fill the whole square with interesting detail in every part (sky, people, land or water), because it will be cut into jigsaw pieces.",
+    "No words, letters, captions, borders, frames or signatures anywhere in the image.",
+  ].join("\n");
+}
+
+/** A square Bible picture for the jigsaw game. */
+export async function generateJigsawPicture(story: string): Promise<{ image: ImageInput } | { error: string }> {
+  return requestImage(posterRequestBody(jigsawPicturePrompt(story), [], "square"), "picture");
 }

@@ -3,6 +3,7 @@
 import { CircleAlert, CircleCheck, Info, X, type LucideIcon } from "lucide-react";
 
 import { useEffect, useState } from "react";
+import { haptic } from "@/lib/haptics";
 
 // Toast notifications ("Member added.", "Couldn't save — try again.").
 //
@@ -54,6 +55,7 @@ export function Toaster() {
   function push(message: string, tone: Tone) {
     const id = nextId++;
     setToasts((t) => [...t.slice(-2), { id, message, tone }]);
+    if (tone !== "info") haptic(tone === "error" ? "error" : "success");
     // Errors stay until dismissed; confirmations fade after a few seconds.
     if (tone !== "error") setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 5000);
   }

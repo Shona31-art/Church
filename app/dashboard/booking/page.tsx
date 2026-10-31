@@ -50,6 +50,7 @@ export default async function BookingPage({ searchParams }: { searchParams: { st
   return (
     <div className="max-w-3xl">
       <PageHeader
+        back={{ href: "/dashboard", label: "Home" }}
         title={shepherd ? "Booking requests" : "My booking requests"}
         description={
           shepherd

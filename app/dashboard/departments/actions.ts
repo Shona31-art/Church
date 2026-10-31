@@ -121,8 +121,8 @@ export async function deleteDepartment(_prev: FormState, formData: FormData): Pr
 // Managing who is in a department, from the department's own page.
 // A person belongs to one department (app_users.department_id), so "add"
 // moves them here from wherever they were. Same rules as editing a member:
-// pastors and church admins; nobody changes their own; only a church admin
-// changes a church admin (lib/permissions.ts canEditMemberRole). RLS and the
+// pastors and church admins (who may also move themselves); only a church
+// admin changes another church admin (lib/permissions.ts canEditMemberRole). RLS and the
 // app_users trigger enforce the same in the database.
 
 export type DeptResult = { ok?: boolean; error?: string; skipped?: string[] } | null;
@@ -132,6 +132,15 @@ async function memberManager() {
   if (!me || !me.church_id) return { error: SESSION_EXPIRED } as const;
   if (!can(me.role, "manageMembers")) return { error: "Only pastors and church admins can change who's in a department." } as const;
   return { me: me as typeof me & { church_id: string } } as const;
+}
+
+/**
+ * May `me` change this person's department? Pastors and church admins may
+ * change their own (it doesn't change their role — the database allows it
+ * too); for anyone else, the usual member-editing rule applies.
+ */
+function canMoveDepartment(me: { id: string; role: string }, person: { id: string; role: string }) {
+  return person.id === me.id || canEditMemberRole(me, person);
 }
 
 async function loadDept(id: string, churchId: string) {
@@ -157,7 +166,7 @@ export async function addPeopleToDepartment(_prev: DeptResult, formData: FormDat
   let added = 0;
   for (const person of people ?? []) {
     if (person.department_id === dept.id) continue;
-    if (!canEditMemberRole(me, person)) {
+    if (!canMoveDepartment(me, person)) {
       skipped.push(person.name);
       continue;
     }
@@ -196,9 +205,7 @@ export async function removeFromDepartment(formData: FormData): Promise<void> {
   const supabase = createClient();
   const { data: person } = await supabase.from("app_users").select("id, name, role, department_id").eq("id", memberId.data).eq("church_id", me.church_id).maybeSingle();
   if (!person || person.department_id !== deptId.data) return flash("They're not in this department any more — refresh the page.", "error");
-  if (!canEditMemberRole(me, person)) {
-    return flash(person.id === me.id ? "You can't change your own department — ask another church admin." : "Only a church admin can change a church admin's department.", "error");
-  }
+  if (!canMoveDepartment(me, person)) return flash("Only a church admin can change a church admin's department.", "error");
   const newRole = person.role === "department_leader" ? "member" : person.role;
   const { error } = await supabase.from("app_users").update({ department_id: null, role: newRole }).eq("id", person.id).eq("church_id", me.church_id);
   if (error) {

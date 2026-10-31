@@ -39,6 +39,7 @@ export default async function SuperAdminHome() {
   return (
     <div className="max-w-6xl space-y-6">
       <PageHeader
+        back={{ href: "/dashboard", label: "Home" }}
         title="Platform overview"
         description="Every church on the platform. Church content (prayers, care notes, journals) is never visible here."
         actions={

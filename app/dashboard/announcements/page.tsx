@@ -52,7 +52,7 @@ export default async function AnnouncementsPage({ searchParams }: { searchParams
 
   return (
     <div className="max-w-3xl">
-      <PageHeader title="Announcements" description="News and notices for your church family." actions={newButton} />
+      <PageHeader back={{ href: "/dashboard", label: "Home" }} title="Announcements" description="News and notices for your church family." actions={newButton} />
 
       {canPost && (
         <nav aria-label="Announcement status" className="mb-4 flex gap-1 border-b border-line">

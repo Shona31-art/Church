@@ -17,10 +17,11 @@ export function detectCrisisSignal(text: string): boolean {
   return CRISIS_PATTERNS.some((p) => p.test(text));
 }
 
-// Sourced July 2026 — SADAG (South African Depression and Anxiety Group).
+// Sourced July 2026 (Lifeline and 112 added Oct 2026) — SADAG (South African Depression and Anxiety Group).
 // Worth re-verifying periodically; helpline numbers do change.
 export const SA_CRISIS_RESOURCES = `If you're in immediate danger, please contact:
 • SADAG Suicide Crisis Line: 0800 567 567 (24/7) or SMS 31393
 • SADAG Mental Health Line: 0800 21 22 23
+• Lifeline South Africa: 0861 322 322 (24/7)
 • Childline South Africa (under 18): 0800 055 555
-• Emergency services: 10111 (police) or 10177 (ambulance)`;
+• Emergency services: 112 from any cellphone (free, even without airtime), 10111 (police) or 10177 (ambulance)`;

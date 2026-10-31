@@ -56,6 +56,7 @@ export default async function PastoralCarePage({ searchParams }: { searchParams:
   return (
     <div className="max-w-3xl">
       <PageHeader
+        back={{ href: "/dashboard", label: "Home" }}
         title="Pastoral care"
         description={
           <PrivacyNote>

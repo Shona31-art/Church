@@ -31,8 +31,12 @@ export const statusChangeSchema = z.object({
   declineReason: z.string().trim().max(500, "Keep the reason under 500 characters.").optional(),
 });
 
-export const availabilityBlockSchema = z.object({
-  pastorId: z.string().uuid().optional(),
-  blockedDate: isoDate,
-  note: z.string().trim().max(200, "Keep the note under 200 characters.").optional(),
-});
+export const availabilityBlockSchema = z
+  .object({
+    pastorId: z.string().uuid().optional(),
+    blockedDate: isoDate,
+    /** Last day away; leave empty for a single day. */
+    untilDate: isoDate.optional(),
+    note: z.string().trim().max(200, "Keep the note under 200 characters.").optional(),
+  })
+  .refine((v) => !v.untilDate || v.untilDate >= v.blockedDate, { message: "The “until” date must be on or after the first day away.", path: ["untilDate"] });

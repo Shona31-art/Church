@@ -64,6 +64,7 @@ export default async function GivingPage({ searchParams }: { searchParams: { car
   return (
     <div className="max-w-5xl">
       <PageHeader
+        back={{ href: "/dashboard", label: "Home" }}
         title="Giving"
         description="Give your tithes and offerings straight to your church's bank account. Your own giving history is always here."
         actions={

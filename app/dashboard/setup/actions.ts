@@ -1,5 +1,7 @@
 "use server";
 
+import { planIncludes } from "@/lib/features";
+import { aiProvider, generateText, lastAiFailure } from "@/lib/ai";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -242,4 +244,45 @@ export async function removeChurchLogo(): Promise<{ error?: string; ok?: boolean
   await logAudit({ churchId: me.church_id, actorId: me.id, action: "church.logo_removed", targetTable: "churches", targetId: me.church_id });
   revalidatePath("/dashboard", "layout");
   return { ok: true };
+}
+
+export interface AiCheck {
+  provider: "gemini" | "anthropic" | null;
+  model: string | null;
+  onPlan: boolean;
+  ok: boolean;
+  message: string;
+}
+
+/**
+ * Church admins: "Test AI". Says whether this live site can see an AI key,
+ * and makes one tiny request to prove it answers. Never shows the key.
+ */
+export async function testAiConnection(): Promise<AiCheck> {
+  const me = await getCurrentAppUser();
+  if (!me || !can(me.role, "manageChurchProfile")) return { provider: null, model: null, onPlan: false, ok: false, message: "Only church admins can run this check." };
+  const provider = aiProvider();
+  const model = provider === "gemini" ? process.env.GEMINI_MODEL || "gemini-3.5-flash" : provider === "anthropic" ? process.env.ANTHROPIC_MODEL || "default" : null;
+  const onPlan = await planIncludes("ai_assist");
+  if (!provider) {
+    return {
+      provider,
+      model,
+      onPlan,
+      ok: false,
+      message:
+        "This live site can't see an AI key. In Vercel → Settings → Environment Variables, add GEMINI_API_KEY (exactly that name, ticked for Production), then Deployments → ⋯ → Redeploy.",
+    };
+  }
+  const reply = await generateText({ prompt: "Reply with exactly one word: ready", maxTokens: 20 });
+  if (!reply) return { provider, model, onPlan, ok: false, message: `The key is there, but the AI didn't answer. ${lastAiFailure() ?? "Check the key in Google AI Studio and try again."}` };
+  return {
+    provider,
+    model,
+    onPlan,
+    ok: true,
+    message: onPlan
+      ? "Working. AI features are on for your church."
+      : "The AI works, but your church's plan doesn't include AI help, so members won't see AI features until the plan changes.",
+  };
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { haptic } from "@/lib/haptics";
 import { useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 import type { SetView } from "../engine";
@@ -31,6 +32,7 @@ export function SetBoard({ sessionId, view, finish, finishing, promptStyle }: Bo
     setBusy(false);
     if (r.error || r.correct === undefined) return setError(r.error ?? "Couldn't check that answer.");
     setResult({ correct: r.correct, answer: r.answer ?? "", reference: r.reference, picked: typeof answer === "number" ? answer : undefined, answerIndex: r.answerIndex });
+    haptic(r.correct ? "success" : "error");
     if (r.correct) setScore((s) => s + 1);
   }
 

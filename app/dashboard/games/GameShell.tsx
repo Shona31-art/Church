@@ -1,5 +1,6 @@
 "use client";
 
+import { haptic } from "@/lib/haptics";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Award, CalendarCheck, CheckCircle2, ChevronLeft, LoaderCircle, Smile, Timer, Trophy, XCircle } from "lucide-react";
@@ -217,6 +218,8 @@ function ResultCard({
 }) {
   const { correct = 0, maxCorrect = 0, points = 0, durationMs = 0 } = result;
   const perfect = maxCorrect > 0 && correct === maxCorrect;
+  // A celebratory buzz when the score comes up.
+  useEffect(() => haptic("success"), []);
   return (
     <div className="card-elevated rounded-2xl p-8 text-center" role="status">
       <span aria-hidden className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-line bg-parchment text-gold">

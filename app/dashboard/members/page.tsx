@@ -62,6 +62,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
   return (
     <div className="max-w-5xl">
       <PageHeader
+        back={{ href: "/dashboard", label: "Home" }}
         title="Members"
         description="Everyone in your church directory. Each member has a login so they can use the app; deactivating someone keeps their records but removes their access."
         actions={

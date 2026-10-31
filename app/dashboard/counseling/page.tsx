@@ -43,6 +43,7 @@ export default async function CounselingHome() {
   return (
     <div className="max-w-3xl space-y-6">
       <PageHeader
+        back={{ href: "/dashboard", label: "Home" }}
         title="Christian counseling"
         description="A private, scripture-based space to talk things through. Not a substitute for pastoral care, therapy or medical help."
         actions={

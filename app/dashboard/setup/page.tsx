@@ -8,6 +8,7 @@ import { PageHeader, Section } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { Check, Circle } from "lucide-react";
+import { AiCheckButton } from "./AiCheckButton";
 
 export default async function ChurchSettingsPage() {
   const me = await getCurrentAppUser();
@@ -49,6 +50,7 @@ export default async function ChurchSettingsPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <PageHeader
+        back={{ href: "/dashboard", label: "Home" }}
         title="Church settings"
         description={remaining ? `${remaining} step${remaining === 1 ? "" : "s"} left to get your church ready. You can change any of these later.` : "Your church is set up. Change anything here at any time."}
       />
@@ -68,6 +70,10 @@ export default async function ChurchSettingsPage() {
           </li>
         ))}
       </ol>
+
+      <Section title="AI connection" description="Check that AI writing help, AI counseling and AI posters can reach the AI service. Makes one tiny test request.">
+        <AiCheckButton />
+      </Section>
 
       <Section
         title="Features on your plan"

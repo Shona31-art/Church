@@ -42,6 +42,7 @@ const CHURCH_NAV: { label: string; items: NavSpec[] }[] = [
     items: [
       { href: "/dashboard/service-planner", label: "Service Planner", icon: "servicePlanner", module: "service_planner" },
       { href: "/dashboard/sermons", label: "Sermons", icon: "sermons", module: "sermon_ai" },
+      { href: "/dashboard/songs", label: "Songs", icon: "songs" },
       { href: "/dashboard/booking", label: "Pastor Booking", icon: "booking", module: "pastor_booking" },
       { href: "/dashboard/pastoral-care", label: "Pastoral Care", icon: "pastoralCare", module: "pastoral_care", capability: "pastoralCare" },
       { href: "/dashboard/counseling", label: "Counseling", icon: "counseling", module: "ai_counseling" },

@@ -95,7 +95,9 @@ export default async function CounselingConversationPage({ params }: { params: {
         {isOwner && settings?.enabled && (
           <div className="mt-5 border-t border-line pt-4">
             <MessageComposer conversationId={conversation.id} />
-            <p className="text-xs text-ink/60 mt-2">Not a substitute for pastoral care or professional help. In an emergency call 10111 or SADAG on 0800 567 567.</p>
+            <p className="text-xs text-ink/60 mt-2">
+              Not a substitute for pastoral care or professional help. In an emergency: <strong>112</strong> from any cellphone (free, even without airtime), <strong>10111</strong> police, <strong>10177</strong> ambulance. Need to talk now? SADAG crisis line <strong>0800 567 567</strong> (free, 24/7) or Lifeline <strong>0861 322 322</strong>.
+            </p>
           </div>
         )}
       </section>

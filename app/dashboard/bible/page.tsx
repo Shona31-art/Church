@@ -6,6 +6,7 @@ import { moduleGate } from "@/lib/gate";
 import { getChurchAccess } from "@/lib/paywall";
 import { verseRefForDate } from "@/lib/bible";
 import { BOOKS, OLD_TESTAMENT_BOOKS, bookIndexByName, readerHref } from "@/lib/bible/books";
+import { BookPicker } from "@/components/bible/BookPicker";
 import { parseReference } from "@/lib/bible/reference";
 import { fetchVerse, passageText } from "@/lib/bible/text";
 import type { HighlightColor } from "@/lib/bible/annotations";
@@ -48,6 +49,7 @@ export default async function BibleHomePage() {
   return (
     <div className="max-w-3xl">
       <PageHeader
+        back={{ href: "/dashboard", label: "Home" }}
         title="Bible"
         description="Read, search and study in four versions, on any device, even offline."
         actions={
@@ -119,8 +121,8 @@ export default async function BibleHomePage() {
         <h2 id="books-title" className="text-xl font-semibold">
           Books
         </h2>
-        <BookGrid title="Old Testament" from={0} to={OLD_TESTAMENT_BOOKS} />
-        <BookGrid title="New Testament" from={OLD_TESTAMENT_BOOKS} to={BOOKS.length} />
+        <BookPicker title="Old Testament" from={0} to={OLD_TESTAMENT_BOOKS} />
+        <BookPicker title="New Testament" from={OLD_TESTAMENT_BOOKS} to={BOOKS.length} />
       </section>
     </div>
   );
@@ -180,25 +182,5 @@ function SavedList({
         <p className="text-sm text-ink/60">{empty}</p>
       )}
     </section>
-  );
-}
-
-function BookGrid({ title, from, to }: { title: string; from: number; to: number }) {
-  return (
-    <>
-      <h3 className="eyebrow mb-2 mt-5">{title}</h3>
-      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-        {BOOKS.slice(from, to).map((b, i) => (
-          <li key={b.slug}>
-            <Link
-              href={readerHref({ bookIndex: from + i, chapter: 1 })}
-              className="block rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-medium hover:border-line-strong hover:bg-surface-raised"
-            >
-              {b.name}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </>
   );
 }

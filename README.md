@@ -70,6 +70,7 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 33 | `email_sync.sql` | When a member's sign-in email changes (they confirm it from My account → Email address), copies it to `app_users.email` and audit-logs it with both addresses partly hidden. Plan: `docs/plans/email-change.md` |
 | 34 | `paystack_billing.sql` | Online billing: Paystack customer/subscription codes on `church_subscriptions` (server-written only), `billing_payments` (each subscription payment; readable by the church's admins, written only by the server; each reference recorded once). Plan: `docs/plans/paystack-billing.md` |
 | 35 | `church_logo.sql` | Church logo uploads: a public `church-logos` bucket; only a church admin can add or remove files in their church's folder. The logo shows in the app header (instead of the initials) and on posters; its link is saved in `churches.logo_url` |
+| 36 | `songs.sql` | Songs: each church's song list (title, writer, key, lyrics) readable by the whole church; pastors, church admins and the chosen worship-team department can add, edit and delete; one song per title per church |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so

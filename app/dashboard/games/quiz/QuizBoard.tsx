@@ -1,5 +1,6 @@
 "use client";
 
+import { haptic } from "@/lib/haptics";
 import { useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 import type { QuizView } from "../engine";
@@ -28,7 +29,9 @@ export function QuizBoard({ sessionId, view, finish, finishing }: BoardProps<Qui
     if (result.error || result.correctIndex === undefined) return setError(result.error ?? "Couldn't check that answer.");
     setPicked(result.chosen ?? choice);
     setCorrectIndex(result.correctIndex);
-    if ((result.chosen ?? choice) === result.correctIndex) setScore((s) => s + 1);
+    const right = (result.chosen ?? choice) === result.correctIndex;
+    haptic(right ? "success" : "error");
+    if (right) setScore((s) => s + 1);
   }
 
   function next() {

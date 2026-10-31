@@ -42,6 +42,7 @@ export default async function ServicePlannerPage({ searchParams }: { searchParam
   return (
     <div className="max-w-3xl">
       <PageHeader
+        back={{ href: "/dashboard", label: "Home" }}
         title="Service Planner"
         description={canManage ? "Plan each service's running order and who leads each part. Volunteers see a plan once it's published." : "Published running orders for upcoming services."}
         actions={newButton}

@@ -69,25 +69,27 @@ export default async function PostersPage({ searchParams }: { searchParams: { pa
   // Preview images live in the private bucket: short-lived links, this church only.
   const thumbs = await signPosterAssets(posters.flatMap((p) => (p.thumbnail_path ? [p.thumbnail_path] : [])), me.church_id!);
   // "New design" opens the template gallery; "Quick poster" is the original fixed-layout maker.
+  // Phones: "Create with AI" across the top, the two template options side by side under it.
   const newButton = (
-    <>
-      <Link href="/dashboard/posters/ai" className="btn btn-amber">
+    <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
+      <Link href="/dashboard/posters/ai" className="btn btn-amber col-span-2 justify-center">
         <Sparkles aria-hidden className="h-4 w-4" /> Create with AI
       </Link>
-      <Link href="/dashboard/posters/new" className="btn-ghost">
-        Quick poster
-      </Link>
       {!needsMigration && (
-        <Link href="/dashboard/posters/new-design" className="btn-primary">
+        <Link href="/dashboard/posters/new-design" className="btn-primary justify-center">
           New design
         </Link>
       )}
-    </>
+      <Link href="/dashboard/posters/new" className={`btn-secondary justify-center ${needsMigration ? "col-span-2" : ""}`}>
+        Quick poster
+      </Link>
+    </div>
   );
 
   return (
     <div className="max-w-5xl">
       <PageHeader
+        back={{ href: "/dashboard", label: "Home" }}
         title="Poster Studio"
         description="Event posters from ready-made templates — designed in your browser, so they cost nothing to make. Download them for WhatsApp, Instagram or print."
         actions={newButton}
@@ -104,7 +106,7 @@ export default async function PostersPage({ searchParams }: { searchParams: { pa
       {error ? (
         <Alert tone="error">Couldn&apos;t load posters — refresh the page to try again.</Alert>
       ) : !posters.length ? (
-        <EmptyState icon={NAV_ICONS.posters} title="No posters yet" description="Design a poster for your next event in a couple of minutes." action={newButton} />
+        <EmptyState icon={NAV_ICONS.posters} title="No posters yet" description="Use the buttons above: let AI design one for you, or start from a template." />
       ) : (
         <ul className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
           {posters.map((p) => (

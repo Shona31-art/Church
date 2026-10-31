@@ -97,6 +97,7 @@ export default async function ChatsPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <PageHeader
+        back={{ href: "/dashboard", label: "Home" }}
         title="Chats"
         description="Talk with your whole church, your department, or one person privately."
         actions={

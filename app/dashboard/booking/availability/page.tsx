@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
 import { can } from "@/lib/permissions";
+import { groupConsecutiveDays } from "@/lib/date-range";
 import { formatDate, todayInAppZone } from "@/lib/format";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -32,7 +33,7 @@ export default async function AvailabilityPage() {
       <PageHeader
         back={{ href: "/dashboard/booking", label: "Booking requests" }}
         title="Availability"
-        description="Dates you're away. Members see them when requesting, and requests on these dates are flagged — they aren't blocked outright."
+        description="When you're away, for a day or several weeks. Members see them when requesting, and requests on these dates are flagged — they aren't blocked outright."
       />
 
       <AddBlockForm pastors={me.role === "church_admin" ? pastors ?? [] : null} today={today} />
@@ -43,19 +44,27 @@ export default async function AvailabilityPage() {
         <EmptyState title="No blocked dates coming up" description="Add one above when you'll be away." />
       ) : (
         <ul className="card-elevated rounded-2xl divide-y divide-line">
-          {blocks.map((b: any) => {
-            const label = `${formatDate(b.blocked_date)} (${b.app_users?.name ?? "pastor"})`;
-            const canRemove = me.role === "church_admin" || b.pastor_id === me.id;
+          {groupConsecutiveDays(
+            blocks.map((b: any) => ({ id: b.id, date: b.blocked_date as string, key: `${b.pastor_id}|${b.note ?? ""}`, pastorId: b.pastor_id as string, name: (b.app_users?.name as string) ?? "Pastor", note: b.note as string | null }))
+          ).map((range) => {
+            const first = range.rows[0];
+            const days = range.rows.length;
+            const when =
+              days === 1
+                ? formatDate(range.start, { weekday: "long" })
+                : `${formatDate(range.start, { year: undefined })} – ${formatDate(range.end)}`;
+            const canRemove = me.role === "church_admin" || first.pastorId === me.id;
             return (
-              <li key={b.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                <div>
-                  <p className="font-medium">{formatDate(b.blocked_date, { weekday: "long" })}</p>
+              <li key={first.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium">{when}</p>
                   <p className="text-xs text-ink/60">
-                    {b.app_users?.name}
-                    {b.note && ` · ${b.note}`}
+                    {first.name}
+                    {days > 1 && ` · ${days} days`}
+                    {first.note && ` · ${first.note}`}
                   </p>
                 </div>
-                {canRemove && <RemoveBlockForm id={b.id} label={label} />}
+                {canRemove && <RemoveBlockForm ids={range.rows.map((r) => r.id)} label={`${when} (${first.name})`} />}
               </li>
             );
           })}

@@ -115,7 +115,6 @@ export function NewPrayerForm({ aiAvailable }: { aiAvailable: boolean }) {
         </span>
       </label>
 
-      <p className="text-xs text-ink/60">We'll suggest a few relevant Bible verses automatically when you save.</p>
 
       <FormActions>
         <SubmitButton />

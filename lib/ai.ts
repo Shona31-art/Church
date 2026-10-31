@@ -35,6 +35,12 @@ function getClient(): Anthropic | null {
 
 export type AiProvider = "anthropic" | "gemini";
 
+/** Why the most recent AI call on this server failed — shown by the admin "Test AI" button. */
+let lastFailure: string | null = null;
+export function lastAiFailure() {
+  return lastFailure;
+}
+
 /** Which AI service answers, or null when no key is set. */
 export function aiProvider(): AiProvider | null {
   if (process.env.ANTHROPIC_API_KEY) return "anthropic";
@@ -89,6 +95,7 @@ export async function generateText(params: {
     // Log the real cause server-side; callers show a friendly fallback.
     if (error instanceof Anthropic.APIError) {
       console.error(`[ai] API error ${error.status}: ${error.message}`);
+      lastFailure = `Anthropic answered ${error.status}: ${error.message.slice(0, 200)}`;
     } else {
       console.error("[ai] request failed:", error);
     }
@@ -143,14 +150,21 @@ async function generateWithGemini(params: { messages: AiTurn[]; system?: string;
         signal: AbortSignal.timeout(TIMEOUT_MS),
         cache: "no-store",
       });
-      if (res.ok) return geminiText((await res.json()) as GeminiResponse);
+      if (res.ok) {
+        const json = (await res.json()) as GeminiResponse;
+        const text = geminiText(json);
+        if (!text) lastFailure = `Google replied without text (${json.promptFeedback?.blockReason ?? json.candidates?.[0]?.finishReason ?? "empty answer"}).`;
+        return text;
+      }
       const detail = (await res.text()).slice(0, 300);
       if (attempt === 0 && (res.status === 429 || res.status >= 500)) continue;
       console.error(`[ai] Gemini API error ${res.status} (model ${GEMINI_MODEL}${res.status === 404 ? " — check GEMINI_MODEL" : ""}): ${detail}`);
+      lastFailure = `Google answered ${res.status}: ${detail.replace(/\s+/g, " ").slice(0, 200)}`;
       return null;
     } catch (error) {
       if (attempt === 0) continue;
       console.error("[ai] Gemini request failed:", error);
+      lastFailure = `Couldn't reach Google: ${(error as Error)?.message ?? "network error"}`;
       return null;
     }
   }

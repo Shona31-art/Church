@@ -30,7 +30,7 @@ export function PageHeader({
           {meta && <div className="mt-3 flex flex-wrap items-center gap-2">{meta}</div>}
           {description && <p className="mt-3 max-w-2xl text-lede text-ink/60">{description}</p>}
         </div>
-        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+        {actions && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">{actions}</div>}
       </div>
     </header>
   );

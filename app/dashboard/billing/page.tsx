@@ -59,7 +59,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
 
   return (
     <div className="max-w-4xl space-y-6">
-      <PageHeader title="Billing" description="Your church's plan and what it includes." />
+      <PageHeader back={{ href: "/dashboard", label: "Home" }} title="Billing" description="Your church's plan and what it includes." />
 
       {result && (
         <Alert tone={result.tone} title={result.title}>

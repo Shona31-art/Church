@@ -30,6 +30,7 @@ export default async function DepartmentsPage() {
   return (
     <div className="max-w-3xl">
       <PageHeader
+        back={{ href: "/dashboard", label: "Home" }}
         title="Departments"
         description="Ministry teams like Worship, Youth or Ushers. Members can belong to one department; each department gets its own chat, announcements and events."
         actions={addButton}

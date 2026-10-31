@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
+import { groupConsecutiveDays } from "@/lib/date-range";
 import { formatDate, todayInAppZone } from "@/lib/format";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { BookingForm } from "./BookingForm";
@@ -17,11 +18,11 @@ export default async function NewBookingPage() {
     // Shown up front so people can avoid dates a pastor is away.
     supabase
       .from("pastor_availability_blocks")
-      .select("blocked_date, app_users(name)")
+      .select("id, blocked_date, pastor_id, app_users(name)")
       .eq("church_id", me.church_id)
       .gte("blocked_date", today)
       .order("blocked_date")
-      .limit(30),
+      .limit(400),
   ]);
   // Not fatal: the form still works with "Any available pastor".
   if (error) console.error("[booking] pastor list failed:", error.message);
@@ -32,7 +33,12 @@ export default async function NewBookingPage() {
       <BookingForm
         pastors={pastors ?? []}
         today={today}
-        blockedDates={(blocks ?? []).map((b: any) => ({ pastor: b.app_users?.name ?? "A pastor", date: formatDate(b.blocked_date) }))}
+        blockedDates={groupConsecutiveDays((blocks ?? []).map((b: any) => ({ id: b.id, date: b.blocked_date as string, key: b.pastor_id as string, name: (b.app_users?.name as string) ?? "A pastor" })))
+          .slice(0, 30)
+          .map((r) => ({
+            pastor: r.rows[0].name,
+            date: r.start === r.end ? formatDate(r.start) : `${formatDate(r.start, { year: undefined })} – ${formatDate(r.end)}`,
+          }))}
       />
     </div>
   );

@@ -40,7 +40,7 @@ export default async function SermonsPage({ searchParams }: { searchParams: { q?
 
   return (
     <div className="max-w-3xl">
-      <PageHeader title="Sermons" description="Past messages with study notes for small groups, and your own private notes." actions={addButton} />
+      <PageHeader back={{ href: "/dashboard", label: "Home" }} title="Sermons" description="Past messages with study notes for small groups, and your own private notes." actions={addButton} />
       <FilterBar query={q} placeholder="Search by title or speaker…" label="Search sermons" resetHref="/dashboard/sermons" active={Boolean(q)} />
 
       {error ? (

@@ -55,6 +55,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
   return (
     <div className="max-w-2xl">
       <PageHeader
+        back={{ href: "/dashboard", label: "Home" }}
         title="Notifications"
         description="Announcements, messages, prayers for you and alerts. Kept for 90 days."
         actions={

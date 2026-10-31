@@ -70,7 +70,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: { w
 
     return (
       <div className="max-w-5xl">
-        <PageHeader title="Calendar" description="Services, meetings and events for your church." actions={createButton} />
+        <PageHeader back={{ href: "/dashboard", label: "Home" }} title="Calendar" description="Services, meetings and events for your church." actions={createButton} />
         {tabs}
         {error ? (
           <Alert tone="error" title="Couldn't load the calendar">Refresh the page to try again.</Alert>
@@ -106,7 +106,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: { w
 
   return (
     <div className="max-w-3xl">
-      <PageHeader title="Calendar" description="Services, meetings and events for your church." actions={createButton} />
+      <PageHeader back={{ href: "/dashboard", label: "Home" }} title="Calendar" description="Services, meetings and events for your church." actions={createButton} />
 
       {tabs}
 

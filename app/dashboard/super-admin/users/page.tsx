@@ -43,6 +43,7 @@ export default async function PlatformUsersPage({ searchParams }: { searchParams
   return (
     <div className="max-w-6xl">
       <PageHeader
+        back={{ href: "/dashboard/super-admin", label: "Platform admin" }}
         title="Platform users"
         description="Every login on the platform. A church's own Members page is where its admins manage their people; use this for support and account recovery."
         actions={

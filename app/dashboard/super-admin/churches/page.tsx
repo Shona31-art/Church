@@ -49,7 +49,7 @@ export default async function AllChurchesPage({ searchParams }: { searchParams: 
 
   return (
     <div className="max-w-6xl">
-      <PageHeader title="Churches" description={`${rows.length} ${rows.length === 1 ? "church" : "churches"}${status || q ? " match your filters" : " on the platform"}.`} actions={addButton} />
+      <PageHeader back={{ href: "/dashboard/super-admin", label: "Platform admin" }} title="Churches" description={`${rows.length} ${rows.length === 1 ? "church" : "churches"}${status || q ? " match your filters" : " on the platform"}.`} actions={addButton} />
 
       <FilterBar query={q} placeholder="Search by church name…" label="Search churches" resetHref="/dashboard/super-admin/churches" active={Boolean(q || status)}>
         <FilterSelect name="status" label="Status" value={status} allLabel="All statuses" options={STATUSES.map((s) => ({ value: s, label: s.replace("_", " ").replace(/^./, (c) => c.toUpperCase()) }))} />

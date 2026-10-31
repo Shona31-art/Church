@@ -51,9 +51,9 @@ export function DepartmentPeople({
                 </Link>
                 <span className="text-xs text-ink/60">{m.role === "department_leader" ? "Leader" : m.roleLabel}</span>
               </div>
-              {canManage && m.id !== meId && (
+              {canManage && (
                 <div className="flex shrink-0 items-center gap-1">
-                  {(m.role === "member" || m.role === "department_leader") && (
+                  {m.id !== meId && (m.role === "member" || m.role === "department_leader") && (
                     <form action={setDepartmentLeader}>
                       <input type="hidden" name="department_id" value={departmentId} />
                       <input type="hidden" name="member_id" value={m.id} />
@@ -67,7 +67,7 @@ export function DepartmentPeople({
                     <input type="hidden" name="department_id" value={departmentId} />
                     <input type="hidden" name="member_id" value={m.id} />
                     <ConfirmSubmitButton
-                      title={`Remove ${m.name} from ${departmentName}?`}
+                      title={m.id === meId ? `Leave ${departmentName}?` : `Remove ${m.name} from ${departmentName}?`}
                       message={
                         m.role === "department_leader"
                           ? "They'll stop seeing this department's announcements and chat, and they'll no longer be its leader. Their account stays as it is."
@@ -77,7 +77,7 @@ export function DepartmentPeople({
                       pendingLabel="Removing…"
                       className="btn-ghost btn-sm text-danger"
                     >
-                      Remove
+                      {m.id === meId ? "Leave" : "Remove"}
                     </ConfirmSubmitButton>
                   </form>
                 </div>
@@ -103,7 +103,7 @@ function AddPeople({ departmentId, departmentName, others }: { departmentId: str
     dialogRef.current?.close();
     setPicked(new Set());
     setQuery("");
-    if (state.skipped?.length) showToast(`Couldn't add ${state.skipped.join(", ")} — only a church admin can move a church admin, and nobody can move themselves.`, "error");
+    if (state.skipped?.length) showToast(`Couldn't add ${state.skipped.join(", ")}. Only a church admin can move another church admin.`, "error");
   }, [state]);
 
   const shown = useMemo(() => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { haptic } from "@/lib/haptics";
 import { useState } from "react";
 import { CheckCircle2, Eye, RotateCcw } from "lucide-react";
 import type { VersePuzzleView } from "../engine";
@@ -28,6 +29,7 @@ export function VersePuzzleBoard({ sessionId, view, finish, finishing }: BoardPr
     const result = await callAction(() => checkVerseAttempt(sessionId, index, placed.map((i) => verse.words[i])), { error: CONNECTION_FAILED });
     setBusy(false);
     if (result.error) return setError(result.error);
+    haptic(result.correct ? "success" : "error");
     if (result.correct) {
       setStatus({ kind: "solved" });
       setSolvedCount((n) => n + 1);

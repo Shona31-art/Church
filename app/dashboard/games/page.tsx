@@ -100,6 +100,7 @@ export default async function GamesHubPage({ searchParams }: { searchParams: { k
   return (
     <div className="max-w-6xl space-y-8">
       <PageHeader
+        back={{ href: "/dashboard", label: "Home" }}
         title="Bible games"
         description="Quizzes and puzzles at three levels. Every point counts towards your church's scoreboard."
         actions={
@@ -277,6 +278,7 @@ function KidsHub() {
   return (
     <div className="max-w-5xl space-y-8">
       <PageHeader
+        back={{ href: "/dashboard", label: "Home" }}
         title="Kids' Bible games"
         description="Easy games with bigger buttons and no clock. Kids' scores stay off the church scoreboard."
         actions={

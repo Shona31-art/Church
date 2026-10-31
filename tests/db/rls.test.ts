@@ -351,3 +351,52 @@ describe("church logo uploads (church_logo.sql)", () => {
     expect(await del(ADMIN_A)).toHaveLength(1);
   });
 });
+
+describe("department membership from the department page", () => {
+  test("a church admin can put themselves in a department, but still can't change their own role", async () => {
+    const [{ id: dept }] = await rows(`insert into departments (church_id, name) values ($1, 'Media and Tech') returning id`, [CHURCH_A]);
+    const moved = await asUser(db, ADMIN_A, () => rows(`update app_users set department_id = $1 where id = $2 returning id`, [dept, ADMIN_A]));
+    expect(moved).toHaveLength(1);
+    await expect(asUser(db, ADMIN_A, () => rows(`update app_users set role = 'member' where id = $1`, [ADMIN_A]))).rejects.toThrow(/own role/);
+    await expect(asUser(db, MEMBER_A, () => rows(`update app_users set department_id = $1 where id = $2`, [dept, MEMBER_A]))).rejects.toThrow(/pastors and church admins/);
+    await db.exec(`update app_users set department_id = null where id = '${ADMIN_A}'`); // reset
+  });
+});
+
+describe("songs (songs.sql)", () => {
+  let worshipDept: string;
+  let songId: string;
+
+  beforeAll(async () => {
+    [{ id: worshipDept }] = await rows(`insert into departments (church_id, name) values ($1, 'Worship') returning id`, [CHURCH_A]);
+  });
+
+  test("a pastor can add a song; everyone in the church can read it; other churches can't", async () => {
+    [{ id: songId }] = await asUser(db, PASTOR_A, () =>
+      rows(`insert into songs (church_id, title, lyrics) values ($1, 'Way Maker', 'You are here, moving in our midst') returning id`, [CHURCH_A])
+    );
+    expect(await asUser(db, MEMBER_A, () => rows(`select title from songs where id = $1`, [songId]))).toEqual([{ title: "Way Maker" }]);
+    expect(await asUser(db, MEMBER_B, () => rows(`select title from songs where id = $1`, [songId]))).toHaveLength(0);
+  });
+
+  test("an ordinary member can't add or change songs", async () => {
+    await expect(asUser(db, MEMBER_A, () => rows(`insert into songs (church_id, title) values ($1, 'Mine')`, [CHURCH_A]))).rejects.toThrow();
+    expect(await asUser(db, MEMBER_A, () => rows(`update songs set lyrics = 'x' where id = $1 returning id`, [songId]))).toHaveLength(0);
+    expect(await asUser(db, MEMBER_A, () => rows(`delete from songs where id = $1 returning id`, [songId]))).toHaveLength(0);
+  });
+
+  test("once their department is the worship team, its members can manage songs", async () => {
+    await asUser(db, ADMIN_A, () =>
+      rows(`insert into church_song_settings (church_id, worship_department_id) values ($1, $2) on conflict (church_id) do update set worship_department_id = excluded.worship_department_id`, [CHURCH_A, worshipDept])
+    );
+    await db.exec(`update app_users set department_id = '${worshipDept}' where id = '${MEMBER2_A}'`);
+    expect(await asUser(db, MEMBER2_A, () => rows(`update songs set song_key = 'G' where id = $1 returning id`, [songId]))).toHaveLength(1);
+    // Only pastors and admins choose the worship team.
+    await expect(asUser(db, MEMBER2_A, () => rows(`update church_song_settings set worship_department_id = null where church_id = $1 returning church_id`, [CHURCH_A]))).resolves.toHaveLength(0);
+    await db.exec(`update app_users set department_id = null where id = '${MEMBER2_A}'`);
+  });
+
+  test("the same title can't be added twice in a church", async () => {
+    await expect(asUser(db, PASTOR_A, () => rows(`insert into songs (church_id, title) values ($1, ' way maker ')`, [CHURCH_A]))).rejects.toThrow();
+  });
+});

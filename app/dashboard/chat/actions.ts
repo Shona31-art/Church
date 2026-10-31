@@ -147,7 +147,11 @@ async function saveMySettings(channelId: string, values: Record<string, string |
     .from("chat_member_settings")
     .upsert({ channel_id: channelId, user_id: me.id, ...values }, { onConflict: "channel_id,user_id" });
   if (error) {
-    console.error("[chat] settings save failed:", error.message);
+    console.error("[chat] settings save failed:", error.code, error.message);
+    // 42703 / PGRST204: a column from a later database update is missing.
+    if (error.code === "42703" || error.code === "PGRST204" || /column/i.test(error.message)) {
+      return { error: "This needs a database update: a church admin should run supabase/chat_v3.sql in the Supabase SQL Editor." };
+    }
     return { error: "Couldn't save that setting — please try again." };
   }
   revalidatePath("/dashboard/chat");

@@ -53,6 +53,7 @@ export default async function SupportPage({ searchParams }: { searchParams: { st
   return (
     <div className="max-w-4xl">
       <PageHeader
+        back={{ href: "/dashboard", label: "Home" }}
         title={platform ? "Support tickets" : "Support"}
         description={platform ? "Tickets from every church on the platform." : "Something not working, or a question about the app? Open a ticket and the platform team will help."}
         actions={newButton}

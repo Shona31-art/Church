@@ -7,7 +7,7 @@ import { CommentForm } from "./CommentForm";
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
 import { moduleGate } from "@/lib/gate";
 import { Alert } from "@/components/ui/Alert";
-import { BookOpen, Flame, HandHeart, MessageCircle, Plus, Sparkles } from "lucide-react";
+import { Flame, HandHeart, MessageCircle, Plus, Sparkles } from "lucide-react";
 import { Pagination } from "@/components/ui/Pagination";
 import { buildQuery, pageFrom } from "@/lib/list";
 import { formatDate } from "@/lib/format";
@@ -52,7 +52,7 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
 
   let query = supabase
     .from("prayer_board_items")
-    .select("id, user_id, prayer_text, category, scripture_refs, status, answered_reflection, created_at, answered_at, app_users!user_id(name)")
+    .select("id, user_id, prayer_text, category, status, answered_reflection, created_at, answered_at, app_users!user_id(name)")
     .eq("church_id", me.church_id)
     .or("is_shared_request.eq.true,is_testimony_shared.eq.true");
   if (show === "requests") query = query.neq("status", "answered");
@@ -239,16 +239,6 @@ export default async function PrayerWallPage({ searchParams }: { searchParams: {
                 </div>
 
                 <p className="mt-4 whitespace-pre-line font-display text-lg leading-snug">{p.prayer_text}</p>
-
-                {p.scripture_refs?.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {p.scripture_refs.map((ref: string) => (
-                      <span key={ref} className="inline-flex items-center gap-1 rounded-full bg-gold-soft px-2.5 py-0.5 text-xs font-semibold text-gold-deep">
-                        <BookOpen aria-hidden className="h-3 w-3" /> {ref}
-                      </span>
-                    ))}
-                  </div>
-                )}
 
                 {isTestimony && p.answered_reflection && (
                   <div className="mt-4 rounded-2xl border border-[#f0b04a]/40 bg-[#f0b04a]/10 p-3">

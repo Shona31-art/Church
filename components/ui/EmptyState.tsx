@@ -22,7 +22,7 @@ export function EmptyState({
       </span>
       <p className="mt-5 font-display text-2xl font-medium">{title}</p>
       {description && <p className="mx-auto mt-1.5 max-w-md text-sm text-ink/60">{description}</p>}
-      {action && <div className="mt-6 flex justify-center">{action}</div>}
+      {action && <div className="mt-6 flex flex-wrap justify-center gap-2">{action}</div>}
     </div>
   );
 }

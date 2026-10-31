@@ -41,6 +41,7 @@ export default async function JournalPage({ searchParams }: { searchParams: { pa
   return (
     <div className="max-w-3xl">
       <PageHeader
+        back={{ href: "/dashboard", label: "Home" }}
         title="My journal"
         description={
           <PrivacyNote>Private and encrypted. Only you can read these — not your pastor, not your church admin, not the platform owner.</PrivacyNote>

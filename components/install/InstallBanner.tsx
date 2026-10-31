@@ -3,25 +3,32 @@
 import { useEffect, useRef, useState } from "react";
 import { Download, Smartphone, X } from "lucide-react";
 import { useInstall } from "./install-store";
-import { IosSteps } from "./InstallSteps";
+import { InstallApp } from "./InstallApp";
 
 const DISMISSED_KEY = "install-banner-dismissed";
+/** "Not now" hides the banner for this long, then it may ask again. */
+const SNOOZE_MS = 30 * 24 * 60 * 60 * 1000;
 
 function wasDismissed(): boolean {
   try {
-    return localStorage.getItem(DISMISSED_KEY) === "1";
+    // Stored as the time of "Not now". The old value "1" (hidden forever) counts as expired.
+    const at = Number(localStorage.getItem(DISMISSED_KEY));
+    return at > 1 && Date.now() - at < SNOOZE_MS;
   } catch {
     return false; // storage blocked: show it, dismissing just won't stick
   }
 }
 
 /**
- * One-time suggestion on the dashboard home, phones only, and only when the
- * device can actually install right now (browser prompt, or iPhone steps).
- * "Not now" hides it on this device for good; My Account keeps the option.
+ * Suggestion on the dashboard home, phones only, and only when the device can
+ * actually install right now (browser prompt, or iPhone steps). "Not now"
+ * hides it for 30 days. Installing doesn't hide it for good: while the app is
+ * installed the browser stops offering the prompt, so the banner stays away
+ * by itself — and if the app is removed, it can come back. My Account always
+ * keeps the option.
  */
 export function InstallBanner() {
-  const { mode, justInstalled, promptInstall } = useInstall();
+  const { mode, justInstalled, installedOnDevice, promptInstall } = useInstall();
   const [phone, setPhone] = useState(false);
   const [hidden, setHidden] = useState(true);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -34,7 +41,7 @@ export function InstallBanner() {
   function dismiss() {
     setHidden(true);
     try {
-      localStorage.setItem(DISMISSED_KEY, "1");
+      localStorage.setItem(DISMISSED_KEY, String(Date.now()));
     } catch {
       // nothing to do — it simply shows again next visit
     }
@@ -42,11 +49,15 @@ export function InstallBanner() {
 
   async function install() {
     const outcome = await promptInstall();
-    // Either way, don't ask again on this device: they've made their choice.
-    if (outcome !== "unavailable") dismiss();
+    // Declined the browser's prompt: treat like "Not now". Accepted: nothing to
+    // store (see above), so a later uninstall can be offered a reinstall.
+    if (outcome === "dismissed") dismiss();
+    if (outcome === "accepted") setHidden(true);
   }
 
-  if (!phone || hidden || justInstalled || (mode !== "prompt" && mode !== "ios")) return null;
+  // Every phone that isn't running the installed app gets the card — with the
+  // one-tap Install where the browser allows it, and "Show me how" otherwise.
+  if (!phone || hidden || justInstalled || installedOnDevice || mode === null || mode === "installed") return null;
 
   return (
     <section aria-label="Install the app" className="card-elevated flex items-start gap-3 rounded-2xl p-4 motion-safe:animate-fade-in">
@@ -85,7 +96,7 @@ export function InstallBanner() {
             Add Grace to your home screen
           </h2>
           <div className="rule-gold mb-5 mt-3" />
-          <IosSteps />
+          <InstallApp />
           <div className="mt-6 flex justify-end">
             <button type="button" autoFocus className="btn-secondary" onClick={() => dialogRef.current?.close()}>
               Done

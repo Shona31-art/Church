@@ -11,7 +11,7 @@ import { InAppBrowserSteps, IosSteps, ManualSteps } from "./InstallSteps";
  * only when the browser confirms it.
  */
 export function InstallApp() {
-  const { mode, platform, justInstalled, promptInstall } = useInstall();
+  const { mode, platform, justInstalled, installedOnDevice, promptInstall } = useInstall();
   const [waiting, setWaiting] = useState(false);
   const [declined, setDeclined] = useState(false);
 
@@ -23,6 +23,15 @@ export function InstallApp() {
   }
 
   if (mode === null) return <div aria-hidden className="h-10" />;
+
+  if (installedOnDevice && mode !== "installed" && !justInstalled) {
+    return (
+      <p role="status" className="flex items-center gap-2 text-sm text-ink/80">
+        <CircleCheck aria-hidden className="h-4 w-4 shrink-0 text-success" />
+        Grace is installed on this phone. Open it from your home screen or app list.
+      </p>
+    );
+  }
 
   if (mode === "installed" || justInstalled) {
     return (
@@ -51,6 +60,9 @@ export function InstallApp() {
         <button type="button" onClick={install} className="btn-primary">
           <Download aria-hidden className="h-4 w-4" /> Install Grace
         </button>
+        <p className="hint">
+          If it says installation failed, open Chrome&apos;s menu ⋮ → <strong>Add to Home screen</strong> → <strong>Create shortcut</strong> instead.
+        </p>
       </div>
     );
   }

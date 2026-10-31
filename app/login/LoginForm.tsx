@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/Alert";
 import { FormField } from "@/components/ui/FormField";
 import { AuthShell, AuthHeading } from "@/components/brand/AuthShell";
+import { InstallOnSignIn } from "@/components/install/InstallOnSignIn";
 
 // Only ever redirect back into the app — never to an arbitrary URL from the
 // query string (open-redirect protection).
@@ -112,6 +113,7 @@ export function LoginForm({ expired, nextPath, reason }: { expired: boolean; nex
           </Link>
         </p>
       </form>
+      <InstallOnSignIn />
     </AuthShell>
   );
 }

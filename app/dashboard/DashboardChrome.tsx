@@ -10,6 +10,7 @@ import { NavIcon } from "@/components/ui/NavIcon";
 import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
 import { Avatar } from "@/components/ui/Avatar";
 import { initials } from "@/lib/initials";
+import { InstallMenuItem } from "@/components/install/InstallMenuItem";
 import { activeHref, buildTabBar, hidesTabBar, type NavGroup } from "@/lib/navigation";
 import { KeyboardViewport } from "@/components/KeyboardViewport";
 import { PullToRefresh } from "@/components/PullToRefresh";
@@ -280,6 +281,7 @@ function Sidebar({
       </nav>
 
       <div className="space-y-3 border-t border-line p-3">
+        <InstallMenuItem />
         <Link href="/dashboard/account" className="flex items-center gap-3 rounded-lg p-2 hover:bg-ink/[0.05]" title="My account">
           <Avatar name={userName} src={userPhotoUrl} />
           <div className="min-w-0">

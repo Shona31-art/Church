@@ -15,6 +15,25 @@ interface BeforeInstallPromptEvent extends Event {
 
 let deferredPrompt: BeforeInstallPromptEvent | null = null;
 let installedThisVisit = false;
+/** Chrome on Android can tell us the app is already installed on this phone (manifest related_applications). */
+let installedOnDevice = false;
+let checkedDevice = false;
+
+async function checkInstalledOnDevice() {
+  if (checkedDevice) return;
+  checkedDevice = true;
+  const nav = navigator as Navigator & { getInstalledRelatedApps?: () => Promise<unknown[]> };
+  if (!nav.getInstalledRelatedApps) return;
+  try {
+    const apps = await nav.getInstalledRelatedApps();
+    if (apps.length > 0) {
+      installedOnDevice = true;
+      emit();
+    }
+  } catch {
+    // Not supported here: we simply can't tell, so keep offering.
+  }
+}
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
@@ -44,6 +63,8 @@ export interface InstallState {
   platform: InstallPlatform | null;
   /** The browser confirmed installation during this visit. */
   justInstalled: boolean;
+  /** Installed on this device, though this page is open in the browser (Chrome on Android can tell). */
+  installedOnDevice: boolean;
   /** Opens the browser's own prompt. Resolves to what the person chose. */
   promptInstall: () => Promise<"accepted" | "dismissed" | "unavailable">;
 }
@@ -54,6 +75,7 @@ export function useInstall(): InstallState {
 
   useEffect(() => {
     setMounted(true);
+    void checkInstalledOnDevice();
     const rerender = () => setVersion((v) => v + 1);
     listeners.add(rerender);
     const media = window.matchMedia("(display-mode: standalone)");
@@ -81,7 +103,7 @@ export function useInstall(): InstallState {
     }
   }
 
-  if (!mounted) return { mode: null, platform: null, justInstalled: false, promptInstall };
+  if (!mounted) return { mode: null, platform: null, justInstalled: false, installedOnDevice: false, promptInstall };
 
   const platform = detectPlatform(navigator.userAgent, navigator.maxTouchPoints);
   const mode = installMode({
@@ -90,5 +112,6 @@ export function useInstall(): InstallState {
     platform,
     inAppBrowser: isInAppBrowser(navigator.userAgent),
   });
-  return { mode, platform, justInstalled: installedThisVisit, promptInstall };
+  // A fresh install prompt means the browser knows it isn't installed (any more).
+  return { mode, platform, justInstalled: installedThisVisit, installedOnDevice: installedOnDevice && deferredPrompt === null, promptInstall };
 }

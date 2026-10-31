@@ -25,5 +25,8 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "en-ZA",
     categories: ["lifestyle", "social", "education"],
     prefer_related_applications: false,
+    // Lets the dashboard ask Chrome "is Grace already installed on this phone?"
+    // (navigator.getInstalledRelatedApps), so it stops offering to install it.
+    related_applications: [{ platform: "webapp", url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/manifest.webmanifest` }],
   };
 }

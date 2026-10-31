@@ -34,6 +34,10 @@ export function ManualSteps({ platform }: { platform: InstallPlatform | null }) 
         <Step n={2}>
           Tap <strong>Install app</strong> or <strong>Add to Home screen</strong>, then confirm.
         </Step>
+        <p className="hint">
+          If it says installation failed: check the phone has free storage, update Chrome from the Play Store, then try again. Or choose{" "}
+          <strong>Add to Home screen</strong> → <strong>Create shortcut</strong>, which always works.
+        </p>
       </ol>
     );
   }

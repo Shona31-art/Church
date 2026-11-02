@@ -8,23 +8,22 @@ import { checkModuleAccess } from "@/lib/paywall";
 import { can } from "@/lib/permissions";
 import { todayInAppZone } from "@/lib/format";
 import { logAudit } from "@/lib/audit";
-import { createRoom, deleteRoom, isVideoConfigured } from "@/lib/daily";
 import { CALL_HOURS, MAX_PARTICIPANTS, bookingCallWindow, isCallOpen, newRoomName } from "@/lib/video-call-rules";
 
-// Starting, joining and ending video calls (supabase/video_calls.sql).
-// Each action checks the person may use calls (plan + set-up) and may be in
-// that chat or appointment; the browser never talks to Daily directly except
-// to show the call itself, with a pass from the server (calls/[id]/page.tsx).
+// Starting, joining and ending calls (supabase/video_calls.sql). Calls are
+// built in: phones connect straight to each other (WebRTC — see
+// calls/[id]/CallRoom.tsx), introduced over a Supabase Realtime channel only
+// the call's participants can join (calls_v2.sql). No outside call service.
+// Each action checks the person may use calls (plan) and may be in that chat
+// or appointment.
 
 type StartResult = { callId: string } | { error: string };
 
-const NOT_SET_UP = "Video calls aren't set up for your church yet.";
 const MIGRATION_MISSING = "Video calls need a database update first: run supabase/video_calls.sql.";
 
 async function requireCaller(): Promise<AppUser | { error: string }> {
   const me = await getCurrentAppUser();
   if (!me?.church_id) return { error: "Your session has expired — sign in again." };
-  if (!isVideoConfigured()) return { error: NOT_SET_UP };
   if (!(await checkModuleAccess("video_calls")).allowed) return { error: "Video calls aren't included in your church's plan." };
   return me;
 }
@@ -53,13 +52,9 @@ async function openCall(
   if (existing) await admin.from("video_calls").update({ ended_at: new Date().toISOString() }).eq("id", existing.id);
 
   const expiresAt = new Date(Date.now() + CALL_HOURS * 3600_000);
-  let room: { name: string; url: string };
-  try {
-    room = await createRoom({ name: newRoomName(), expiresAt, maxParticipants, audioOnly });
-  } catch (error) {
-    console.error("[calls] creating the room failed:", (error as Error).message);
-    return { error: "The video service didn't respond — please try again in a moment." };
-  }
+  // Built-in calls: the "room" is just this call's private channel. The size
+  // limit is kept by the call screen (each phone connects to every other).
+  const room = { name: newRoomName(), url: `builtin:${maxParticipants}` };
 
   const { data: created, error } = await admin
     .from("video_calls")
@@ -68,7 +63,6 @@ async function openCall(
     .select("id")
     .single();
   if (error || !created) {
-    await deleteRoom(room.name).catch(() => undefined);
     // Someone else started one a moment ago (one open call per place): join theirs.
     const { data: winner } = await admin.from("video_calls").select("id").eq(column, value).is("ended_at", null).maybeSingle();
     if (winner) return { callId: winner.id };
@@ -154,12 +148,6 @@ export async function endCall(callId: string): Promise<{ ok?: true; error?: stri
   if (!call) return { error: "That call couldn't be found." };
   if (call.started_by !== me.id && !can(me.role, "manageBookings")) return { error: "Only the person who started the call, or a pastor, can end it for everyone." };
   if (!call.ended_at) {
-    try {
-      await deleteRoom(call.room_name);
-    } catch (error) {
-      console.error("[calls] ending the room failed:", (error as Error).message);
-      return { error: "The video service didn't respond — please try again." };
-    }
     await createAdminClient().from("video_calls").update({ ended_at: new Date().toISOString() }).eq("id", call.id);
     await logAudit({ churchId: me.church_id, actorId: me.id, action: "video_call.ended", targetTable: "video_calls", targetId: call.id });
   }

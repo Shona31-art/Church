@@ -1,7 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { planIncludes } from "@/lib/features";
-import { isVideoConfigured } from "@/lib/daily";
 import { isCallOpen } from "@/lib/video-call-rules";
 
 /**
@@ -11,9 +10,10 @@ import { isCallOpen } from "@/lib/video-call-rules";
  * hasn't been run yet.
  */
 export async function videoCallState(place: { channelId: string } | { bookingId: string }): Promise<{ available: boolean; activeCallId: string | null }> {
-  if (!isVideoConfigured() || !(await planIncludes("video_calls"))) return { available: false, activeCallId: null };
+  if (!(await planIncludes("video_calls"))) return { available: false, activeCallId: null };
   const [column, value] = "channelId" in place ? ["channel_id", place.channelId] : ["booking_id", place.bookingId];
   const { data, error } = await createClient().from("video_calls").select("id, ended_at, expires_at").eq(column, value).is("ended_at", null).maybeSingle();
   if (error) return { available: false, activeCallId: null };
   return { available: true, activeCallId: data && isCallOpen(data) ? data.id : null };
 }
+

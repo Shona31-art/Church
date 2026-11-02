@@ -28,6 +28,7 @@ import {
 import { formatDateTime } from "@/lib/format";
 import { toCompressedImage } from "@/lib/image-resize";
 import { deleteChatMessage, editChatMessage, unblockMember } from "../actions";
+import { startChatCall } from "@/app/dashboard/calls/actions";
 import { MessageBubble } from "./MessageBubble";
 import { ForwardDialog } from "./ForwardDialog";
 import { PollDialog } from "./PollDialog";
@@ -586,6 +587,13 @@ export function ChatThread({
     return null;
   }
 
+  /** Tapping a call bubble calls back, straight into the call screen. */
+  async function callBack(kind: "voice" | "video") {
+    const r = await callAction(() => startChatCall(channelId, kind === "voice"), { error: CONNECTION_FAILED });
+    if ("error" in r) return showToast(r.error, "error");
+    router.push(`/dashboard/calls/${r.callId}?go=1`);
+  }
+
   function jumpTo(messageId: string) {
     const el = document.getElementById(`msg-${messageId}`);
     if (!el) return showToast("That message is older than what's shown here.", "info");
@@ -661,6 +669,7 @@ export function ChatThread({
                 onForward={v4 && !m.pending && m.kind !== "poll" ? () => setForwarding(m) : undefined}
                 mentionNames={(m.mentions ?? []).map((id) => person(id).name)}
                 mentionsMe={(m.mentions ?? []).includes(currentUserId)}
+                onCallBack={isDm ? callBack : undefined}
                 poll={
                   m.kind === "poll" && polls[m.id]
                     ? {

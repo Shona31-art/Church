@@ -63,6 +63,7 @@ export const MIGRATION_ORDER = [
   "chat_notifications_v2.sql",
   "chat_v4.sql",
   "calls_v2.sql",
+  "calls_v3.sql",
 ];
 
 const SUPABASE_STUBS = `

@@ -77,8 +77,8 @@ describe("POST /api/notifications/push", () => {
     const ring = { ...record, type: "video_call", title: "Alice is calling you", body: "Video call — tap to join", link: "/dashboard/calls/1b4e28ba-2fa1-41d2-883f-0016d3cca427", group_key: null };
     expect((await call({ type: "INSERT", table: "notifications", record: ring })).status).toBe(200);
     expect(sendPushToUser).toHaveBeenCalledWith(record.user_id, "messages", {
-      title: "Alice is calling you",
-      body: "Video call — tap to join",
+      title: "Alice",
+      body: "Incoming video call",
       link: ring.link,
       tag: `call:${ring.link}`,
       call: true,

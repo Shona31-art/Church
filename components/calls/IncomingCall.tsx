@@ -4,6 +4,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Phone, PhoneOff, Video } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { startRinging } from "@/lib/call-sounds";
+import { Avatar } from "@/components/ui/Avatar";
+import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
+import { endCall } from "@/app/dashboard/calls/actions";
 
 /** How long an incoming call rings before it gives up (it stays in the bell). */
 const RING_SECONDS = 45;
@@ -77,7 +81,13 @@ export function IncomingCall({ userId }: { userId: string }) {
       onAnswer={() => {
         markRead(incoming.notificationId);
         setIncoming(null);
-        router.push(incoming.link);
+        // ?go=1: tapping Accept counts as answering — straight into the call.
+        router.push(`${incoming.link}?go=1`);
+      }}
+      onDecline={() => {
+        markRead(incoming.notificationId);
+        setIncoming(null);
+        callAction(() => endCall(incoming.callId, "declined"), { error: CONNECTION_FAILED });
       }}
       onDismiss={(read) => {
         if (read) markRead(incoming.notificationId);
@@ -93,7 +103,7 @@ function markRead(id: string) {
     .then(({ error }) => error && console.error("[calls] marking the call notification read failed:", error.message));
 }
 
-function RingingCard({ incoming, onAnswer, onDismiss }: { incoming: Incoming; onAnswer: () => void; onDismiss: (read: boolean) => void }) {
+function RingingCard({ incoming, onAnswer, onDecline, onDismiss }: { incoming: Incoming; onAnswer: () => void; onDecline: () => void; onDismiss: (read: boolean) => void }) {
   const [ended, setEnded] = useState(false);
   const answerRef = useRef<HTMLButtonElement>(null);
   // The parent re-renders with new handlers; keep the ring timer steady.
@@ -132,82 +142,41 @@ function RingingCard({ incoming, onAnswer, onDismiss }: { incoming: Incoming; on
     return () => clearTimeout(t);
   }, [ended]);
 
+  const caller = incoming.title.replace(/ is calling you$/, "");
+  // Full screen, like WhatsApp: who's calling, and big Decline / Accept buttons.
   return (
-    <div
-      role="alertdialog"
-      aria-modal="false"
-      aria-labelledby="incoming-call-title"
-      className="fixed inset-x-3 top-3 z-[100] mx-auto max-w-sm rounded-2xl border border-line bg-surface p-4 shadow-pop motion-safe:animate-modal-in sm:inset-x-auto sm:right-4"
-    >
-      <div className="flex items-center gap-3">
-        <span aria-hidden className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-success-tint text-success ${ended ? "" : "motion-safe:animate-pulse"}`}>
-          {incoming.voice ? <Phone className="h-5 w-5" /> : <Video className="h-5 w-5" />}
-        </span>
-        <div className="min-w-0">
-          <p id="incoming-call-title" className="truncate font-semibold">
-            {incoming.title}
-          </p>
-          <p className="text-sm text-ink/60">{ended ? "The call has ended." : incoming.voice ? "Voice call" : "Video call"}</p>
-        </div>
+    <div role="alertdialog" aria-modal="true" aria-labelledby="incoming-call-title" className="fixed inset-0 z-[100] flex flex-col items-center justify-between bg-[#0b1f1a] px-6 py-[max(3rem,env(safe-area-inset-top))] text-white motion-safe:animate-modal-in">
+      <div className="text-center">
+        <p className="text-sm text-white/70">{ended ? "Call ended" : incoming.voice ? "Incoming voice call" : "Incoming video call"}</p>
+        <h2 id="incoming-call-title" className="mt-2 text-3xl font-semibold">
+          {caller}
+        </h2>
       </div>
-      {!ended && (
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button type="button" className="btn-secondary" onClick={() => onDismiss(true)}>
-            <PhoneOff aria-hidden className="h-4 w-4" /> Not now
-          </button>
-          <button ref={answerRef} type="button" className="btn-primary" onClick={onAnswer}>
-            <Phone aria-hidden className="h-4 w-4" /> Join
-          </button>
+      <span className={ended ? "" : "motion-safe:animate-pulse"}>
+        <span className="block scale-[2.4]">
+          <Avatar name={caller} size="lg" />
+        </span>
+      </span>
+      {!ended ? (
+        <div className="flex w-full max-w-xs items-center justify-between pb-[env(safe-area-inset-bottom)]">
+          <span className="flex flex-col items-center gap-2">
+            <button type="button" onClick={onDecline} aria-label="Decline" className="flex h-16 w-16 items-center justify-center rounded-full bg-red-600 active:scale-95">
+              <PhoneOff aria-hidden className="h-7 w-7" />
+            </button>
+            <span aria-hidden className="text-xs text-white/80">Decline</span>
+          </span>
+          <span className="flex flex-col items-center gap-2">
+            <button ref={answerRef} type="button" onClick={onAnswer} aria-label="Accept" className="flex h-16 w-16 items-center justify-center rounded-full bg-green-600 active:scale-95 motion-safe:animate-bounce">
+              {incoming.voice ? <Phone aria-hidden className="h-7 w-7" /> : <Video aria-hidden className="h-7 w-7" />}
+            </button>
+            <span aria-hidden className="text-xs text-white/80">Accept</span>
+          </span>
         </div>
+      ) : (
+        <button type="button" className="rounded-full bg-white/15 px-6 py-3 text-sm font-semibold" onClick={() => onDismiss(true)}>
+          Close
+        </button>
       )}
     </div>
   );
-}
-
-/**
- * A phone-style ring made in the browser (no sound file): two soft tones for
- * about a second and a half, then a pause, repeating; plus vibration where the
- * phone supports it. Browsers only allow sound after the person has tapped
- * something on the page — if it's blocked, the card and vibration still show.
- */
-function startRinging(): () => void {
-  let ctx: AudioContext | null = null;
-  try {
-    const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    ctx = AudioCtx ? new AudioCtx() : null;
-    ctx?.resume().catch(() => undefined);
-  } catch {
-    ctx = null;
-  }
-
-  const ringOnce = () => {
-    navigator.vibrate?.([700, 300, 700]);
-    if (!ctx || ctx.state === "closed") return;
-    const start = ctx.currentTime + 0.05;
-    const gain = ctx.createGain();
-    gain.connect(ctx.destination);
-    gain.gain.setValueAtTime(0, start);
-    // Two bursts of ~0.6 s, the way a phone rings.
-    for (const offset of [0, 0.8]) {
-      gain.gain.linearRampToValueAtTime(0.18, start + offset + 0.03);
-      gain.gain.setValueAtTime(0.18, start + offset + 0.55);
-      gain.gain.linearRampToValueAtTime(0, start + offset + 0.6);
-    }
-    for (const freq of [440, 480]) {
-      const osc = ctx.createOscillator();
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      osc.connect(gain);
-      osc.start(start);
-      osc.stop(start + 1.45);
-    }
-  };
-
-  ringOnce();
-  const timer = setInterval(ringOnce, 3000);
-  return () => {
-    clearInterval(timer);
-    navigator.vibrate?.(0);
-    ctx?.close().catch(() => undefined);
-  };
 }

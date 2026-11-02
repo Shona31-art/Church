@@ -182,9 +182,10 @@ self.addEventListener("push", (event) => {
         ? {
             requireInteraction: true,
             vibrate: [700, 300, 700, 300, 700, 300, 700, 300, 700, 300, 700],
+            // Like WhatsApp's incoming call pop-up.
             actions: [
-              { action: "join", title: "Join" },
-              { action: "dismiss", title: "Not now" },
+              { action: "decline", title: "Decline" },
+              { action: "answer", title: "Answer" },
             ],
           }
         : {}),
@@ -196,6 +197,14 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   if (event.action === "dismiss") return;
+  // Incoming call: Decline tells the caller (signed-in cookie), Answer goes straight into the call.
+  const callMatch = /^\/dashboard\/calls\/([0-9a-f-]{36})/.exec(safeUrl(event.notification.data && event.notification.data.url));
+  if (callMatch && event.action === "decline") {
+    event.waitUntil(
+      fetch("/api/calls/decline", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ callId: callMatch[1] }) }).catch(() => {}),
+    );
+    return;
+  }
   // "Mark as read": tell the app (signed-in cookie), update the icon badge, don't open anything.
   if (event.action === "read") {
     const id = event.notification.data && event.notification.data.notificationId;
@@ -212,7 +221,8 @@ self.addEventListener("notificationclick", (event) => {
     );
     return;
   }
-  const url = safeUrl(event.notification.data && event.notification.data.url);
+  let url = safeUrl(event.notification.data && event.notification.data.url);
+  if (callMatch && event.action === "answer") url = `/dashboard/calls/${callMatch[1]}?go=1`;
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });

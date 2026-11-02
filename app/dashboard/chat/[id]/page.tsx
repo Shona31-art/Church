@@ -170,13 +170,15 @@ export default async function ChatChannelPage({ params, searchParams }: { params
   const noVoice = (myRestrictions ?? []).some((r: any) => r.kind === "no_voice");
   const mutedUntil = isMuted(settings?.muted_until) ? settings!.muted_until : null;
   // Video calls (video_calls.sql): not in a private chat with someone you've blocked.
-  const call = myBlock ? { available: false, activeCallId: null } : await videoCallState({ channelId: channel.id });
+  const call = myBlock ? { available: false, activeCallId: null, startedAt: null } : await videoCallState({ channelId: channel.id }, channel.is_dm);
 
   return (
     <div className="relative max-w-3xl">
       {/* The ⋮ menu sits top right, level with "‹ Chats", where people expect it. */}
       {v2 && (
-        <div className="absolute right-0 top-0 z-20">
+        <div className="absolute right-0 top-0 z-20 flex items-center gap-1.5">
+          {/* Call buttons beside the menu, like WhatsApp. */}
+          {call.available && <StartCallButton compact oneToOne={channel.is_dm} place={{ channelId: channel.id }} activeCallId={call.activeCallId} startedAt={call.startedAt} />}
           <ChatMenu
             channelId={channel.id}
             mutedUntil={mutedUntil}
@@ -194,7 +196,6 @@ export default async function ChatChannelPage({ params, searchParams }: { params
       )}
       <PageHeader
         back={{ href: "/dashboard/chat", label: "Chats" }}
-        actions={call.available ? <StartCallButton place={{ channelId: channel.id }} activeCallId={call.activeCallId} /> : undefined}
         title={
           channel.is_dm ? (
             <span className="flex items-center gap-3">

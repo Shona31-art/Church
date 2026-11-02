@@ -339,3 +339,32 @@ export function tallyPoll(optionCount: number, votes: readonly PollVote[]): { co
   }
   return { counts, voters, total: new Set(votes.map((v) => v.user_id)).size };
 }
+
+// ---------------------------------------------------------------------------
+// Call history lines (calls/actions.ts endCall: "📞 Voice call · 2:34",
+// "📹 Missed video call"), shown as WhatsApp-style call bubbles.
+// ---------------------------------------------------------------------------
+
+export interface CallLog {
+  kind: "voice" | "video";
+  missed: boolean;
+  /** "10 secs", "1 min", "2 mins", "1 hr 5 mins". */
+  length: string | null;
+}
+
+export function parseCallLog(content: string): CallLog | null {
+  const m = /^(📞|📹) (Missed )?(voice|video) call(?: · (\d+(?::\d\d){1,2}))?$/iu.exec(content.trim());
+  if (!m) return null;
+  return { kind: m[3].toLowerCase() === "voice" ? "voice" : "video", missed: Boolean(m[2]), length: m[4] ? humanCallLength(m[4]) : null };
+}
+
+/** "0:10" → "10 secs", "1:05" → "1 min", "12:40" → "12 mins", "1:02:10" → "1 hr 2 mins". */
+export function humanCallLength(clock: string): string {
+  const parts = clock.split(":").map(Number);
+  const seconds = parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : parts[0] * 60 + parts[1];
+  if (seconds < 60) return `${seconds} ${seconds === 1 ? "sec" : "secs"}`;
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const minText = `${mins} ${mins === 1 ? "min" : "mins"}`;
+  return hours ? `${hours} hr${mins ? ` ${minText}` : ""}` : minText;
+}

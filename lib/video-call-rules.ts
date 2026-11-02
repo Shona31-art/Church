@@ -61,3 +61,21 @@ export function iceServersFrom(env: { TURN_URLS?: string; TURN_USERNAME?: string
   }
   return servers;
 }
+
+/** A two-person call nobody picked up within this long is over (like an unanswered phone call). */
+export const UNANSWERED_MS = 60_000;
+
+/**
+ * Is this call still worth joining? A two-person call that was never answered
+ * stops counting after a minute, so the chat shows "Voice call / Video call"
+ * again rather than "Join call" for a call nobody is in.
+ */
+export function isLiveCall(
+  call: { ended_at: string | null; expires_at: string; started_at?: string | null; connected_at?: string | null },
+  oneToOne: boolean,
+  now: Date = new Date()
+): boolean {
+  if (!isCallOpen(call, now)) return false;
+  if (!oneToOne || call.connected_at || !call.started_at) return true;
+  return now.getTime() - new Date(call.started_at).getTime() < UNANSWERED_MS;
+}

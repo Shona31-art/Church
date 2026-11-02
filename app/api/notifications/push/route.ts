@@ -69,8 +69,9 @@ export async function POST(request: Request) {
       ? unreadCountFor(record.user_id).then((badge) =>
           sendPushToUser(record.user_id, record.category, {
           // "Alice (3 messages)", like WhatsApp, once more than one is waiting.
-          title: isMessage && (record.count ?? 1) > 1 ? `${record.title} (${record.count} messages)` : record.title,
-          body: record.body,
+          // A call: the caller's name, "Incoming voice call".
+          title: isCall ? record.title.replace(/ is calling you$/, "") : isMessage && (record.count ?? 1) > 1 ? `${record.title} (${record.count} messages)` : record.title,
+          body: isCall ? (record.body?.startsWith("Voice") ? "Incoming voice call" : "Incoming video call") : record.body,
           link: record.link,
           tag: isCall ? `call:${record.link}` : record.group_key ?? undefined,
           // An incoming video call: rings on the phone (sw.js) and is only worth delivering for a minute.

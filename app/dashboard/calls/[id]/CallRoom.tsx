@@ -2,25 +2,33 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Mic, MicOff, Phone, PhoneOff, SwitchCamera, Video, VideoOff } from "lucide-react";
+import { Lock, Mic, MicOff, Phone, PhoneOff, SwitchCamera, Video, VideoOff } from "lucide-react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Avatar } from "@/components/ui/Avatar";
 import { shouldInitiate } from "@/lib/video-call-rules";
-import { endCall } from "../actions";
+import { startRingback } from "@/lib/call-sounds";
+import { endCall, markCallConnected, ringAgain, type EndReason } from "../actions";
 
 /**
- * A built-in voice or video call (no outside call service).
+ * A built-in voice or video call that behaves like WhatsApp.
  *
  * How it works: everyone in the call joins a private Supabase Realtime
  * channel for it ("call:<id>" — only the call's participants may join,
  * calls_v2.sql). There each phone announces itself (presence) and exchanges
  * the short WebRTC set-up messages ("offer", "answer", network candidates)
  * with every other phone. Sound and video then go directly between the
- * phones, encrypted end to end by WebRTC; nothing is recorded or stored.
+ * phones, encrypted by WebRTC; nothing is recorded or stored.
+ *
+ * Two-person calls (private chat, appointment): the caller sees "Calling…"
+ * with a ringing tone; no answer in 45 seconds ends it ("No answer"); the
+ * other person can decline; either hanging up ends it for both. Group calls:
+ * people come and go; the starter or a pastor can end it for everyone.
  */
+
+const NO_ANSWER_MS = 45_000;
 
 type Signal =
   | { type: "description"; from: string; to: string; description: RTCSessionDescriptionInit }
@@ -45,6 +53,8 @@ interface Remote {
 
 type Phase = { kind: "lobby" } | { kind: "joining" } | { kind: "in-call" } | { kind: "full" } | { kind: "ended"; reason: string } | { kind: "error"; message: string };
 
+const END_TEXT: Record<EndReason, string> = { ended: "Call ended", declined: "Call declined", no_answer: "No answer" };
+
 export function CallRoom({
   callId,
   me,
@@ -54,6 +64,11 @@ export function CallRoom({
   canEndForAll,
   audioOnly = false,
   expiresAt,
+  oneToOne = false,
+  isCaller = false,
+  other = null,
+  title = "Call",
+  autoJoin = false,
 }: {
   callId: string;
   me: { id: string; name: string };
@@ -63,16 +78,26 @@ export function CallRoom({
   canEndForAll: boolean;
   audioOnly?: boolean;
   expiresAt: string;
+  /** A private chat or an appointment: two people, WhatsApp rules. */
+  oneToOne?: boolean;
+  /** I started this call. */
+  isCaller?: boolean;
+  /** In a two-person call: who's on the other end. */
+  other?: { name: string; photoUrl: string | null } | null;
+  title?: string;
+  /** Came here by tapping Call / Accept: go straight in (no extra tap). */
+  autoJoin?: boolean;
 }) {
   const router = useRouter();
   const [supabase] = useState(() => createClient());
   const peerId = useMemo(() => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()).slice(2)), []);
-  const [phase, setPhase] = useState<Phase>({ kind: "lobby" });
+  const [phase, setPhase] = useState<Phase>({ kind: autoJoin ? "joining" : "lobby" });
   const [remotes, setRemotes] = useState<Record<string, Remote>>({});
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
   const [facing, setFacing] = useState<"user" | "environment">("user");
-  const [seconds, setSeconds] = useState(0);
+  const [connectedAt, setConnectedAt] = useState<number | null>(null);
+  const [, tick] = useState(0);
   const [confirm, confirmDialog] = useConfirm();
 
   const localRef = useRef<MediaStream | null>(null);
@@ -81,6 +106,9 @@ export function CallRoom({
   const peersRef = useRef(new Map<string, RTCPeerConnection>());
   const pendingRef = useRef(new Map<string, RTCIceCandidateInit[]>());
   const metaRef = useRef<PresenceMeta>({ userId: me.id, name: me.name, muted: false, cameraOff: false });
+  const everConnectedRef = useRef(false);
+  const endingRef = useRef(false);
+  const joinStartedRef = useRef(false);
 
   const send = useCallback((signal: Signal) => {
     channelRef.current?.send({ type: "broadcast", event: "signal", payload: signal });
@@ -100,6 +128,54 @@ export function CallRoom({
     });
   }, []);
 
+  /** Stops everything this phone is doing in the call. */
+  const hangUp = useCallback(() => {
+    for (const id of [...peersRef.current.keys()]) closePeer(id);
+    localRef.current?.getTracks().forEach((t) => t.stop());
+    localRef.current = null;
+    if (channelRef.current) {
+      channelRef.current.untrack().catch(() => undefined);
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+  }, [closePeer, supabase]);
+
+  /** Show how the call ended for a moment, then go back to the chat / appointment. */
+  const finish = useCallback(
+    (reason: string) => {
+      hangUp();
+      setPhase({ kind: "ended", reason });
+      setTimeout(() => {
+        router.push(back.href);
+        router.refresh();
+      }, 1800);
+    },
+    [back.href, hangUp, router]
+  );
+
+  /** End the call (two-person calls: for both of us) with a reason, then finish. */
+  const endWith = useCallback(
+    async (reason: EndReason) => {
+      if (endingRef.current) return;
+      endingRef.current = true;
+      // Tell the other phones straight away (quicker than waiting for the database).
+      // Declining from the incoming screen: not in the call yet, so drop in just to say it.
+      const bye = { type: "broadcast" as const, event: "bye", payload: { from: peerId, reason } };
+      if (channelRef.current) channelRef.current.send(bye).catch(() => undefined);
+      else {
+        const quick = supabase.channel(`call:${callId}`, { config: { private: true } });
+        quick.subscribe((status) => {
+          if (status === "SUBSCRIBED") quick.send(bye).finally(() => setTimeout(() => supabase.removeChannel(quick), 500));
+        });
+      }
+      hangUp();
+      setPhase({ kind: "ended", reason: END_TEXT[reason] });
+      await callAction(() => endCall(callId, reason), { error: CONNECTION_FAILED });
+      finish(END_TEXT[reason]);
+    },
+    [callId, finish, hangUp, peerId, supabase]
+  );
+
   /** A connection to one other phone. The "initiator" sends the first offer. */
   const connectTo = useCallback(
     async (theirId: string, meta: PresenceMeta, initiator: boolean) => {
@@ -111,7 +187,14 @@ export function CallRoom({
       pc.onicecandidate = (e) => {
         if (e.candidate) send({ type: "candidate", from: peerId, to: theirId, candidate: e.candidate.toJSON() });
       };
-      pc.ontrack = (e) => updateRemote(theirId, { stream: e.streams[0] ?? new MediaStream([e.track]) });
+      pc.ontrack = (e) => {
+        updateRemote(theirId, { stream: e.streams[0] ?? new MediaStream([e.track]) });
+        if (!everConnectedRef.current) {
+          everConnectedRef.current = true;
+          setConnectedAt(Date.now());
+          markCallConnected(callId).catch(() => undefined);
+        }
+      };
       pc.onconnectionstatechange = () => {
         updateRemote(theirId, { state: pc.connectionState });
         // A dropped network (e.g. Wi-Fi to mobile data): try to reconnect.
@@ -130,7 +213,7 @@ export function CallRoom({
       }
       return pc;
     },
-    [iceServers, peerId, send, updateRemote]
+    [callId, iceServers, peerId, send, updateRemote]
   );
 
   const handleSignal = useCallback(
@@ -138,7 +221,7 @@ export function CallRoom({
       if (signal.to !== peerId) return;
       let pc = peersRef.current.get(signal.from);
       if (!pc) {
-        const meta = (channelRef.current?.presenceState<PresenceMeta>()[signal.from]?.[0] ?? { userId: "", name: "Someone" }) as PresenceMeta;
+        const meta = (channelRef.current?.presenceState<PresenceMeta>()[signal.from]?.[0] ?? { userId: "", name: other?.name ?? "Someone" }) as PresenceMeta;
         pc = await connectTo(signal.from, meta, false);
         if (!pc) return;
       }
@@ -162,60 +245,85 @@ export function CallRoom({
         console.error("[calls] connection set-up failed:", error);
       }
     },
-    [connectTo, peerId, send]
+    [connectTo, other?.name, peerId, send]
   );
-
-  /** Stops everything this phone is doing in the call. */
-  const hangUp = useCallback(() => {
-    for (const id of [...peersRef.current.keys()]) closePeer(id);
-    localRef.current?.getTracks().forEach((t) => t.stop());
-    localRef.current = null;
-    if (channelRef.current) {
-      channelRef.current.untrack().catch(() => undefined);
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
-  }, [closePeer, supabase]);
 
   // Leaving the page (or closing the app) leaves the call.
   useEffect(() => hangUp, [hangUp]);
 
-  // Someone ended the call for everyone, or it ran out.
+  // The other side ended it (hung up, declined), or it ran out.
   useEffect(() => {
     const status = supabase
       .channel(`call-ended:${callId}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "video_calls", filter: `id=eq.${callId}` }, ({ new: row }) => {
-        if ((row as { ended_at: string | null }).ended_at) {
-          hangUp();
-          setPhase({ kind: "ended", reason: "The call was ended." });
+        const r = row as { ended_at: string | null; end_reason?: EndReason | null };
+        if (r.ended_at && !endingRef.current) {
+          endingRef.current = true;
+          finish(END_TEXT[r.end_reason ?? "ended"] ?? "Call ended");
         }
       })
       .subscribe();
     const untilEnd = new Date(expiresAt).getTime() - Date.now();
-    const timer = setTimeout(() => {
-      hangUp();
-      setPhase({ kind: "ended", reason: "Calls end after three hours." });
-    }, Math.max(0, Math.min(untilEnd, 2_147_000_000)));
+    const timer = setTimeout(() => finish("Calls end after three hours."), Math.max(0, Math.min(untilEnd, 2_147_000_000)));
     return () => {
       clearTimeout(timer);
       supabase.removeChannel(status);
     };
-  }, [callId, expiresAt, hangUp, supabase]);
+  }, [callId, expiresAt, finish, supabase]);
 
-  // Call timer.
+  const people = Object.values(remotes);
+  const someoneHere = people.length > 0;
+  const connected = connectedAt !== null && people.some((p) => p.stream);
+
+  // Caller's side of a two-person call: ringing tone, and "No answer" after 45 s.
+  const waitingForAnswer = phase.kind === "in-call" && oneToOne && isCaller && !someoneHere && !everConnectedRef.current;
+  useEffect(() => {
+    if (!waitingForAnswer) return;
+    const stop = startRingback();
+    const timer = setTimeout(() => endWith("no_answer"), NO_ANSWER_MS);
+    // Keep their phone buzzing even if the app is closed (a fresh pop-up every 7 s).
+    const again = setInterval(() => ringAgain(callId).catch(() => undefined), 7000);
+    return () => {
+      stop();
+      clearTimeout(timer);
+      clearInterval(again);
+    };
+  }, [waitingForAnswer, endWith, callId]);
+
+  // Two-person call: when the other person leaves after picking up, it's over for both.
+  useEffect(() => {
+    if (oneToOne && phase.kind === "in-call" && everConnectedRef.current && !someoneHere) {
+      const t = setTimeout(() => endWith("ended"), 1500); // a moment's grace for a quick reconnect
+      return () => clearTimeout(t);
+    }
+  }, [oneToOne, phase.kind, someoneHere, endWith]);
+
+  // Call timer, and keep the screen on during the call (where the phone allows it).
   useEffect(() => {
     if (phase.kind !== "in-call") return;
-    const started = Date.now();
-    const t = setInterval(() => setSeconds(Math.floor((Date.now() - started) / 1000)), 1000);
-    return () => clearInterval(t);
+    const t = setInterval(() => tick((n) => n + 1), 1000);
+    let lock: { release: () => Promise<void> } | null = null;
+    const nav = navigator as Navigator & { wakeLock?: { request: (type: "screen") => Promise<{ release: () => Promise<void> }> } };
+    const keepAwake = () => {
+      if (document.visibilityState === "visible") nav.wakeLock?.request("screen").then((l) => (lock = l), () => undefined);
+    };
+    keepAwake();
+    document.addEventListener("visibilitychange", keepAwake);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", keepAwake);
+      lock?.release().catch(() => undefined);
+    };
   }, [phase.kind]);
 
   // Show my own camera.
   useEffect(() => {
     if (localVideoRef.current && localRef.current) localVideoRef.current.srcObject = localRef.current;
-  }, [phase.kind, facing]);
+  }, [phase.kind, facing, someoneHere]);
 
   async function join() {
+    if (joinStartedRef.current) return;
+    joinStartedRef.current = true;
     setPhase({ kind: "joining" });
     try {
       localRef.current = await navigator.mediaDevices.getUserMedia({
@@ -223,6 +331,7 @@ export function CallRoom({
         video: audioOnly ? false : { facingMode: facing, width: { ideal: 640 }, height: { ideal: 480 } },
       });
     } catch (error) {
+      joinStartedRef.current = false;
       const denied = (error as DOMException)?.name === "NotAllowedError";
       return setPhase({
         kind: "error",
@@ -234,15 +343,14 @@ export function CallRoom({
 
     const channel = supabase.channel(`call:${callId}`, { config: { private: true, presence: { key: peerId }, broadcast: { self: false } } });
     channelRef.current = channel;
-    let joinedOnce = false;
+    let firstSync = true;
 
     channel
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState<PresenceMeta>();
         const others = Object.entries(state).filter(([id]) => id !== peerId);
-        if (!joinedOnce) {
-          joinedOnce = true;
-          // Full: everyone already there (and me) would be over the limit.
+        if (firstSync) {
+          firstSync = false;
           if (others.length + 1 > capacity) {
             hangUp();
             return setPhase({ kind: "full" });
@@ -256,20 +364,36 @@ export function CallRoom({
             updateRemote(id, { muted: Boolean(meta.muted), cameraOff: Boolean(meta.cameraOff), name: meta.name });
           }
         }
-        // People who left.
         for (const id of [...peersRef.current.keys()]) if (!state[id]) closePeer(id);
       })
       .on("broadcast", { event: "signal" }, ({ payload }) => handleSignal(payload as Signal))
+      // The other person hung up or declined.
+      .on("broadcast", { event: "bye" }, ({ payload }) => {
+        const p = payload as { from: string; reason: EndReason };
+        if (oneToOne && !endingRef.current) {
+          endingRef.current = true;
+          finish(END_TEXT[p.reason] ?? "Call ended");
+        } else if (!oneToOne) {
+          closePeer(p.from);
+        }
+      })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           await channel.track(metaRef.current);
           setPhase((p) => (p.kind === "joining" ? { kind: "in-call" } : p));
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           hangUp();
+          joinStartedRef.current = false;
           setPhase({ kind: "error", message: "We couldn't connect to the call. Check your connection and try again." });
         }
       });
   }
+
+  // Tapped Call or Accept to get here: go straight in.
+  useEffect(() => {
+    if (autoJoin) join();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
+  }, []);
 
   function share(patch: Partial<PresenceMeta>) {
     metaRef.current = { ...metaRef.current, ...patch };
@@ -313,143 +437,203 @@ export function CallRoom({
     }
   }
 
-  function leave() {
+  /** The red button: two-person calls end for both; in a group you just leave. */
+  function hangUpButton() {
+    if (oneToOne) return endWith("ended");
     hangUp();
     router.push(back.href);
   }
 
   async function endForAll() {
     if (!(await confirm({ title: "End the call for everyone?", message: "Anyone still in the call will be disconnected.", confirmLabel: "End call", tone: "danger" }))) return;
-    const r = await callAction(() => endCall(callId), { error: CONNECTION_FAILED });
-    if (r.error) return setPhase({ kind: "error", message: r.error });
-    hangUp();
-    router.push(back.href);
-    router.refresh();
+    endWith("ended");
   }
 
-  const people = Object.values(remotes);
-  const kind = audioOnly ? "Voice call" : "Video call";
+  const kindLabel = audioOnly ? "Voice call" : "Video call";
+  const elapsed = connectedAt ? Math.floor((Date.now() - connectedAt) / 1000) : 0;
+  const timer = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`;
+  const statusLine =
+    phase.kind === "joining"
+      ? "Connecting…"
+      : phase.kind === "ended"
+      ? phase.reason
+      : connected
+      ? timer
+      : someoneHere
+      ? "Connecting…"
+      : oneToOne && isCaller
+      ? "Calling…"
+      : oneToOne
+      ? `Waiting for ${other?.name ?? "them"}…`
+      : "Waiting for others to join…";
 
-  if (phase.kind === "lobby" || phase.kind === "joining" || phase.kind === "error" || phase.kind === "full" || phase.kind === "ended") {
-    return (
-      <div className="mx-auto max-w-md space-y-5 py-6 text-center">
-        <span aria-hidden className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success-tint text-success">
-          {audioOnly ? <Phone className="h-7 w-7" /> : <Video className="h-7 w-7" />}
-        </span>
-        <h1 className="font-display text-2xl font-semibold">{kind}</h1>
-        {phase.kind === "error" && <p role="alert" className="text-sm text-danger">{phase.message}</p>}
-        {phase.kind === "full" && <p className="text-sm text-ink/70">This call is full ({capacity} people). Try again when someone leaves.</p>}
-        {phase.kind === "ended" && <p className="text-sm text-ink/70">{phase.reason}</p>}
-        {(phase.kind === "lobby" || phase.kind === "joining" || phase.kind === "error") && (
-          <>
-            <p className="text-sm text-ink/70">
-              {audioOnly ? "Your browser will ask to use your microphone — choose Allow." : "Your browser will ask to use your camera and microphone — choose Allow."} Calls aren&apos;t recorded.
-            </p>
-            <button type="button" className="btn-primary w-full" onClick={join} disabled={phase.kind === "joining"}>
-              {audioOnly ? <Phone aria-hidden className="h-4 w-4" /> : <Video aria-hidden className="h-4 w-4" />}
-              {phase.kind === "joining" ? "Connecting…" : phase.kind === "error" ? "Try again" : "Join call"}
-            </button>
-          </>
-        )}
-        <button type="button" className="btn-secondary w-full" onClick={leave}>
-          {back.label}
-        </button>
-      </div>
-    );
-  }
+  const remoteVideo = !audioOnly && oneToOne ? people.find((p) => p.stream && !p.cameraOff) : undefined;
 
+  // ---------------------------------------------------------------------------
+  // Screens
+  // ---------------------------------------------------------------------------
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2 text-sm">
-        <span className="font-semibold">{kind}</span>
-        <span className="tabular text-ink/60">
-          {people.length ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}` : "Waiting for others to join…"}
-        </span>
-      </div>
+    <div className="fixed inset-0 z-[80] flex flex-col bg-[#0b1f1a] text-white" role="dialog" aria-label={`${kindLabel} — ${title}`}>
+      {/* Two-person video: the other person fills the screen, like WhatsApp. */}
+      {remoteVideo && <RemoteMedia person={remoteVideo} audioOnly={false} fill nameTag={false} />}
 
-      <div className={`grid gap-2 ${people.length > 1 ? "sm:grid-cols-2" : ""}`}>
-        {people.map((p) => (
-          <RemoteTile key={p.peerId} person={p} audioOnly={audioOnly} />
-        ))}
-        {!people.length && (
-          <div className="flex aspect-video flex-col items-center justify-center gap-3 rounded-2xl bg-ink text-on-ember">
-            <span className="motion-safe:animate-pulse">
-              <Avatar name={me.name} size="lg" />
+      {/* Sound from everyone (and video tiles in group calls). */}
+      {!remoteVideo &&
+        people.map((p) => (oneToOne || audioOnly ? <RemoteMedia key={p.peerId} person={p} audioOnly hidden /> : null))}
+
+      <header className="relative z-10 px-6 pt-[max(2.5rem,env(safe-area-inset-top))] text-center [text-shadow:0_1px_3px_rgb(0_0_0/0.6)]">
+        <p className="flex items-center justify-center gap-1 text-xs text-white/70">
+          <Lock aria-hidden className="h-3 w-3" /> End-to-end encrypted
+        </p>
+        <h1 className="mt-2 truncate text-2xl font-semibold">{title}</h1>
+        <p className="mt-1 text-sm tabular-nums text-white/80" role="status">
+          {phase.kind === "lobby" ? (oneToOne && !isCaller ? `Incoming ${kindLabel.toLowerCase()}` : kindLabel) : phase.kind === "full" ? `This call is full (${capacity} people)` : statusLine}
+        </p>
+      </header>
+
+      <main className="relative z-10 flex flex-1 flex-col items-center justify-center gap-4 px-4">
+        {!remoteVideo && (oneToOne || audioOnly || !someoneHere) && phase.kind !== "error" && (
+          <span className={!connected && phase.kind !== "ended" ? "motion-safe:animate-pulse" : ""}>
+            <span className="block scale-[2.2]">
+              <Avatar name={oneToOne ? other?.name ?? title : title} src={oneToOne ? other?.photoUrl ?? null : null} size="lg" />
             </span>
-            <p className="text-sm opacity-80">Ringing… the call starts when someone joins.</p>
+          </span>
+        )}
+        {!oneToOne && !audioOnly && someoneHere && (
+          <div className={`grid w-full max-w-3xl gap-2 ${people.length > 1 ? "grid-cols-2" : ""}`}>
+            {people.map((p) => (
+              <div key={p.peerId} className="relative aspect-video overflow-hidden rounded-2xl bg-black/40">
+                <RemoteMedia person={p} audioOnly={false} fill />
+              </div>
+            ))}
           </div>
         )}
-      </div>
-
-      {!audioOnly && (
-        <div className="relative ml-auto aspect-[3/4] w-28 overflow-hidden rounded-xl border border-line bg-ink sm:w-36">
-          <video ref={localVideoRef} autoPlay playsInline muted className={`h-full w-full object-cover ${facing === "user" ? "-scale-x-100" : ""} ${cameraOff ? "invisible" : ""}`} />
-          {cameraOff && <span className="absolute inset-0 flex items-center justify-center text-xs text-on-ember/80">Camera off</span>}
-          <span className="absolute bottom-1 left-1 rounded bg-ink/60 px-1.5 text-[10px] text-on-ember">You</span>
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center justify-center gap-3 pt-2" role="group" aria-label="Call controls">
-        <button type="button" onClick={toggleMute} aria-pressed={muted} className={`btn-icon h-14 w-14 rounded-full ${muted ? "btn-primary" : "btn-secondary"}`} aria-label={muted ? "Unmute" : "Mute"}>
-          {muted ? <MicOff aria-hidden className="h-5 w-5" /> : <Mic aria-hidden className="h-5 w-5" />}
-        </button>
-        {!audioOnly && (
-          <>
-            <button type="button" onClick={toggleCamera} aria-pressed={cameraOff} className={`btn-icon h-14 w-14 rounded-full ${cameraOff ? "btn-primary" : "btn-secondary"}`} aria-label={cameraOff ? "Turn camera on" : "Turn camera off"}>
-              {cameraOff ? <VideoOff aria-hidden className="h-5 w-5" /> : <Video aria-hidden className="h-5 w-5" />}
-            </button>
-            <button type="button" onClick={switchCamera} className="btn-secondary btn-icon h-14 w-14 rounded-full" aria-label="Switch camera">
-              <SwitchCamera aria-hidden className="h-5 w-5" />
-            </button>
-          </>
+        {!oneToOne && audioOnly && someoneHere && (
+          <p className="text-sm text-white/80">{people.map((p) => p.name + (p.muted ? " (muted)" : "")).join(", ")}</p>
         )}
-        <button type="button" onClick={leave} className="btn-icon h-14 w-14 rounded-full bg-danger text-white hover:opacity-90" aria-label="Leave the call">
-          <PhoneOff aria-hidden className="h-5 w-5" />
-        </button>
-      </div>
-      {canEndForAll && (
-        <div className="text-center">
-          <button type="button" className="btn-ghost btn-sm text-danger" onClick={endForAll}>
-            End the call for everyone
+        {oneToOne && people.some((p) => p.muted) && <p className="flex items-center gap-1 text-sm text-white/80"><MicOff aria-hidden className="h-4 w-4" /> {other?.name ?? "They"} muted their microphone</p>}
+        {phase.kind === "error" && <p role="alert" className="max-w-sm text-center text-sm text-red-200">{phase.message}</p>}
+      </main>
+
+      {/* My own camera, small, bottom right — with the flip-camera button on it, like WhatsApp. */}
+      {!audioOnly && (phase.kind === "in-call" || phase.kind === "joining") && (
+        <div className="absolute bottom-[max(7.5rem,calc(env(safe-area-inset-bottom)+6.5rem))] right-4 z-20 aspect-[3/4] w-28 overflow-hidden rounded-2xl border border-white/20 bg-black sm:w-36">
+          <video ref={localVideoRef} autoPlay playsInline muted className={`h-full w-full object-cover ${facing === "user" ? "-scale-x-100" : ""} ${cameraOff ? "invisible" : ""}`} />
+          {cameraOff && <span className="absolute inset-0 flex items-center justify-center text-[11px] text-white/70">Camera off</span>}
+          <button type="button" onClick={switchCamera} aria-label="Switch camera" className="absolute right-1.5 top-1.5 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white">
+            <SwitchCamera aria-hidden className="h-4 w-4" />
           </button>
         </div>
       )}
+
+      <footer className="relative z-10 px-6 pb-[max(2rem,env(safe-area-inset-bottom))]">
+        {phase.kind === "lobby" && oneToOne && !isCaller ? (
+          // Incoming call screen: Decline / Accept.
+          <div className="flex items-center justify-around">
+            <RoundButton label="Decline" tone="red" onClick={() => endWith("declined")}>
+              <PhoneOff aria-hidden className="h-7 w-7" />
+            </RoundButton>
+            <RoundButton label="Accept" tone="green" onClick={join}>
+              {audioOnly ? <Phone aria-hidden className="h-7 w-7" /> : <Video aria-hidden className="h-7 w-7" />}
+            </RoundButton>
+          </div>
+        ) : phase.kind === "lobby" || phase.kind === "error" ? (
+          <div className="flex items-center justify-around">
+            <RoundButton label="Back" tone="glass" onClick={() => router.push(back.href)}>
+              <PhoneOff aria-hidden className="h-6 w-6" />
+            </RoundButton>
+            <RoundButton label={phase.kind === "error" ? "Try again" : "Join"} tone="green" onClick={join}>
+              {audioOnly ? <Phone aria-hidden className="h-7 w-7" /> : <Video aria-hidden className="h-7 w-7" />}
+            </RoundButton>
+          </div>
+        ) : phase.kind === "full" || phase.kind === "ended" ? (
+          <div className="flex justify-center">
+            <button type="button" className="rounded-full bg-white/15 px-6 py-3 text-sm font-semibold" onClick={() => router.push(back.href)}>
+              {back.label}
+            </button>
+          </div>
+        ) : (
+          <>
+            {audioOnly ? (
+              // Voice call: a rounded panel of labelled buttons, like WhatsApp.
+              <div className="mx-auto flex max-w-sm items-start justify-around rounded-[2rem] bg-white/10 px-4 pb-4 pt-5 backdrop-blur" role="group" aria-label="Call controls">
+                <RoundButton label={muted ? "Unmute" : "Mute"} tone={muted ? "light" : "glass"} pressed={muted} onClick={toggleMute}>
+                  {muted ? <MicOff aria-hidden className="h-6 w-6" /> : <Mic aria-hidden className="h-6 w-6" />}
+                </RoundButton>
+                <RoundButton label={oneToOne ? "End" : "Leave"} tone="red" onClick={hangUpButton}>
+                  <PhoneOff aria-hidden className="h-6 w-6" />
+                </RoundButton>
+              </div>
+            ) : (
+              // Video call: one pill-shaped bar along the bottom.
+              <div className="mx-auto flex max-w-sm items-center justify-between gap-3 rounded-full bg-black/60 px-3 py-2.5 backdrop-blur" role="group" aria-label="Call controls">
+                <RoundButton label={cameraOff ? "Turn camera on" : "Turn camera off"} tone={cameraOff ? "glass" : "light"} pressed={cameraOff} onClick={toggleCamera} hideLabel>
+                  {cameraOff ? <VideoOff aria-hidden className="h-6 w-6" /> : <Video aria-hidden className="h-6 w-6" />}
+                </RoundButton>
+                <RoundButton label={muted ? "Unmute" : "Mute"} tone={muted ? "light" : "glass"} pressed={muted} onClick={toggleMute} hideLabel>
+                  {muted ? <MicOff aria-hidden className="h-6 w-6" /> : <Mic aria-hidden className="h-6 w-6" />}
+                </RoundButton>
+                <RoundButton label={oneToOne ? "End call" : "Leave the call"} tone="red" onClick={hangUpButton} hideLabel>
+                  <PhoneOff aria-hidden className="h-6 w-6" />
+                </RoundButton>
+              </div>
+            )}
+            {!oneToOne && canEndForAll && (
+              <div className="mt-4 text-center">
+                <button type="button" className="text-sm text-white/80 underline" onClick={endForAll}>
+                  End the call for everyone
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </footer>
       {confirmDialog}
     </div>
   );
 }
 
-/** Someone else in the call: their video (or their name for voice/camera off), and their sound. */
-function RemoteTile({ person, audioOnly }: { person: Remote; audioOnly: boolean }) {
+function RoundButton({ label, tone, pressed, onClick, hideLabel = false, children }: { label: string; tone: "red" | "green" | "glass" | "light"; pressed?: boolean; onClick: () => void; hideLabel?: boolean; children: React.ReactNode }) {
+  const colors = { red: "bg-red-600 text-white", green: "bg-green-600 text-white", glass: "bg-white/15 text-white", light: "bg-white text-[#0b1f1a]" }[tone];
+  return (
+    <span className="flex flex-col items-center gap-1.5">
+      <button type="button" onClick={onClick} aria-label={label} aria-pressed={pressed} className={`flex h-16 w-16 items-center justify-center rounded-full ${colors} active:scale-95 motion-safe:transition-transform`}>
+        {children}
+      </button>
+      {!hideLabel && (
+        <span aria-hidden className="text-xs text-white/80">
+          {label}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** Someone else's sound and (optionally) video. */
+function RemoteMedia({ person, audioOnly, fill = false, hidden = false, nameTag = true }: { person: Remote; audioOnly: boolean; fill?: boolean; hidden?: boolean; nameTag?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   useEffect(() => {
     if (videoRef.current && person.stream) videoRef.current.srcObject = person.stream;
     if (audioRef.current && person.stream) audioRef.current.srcObject = person.stream;
   }, [person.stream]);
-  const showVideo = !audioOnly && !person.cameraOff && person.stream;
-  const connecting = !person.stream || person.state === "connecting" || person.state === "new";
-
+  if (audioOnly || hidden) return <audio ref={audioRef} autoPlay className="hidden" />;
+  const showVideo = Boolean(person.stream) && !person.cameraOff;
   return (
-    <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-2xl bg-ink text-on-ember">
-      {/* Video elements carry sound too; in voice calls an audio element plays it. */}
-      {!audioOnly ? (
-        <video ref={videoRef} autoPlay playsInline className={`absolute inset-0 h-full w-full object-cover ${showVideo ? "" : "invisible"}`} />
-      ) : (
-        <audio ref={audioRef} autoPlay />
-      )}
+    <>
+      <video ref={videoRef} autoPlay playsInline className={`${fill ? "absolute inset-0 h-full w-full" : "w-full"} object-cover ${showVideo ? "" : "invisible"}`} />
       {!showVideo && (
-        <div className="flex flex-col items-center gap-2">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
           <Avatar name={person.name} size="lg" />
-          <span className="text-sm font-semibold">{person.name}</span>
+          <span className="text-sm">{person.name}</span>
         </div>
       )}
-      <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-ink/60 px-2 py-0.5 text-xs">
-        {person.muted && <MicOff aria-label="Muted" className="h-3 w-3" />}
-        {showVideo && person.name}
-        {connecting && <span className="opacity-80">· connecting…</span>}
-        {person.state === "failed" && <span className="opacity-80">· reconnecting…</span>}
-      </span>
-    </div>
+      {nameTag && (
+        <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-xs">
+          {person.muted && <MicOff aria-label="Muted" className="h-3 w-3" />}
+          {person.name}
+        </span>
+      )}
+    </>
   );
 }

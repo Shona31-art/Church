@@ -15,6 +15,7 @@ import { InstallApp } from "@/components/install/InstallApp";
 import { EmailChangeForm } from "./EmailChangeForm";
 import { PreviewSetting } from "@/components/notifications/PreviewSetting";
 import { LastSeenSetting } from "@/components/chat/LastSeenSetting";
+import { RingtoneSetting } from "@/components/calls/RingtoneSetting";
 import { ChildrenList } from "@/components/members/ChildrenList";
 import { loadChildren } from "@/lib/children";
 
@@ -111,6 +112,7 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
           <Section title="Notifications" description="Get a pop-up on your phone or computer when something happens, even when the app is closed.">
             <PushSettings initialPreferences={pushPrefs} />
             {!previewRes.error && <PreviewSetting initial={previewRes.data?.show_previews ?? true} />}
+            <RingtoneSetting />
             {channelRes && !channelRes.error && (
               <AlertChannels
                 initial={channelRes.data?.whatsapp_alerts ?? true}

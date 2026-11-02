@@ -1,8 +1,8 @@
 "use client";
 
-import { Ban, Check, CheckCheck, Forward, ImageOff, MicOff, Star } from "lucide-react";
+import { Ban, Check, CheckCheck, Forward, ImageOff, MicOff, Phone, PhoneMissed, Star, Video } from "lucide-react";
 import { formatTime } from "@/lib/format";
-import { REACTION_LABELS, messagePreview, splitMentions, type ChatMessage, type PollVote, type Reaction, type ReactionSummary } from "@/lib/chat";
+import { REACTION_LABELS, messagePreview, parseCallLog, splitMentions, type ChatMessage, type PollVote, type Reaction, type ReactionSummary } from "@/lib/chat";
 import { PollCard } from "./PollCard";
 import { Avatar } from "@/components/ui/Avatar";
 import { MessageMenu } from "./MessageMenu";
@@ -33,6 +33,7 @@ export function MessageBubble({
   mentionNames = [],
   mentionsMe = false,
   poll,
+  onCallBack,
 }: {
   message: ChatMessage;
   isMine: boolean;
@@ -58,9 +59,12 @@ export function MessageBubble({
   /** I'm @mentioned here: the bubble gets a gold edge. */
   mentionsMe?: boolean;
   /** For a poll message: its options, live votes and how to vote. */
+  /** Call history bubbles: "Tap to call back". */
+  onCallBack?: (kind: "voice" | "video") => void;
   poll?: { options: string[]; allowMultiple: boolean; votes: PollVote[]; currentUserId: string; nameOf: (id: string) => string; onVote?: (choices: number[]) => void };
 }) {
   const deleted = Boolean(message.deleted_at);
+  const callLog = !deleted && message.kind === "text" ? parseCallLog(message.content) : null;
   const removedByModerator = deleted && message.deleted_by && message.deleted_by !== message.sender_id;
   // Group chats show who's talking; in a DM the page header already does.
   const showAvatarColumn = !isMine && !isDm;
@@ -128,6 +132,23 @@ export function MessageBubble({
                   Voice note expired
                 </p>
               )
+            ) : callLog ? (
+              // A call in this chat, like WhatsApp's call bubbles.
+              <button
+                type="button"
+                onClick={() => onCallBack?.(callLog.kind)}
+                disabled={!onCallBack}
+                className="flex min-w-[12rem] items-center gap-3 text-left"
+                aria-label={`${callLog.missed ? "Missed " : ""}${callLog.kind} call${callLog.length ? `, ${callLog.length}` : ""}${onCallBack ? ". Tap to call back" : ""}`}
+              >
+                <span aria-hidden className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isMine ? "bg-on-ember/15" : "bg-ink/[0.06]"} ${callLog.missed ? "text-red-500" : ""}`}>
+                  {callLog.missed ? <PhoneMissed className="h-5 w-5" /> : callLog.kind === "voice" ? <Phone className="h-5 w-5" /> : <Video className="h-5 w-5" />}
+                </span>
+                <span>
+                  <span className="block font-semibold">{callLog.missed ? `Missed ${callLog.kind} call` : callLog.kind === "voice" ? "Voice call" : "Video call"}</span>
+                  <span className={`block text-xs ${isMine ? "text-on-ember/75" : "text-ink/60"}`}>{callLog.missed ? (onCallBack ? "Tap to call back" : "No answer") : callLog.length}</span>
+                </span>
+              </button>
             ) : message.kind === "poll" ? (
               poll ? (
                 <PollCard question={message.content} options={poll.options} allowMultiple={poll.allowMultiple} votes={poll.votes} currentUserId={poll.currentUserId} nameOf={poll.nameOf} onVote={poll.onVote} onDark={isMine} />

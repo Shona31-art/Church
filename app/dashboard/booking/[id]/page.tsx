@@ -54,7 +54,7 @@ export default async function BookingDetailPage({ params }: { params: { id: stri
   }
 
   // Video call for an approved appointment (video_calls.sql): on its day.
-  const call = status === "approved" ? await videoCallState({ bookingId: booking.id }) : { available: false, activeCallId: null };
+  const call = status === "approved" ? await videoCallState({ bookingId: booking.id }, true) : { available: false, activeCallId: null, startedAt: null };
   const callWindow = bookingCallWindow(booking.preferred_date, todayInAppZone());
 
   const typeLabel = BOOKING_TYPE_LABELS[booking.booking_type as keyof typeof BOOKING_TYPE_LABELS] ?? booking.booking_type;
@@ -82,7 +82,7 @@ export default async function BookingDetailPage({ params }: { params: { id: stri
       {call.available && callWindow !== "past" && (
         <Section title="Video call" description="Meet face to face from wherever you are — only the two of you (and the church's pastors) can join.">
           {callWindow === "open" ? (
-            <StartCallButton place={{ bookingId: booking.id }} activeCallId={call.activeCallId} />
+            <StartCallButton place={{ bookingId: booking.id }} activeCallId={call.activeCallId} startedAt={call.startedAt} oneToOne />
           ) : (
             <p className="text-sm text-ink/70">A video call button appears here on {formatDate(booking.preferred_date, { weekday: "long" })}, the day of the appointment.</p>
           )}

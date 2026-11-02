@@ -8,7 +8,8 @@ import { checkModuleAccess } from "@/lib/paywall";
 import { can } from "@/lib/permissions";
 import { todayInAppZone } from "@/lib/format";
 import { logAudit } from "@/lib/audit";
-import { CALL_HOURS, MAX_PARTICIPANTS, bookingCallWindow, isCallOpen, newRoomName } from "@/lib/video-call-rules";
+import { pushConfigured, sendPushToUser } from "@/lib/push";
+import { CALL_HOURS, MAX_PARTICIPANTS, bookingCallWindow, isLiveCall, newRoomName } from "@/lib/video-call-rules";
 
 // Starting, joining and ending calls (supabase/video_calls.sql). Calls are
 // built in: phones connect straight to each other (WebRTC — see
@@ -43,13 +44,20 @@ async function openCall(
   const admin = createAdminClient();
   const [column, value] = "channel_id" in place ? (["channel_id", place.channel_id] as const) : (["booking_id", place.booking_id] as const);
 
-  const { data: existing, error: findError } = await admin.from("video_calls").select("id, room_name, ended_at, expires_at").eq(column, value).is("ended_at", null).maybeSingle();
+  const { data: existing, error: findError } = await admin.from("video_calls").select("*").eq(column, value).is("ended_at", null).maybeSingle();
   if (findError) {
     console.error("[calls] lookup failed:", findError.message);
     return { error: findError.code === "42P01" ? MIGRATION_MISSING : "Couldn't start the call — please try again." };
   }
-  if (existing && isCallOpen(existing)) return { callId: existing.id };
-  if (existing) await admin.from("video_calls").update({ ended_at: new Date().toISOString() }).eq("id", existing.id);
+  // Two-person calls: an unanswered or finished call doesn't block a new one.
+  const oneToOne = maxParticipants <= MAX_PARTICIPANTS.booking;
+  if (existing && isLiveCall(existing, oneToOne)) return { callId: existing.id };
+  if (existing) {
+    const closing = { ended_at: new Date().toISOString(), ...(existing.connected_at ? {} : { end_reason: "no_answer" }) };
+    const { error: closeError } = await admin.from("video_calls").update(closing).eq("id", existing.id);
+    if (closeError?.code === "42703") await admin.from("video_calls").update({ ended_at: closing.ended_at }).eq("id", existing.id);
+    await admin.from("notifications").update({ read_at: closing.ended_at }).eq("link", `/dashboard/calls/${existing.id}`).eq("type", "video_call").is("read_at", null);
+  }
 
   const expiresAt = new Date(Date.now() + CALL_HOURS * 3600_000);
   // Built-in calls: the "room" is just this call's private channel. The size
@@ -137,19 +145,107 @@ export async function startBookingCall(bookingId: string, audioOnly = false): Pr
   return openCall(me, { booking_id: bookingId }, MAX_PARTICIPANTS.booking, ring, audioOnly === true);
 }
 
-/** End a call for everyone: whoever started it, or a pastor or church admin. */
-export async function endCall(callId: string): Promise<{ ok?: true; error?: string }> {
+export type EndReason = "ended" | "declined" | "no_answer";
+
+/** "2:34" or "1:02:10". */
+function callLength(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = String(total % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
+}
+
+/**
+ * End a call. Like WhatsApp: in a private chat or an appointment (two
+ * people), either person hanging up ends it for both; the person being
+ * called can decline; the caller's phone gives up after 45 seconds with no
+ * answer. In a group call, only whoever started it — or a pastor — can end it
+ * for everyone (others just leave). A private chat then gets a line in its
+ * history: "📞 Voice call · 2:34" or "📞 Missed voice call".
+ */
+export async function endCall(callId: string, reason: EndReason = "ended"): Promise<{ ok?: true; error?: string }> {
   const me = await getCurrentAppUser();
   if (!me?.church_id) return { error: "Your session has expired — sign in again." };
   if (!z.string().uuid().safeParse(callId).success) return { error: "That call couldn't be found." };
+  if (!["ended", "declined", "no_answer"].includes(reason)) return { error: "That didn't look right." };
 
-  // RLS: only calls this person can see.
-  const { data: call } = await createClient().from("video_calls").select("id, room_name, started_by, ended_at").eq("id", callId).maybeSingle();
+  const supabase = createClient();
+  // RLS: only calls this person can see (they're in that chat or appointment).
+  const { data: call } = await supabase.from("video_calls").select("*").eq("id", callId).maybeSingle();
   if (!call) return { error: "That call couldn't be found." };
-  if (call.started_by !== me.id && !can(me.role, "manageBookings")) return { error: "Only the person who started the call, or a pastor, can end it for everyone." };
-  if (!call.ended_at) {
-    await createAdminClient().from("video_calls").update({ ended_at: new Date().toISOString() }).eq("id", call.id);
-    await logAudit({ churchId: me.church_id, actorId: me.id, action: "video_call.ended", targetTable: "video_calls", targetId: call.id });
+  if (call.ended_at) return { ok: true };
+
+  const { data: channel } = call.channel_id ? await supabase.from("chat_channels").select("is_dm").eq("id", call.channel_id).maybeSingle() : { data: null };
+  const oneToOne = Boolean(call.booking_id) || Boolean(channel?.is_dm);
+  if (!oneToOne && call.started_by !== me.id && !can(me.role, "manageBookings")) {
+    return { error: "Only the person who started the call, or a pastor, can end it for everyone." };
   }
+  if (reason === "declined" && !((call.ring_user_ids ?? []) as string[]).includes(me.id)) reason = "ended";
+  if (reason === "no_answer" && call.started_by !== me.id) reason = "ended";
+
+  const admin = createAdminClient();
+  const now = new Date();
+  let { data: closed, error } = await admin.from("video_calls").update({ ended_at: now.toISOString(), end_reason: reason }).eq("id", call.id).is("ended_at", null).select("id");
+  if (error?.code === "42703") ({ data: closed, error } = await admin.from("video_calls").update({ ended_at: now.toISOString() }).eq("id", call.id).is("ended_at", null).select("id"));
+  if (error) {
+    console.error("[calls] ending the call failed:", error.message);
+    return { error: "Couldn't end the call — please try again." };
+  }
+  if (!closed?.length) return { ok: true }; // someone else ended it a moment ago
+
+  // The ring has stopped mattering: clear it from people's bells.
+  await admin.from("notifications").update({ read_at: now.toISOString() }).eq("link", `/dashboard/calls/${call.id}`).eq("type", "video_call").is("read_at", null);
+
+  // Call history in a private chat, from the caller (also tells the other
+  // person about a missed call, through the usual message notification).
+  if (channel?.is_dm && call.started_by) {
+    const kind = call.audio_only ? "voice" : "video";
+    const icon = call.audio_only ? "📞" : "📹";
+    const content = call.connected_at
+      ? `${icon} ${call.audio_only ? "Voice" : "Video"} call · ${callLength(now.getTime() - new Date(call.connected_at).getTime())}`
+      : `${icon} Missed ${kind} call`;
+    const { error: logError } = await admin.from("chat_messages").insert({ channel_id: call.channel_id, sender_id: call.started_by, content });
+    if (logError) console.error("[calls] call history line failed:", logError.message);
+  }
+  await logAudit({ churchId: me.church_id, actorId: me.id, action: "video_call.ended", targetTable: "video_calls", targetId: call.id, metadata: { reason } });
   return { ok: true };
+}
+
+/** The other person picked up: start the clock for the call length (first time only). */
+export async function markCallConnected(callId: string): Promise<void> {
+  const me = await getCurrentAppUser();
+  if (!me?.church_id || !z.string().uuid().safeParse(callId).success) return;
+  // RLS: only someone in the call can do this.
+  const { data: call } = await createClient().from("video_calls").select("id").eq("id", callId).maybeSingle();
+  if (!call) return;
+  await createAdminClient().from("video_calls").update({ connected_at: new Date().toISOString() }).eq("id", callId).is("connected_at", null);
+}
+
+/**
+ * Rings the other phone again (a fresh phone pop-up that buzzes) while the
+ * caller is still on "Calling…". The app can't play its own ringtone when
+ * it's closed, so repeating the pop-up every few seconds is how a closed
+ * phone keeps "ringing". Only the caller, only for an unanswered two-person
+ * call in its first minute.
+ */
+export async function ringAgain(callId: string): Promise<void> {
+  const me = await getCurrentAppUser();
+  if (!me?.church_id || !z.string().uuid().safeParse(callId).success) return;
+  const { data: call } = await createClient().from("video_calls").select("*").eq("id", callId).maybeSingle();
+  if (!call || call.started_by !== me.id || call.connected_at || !isLiveCall(call, true)) return;
+  const targets = ((call.ring_user_ids ?? []) as string[]).filter((id) => id !== me.id);
+  if (!targets.length || !pushConfigured()) return;
+  const link = `/dashboard/calls/${call.id}`;
+  await Promise.all(
+    targets.map((id) =>
+      sendPushToUser(id, "messages", {
+        title: me.name,
+        body: call.audio_only ? "Incoming voice call" : "Incoming video call",
+        link,
+        tag: `call:${link}`,
+        call: true,
+      }).catch(() => 0)
+    )
+  );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BarChart3, ImagePlus, Pencil, Reply, SendHorizontal, Smile, X } from "lucide-react";
+import { BarChart3, ImagePlus, Paperclip, Pencil, Reply, SendHorizontal, Smile, X } from "lucide-react";
 import { MAX_MESSAGE_LENGTH, mentionQuery } from "@/lib/chat";
 import { VoiceRecorder, type RecordedVoiceNote } from "./VoiceRecorder";
 import { EmojiPicker } from "./EmojiPicker";
@@ -57,6 +57,7 @@ export function Composer({
   const photoRef = useRef<HTMLInputElement>(null);
   const [voiceActive, setVoiceActive] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
   const showMic = Boolean(onSendVoice) && !value.trim() && mode?.kind !== "edit";
   const [cursor, setCursor] = useState(0);
   const [mentionIndex, setMentionIndex] = useState(0);
@@ -207,36 +208,66 @@ export function Composer({
             <Smile aria-hidden className="h-5 w-5" />
           </button>
         )}
-        {onPickPhoto && mode?.kind !== "edit" && !voiceActive && (
-          <>
+        {/* Photo and poll share one 📎 button, so the message box keeps its room on a phone. */}
+        {(onPickPhoto || onCreatePoll) && mode?.kind !== "edit" && !voiceActive && (
+          <div className="relative order-3">
             <button
               type="button"
-              onClick={() => photoRef.current?.click()}
+              onClick={() => setAttachOpen((o) => !o)}
+              aria-expanded={attachOpen}
+              aria-haspopup="menu"
               disabled={photoBusy}
               className="btn-ghost btn-icon h-11 w-11 rounded-full"
-              aria-label={photoBusy ? "Sending photo…" : value.trim() ? "Send a photo with this text as its caption" : "Send a photo"}
+              aria-label={photoBusy ? "Sending photo…" : "Attach a photo or poll"}
             >
-              <ImagePlus aria-hidden className={`h-5 w-5 ${photoBusy ? "animate-pulse" : ""}`} />
+              <Paperclip aria-hidden className={`h-5 w-5 ${photoBusy ? "animate-pulse" : ""}`} />
             </button>
-            <input
-              ref={photoRef}
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              tabIndex={-1}
-              aria-hidden
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = "";
-                if (file) onPickPhoto(file);
-              }}
-            />
-          </>
-        )}
-        {onCreatePoll && mode?.kind !== "edit" && !voiceActive && (
-          <button type="button" onClick={onCreatePoll} className="btn-ghost btn-icon h-11 w-11 rounded-full" aria-label="Create a poll">
-            <BarChart3 aria-hidden className="h-5 w-5" />
-          </button>
+            {attachOpen && (
+              <div role="menu" className="absolute bottom-12 right-0 z-30 w-44 rounded-2xl border border-line bg-surface p-1.5 shadow-pop">
+                {onPickPhoto && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-ink/5"
+                    onClick={() => {
+                      setAttachOpen(false);
+                      photoRef.current?.click();
+                    }}
+                  >
+                    <ImagePlus aria-hidden className="h-4 w-4 text-ink/60" /> {value.trim() ? "Photo (text as caption)" : "Photo"}
+                  </button>
+                )}
+                {onCreatePoll && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-ink/5"
+                    onClick={() => {
+                      setAttachOpen(false);
+                      onCreatePoll();
+                    }}
+                  >
+                    <BarChart3 aria-hidden className="h-4 w-4 text-ink/60" /> Poll
+                  </button>
+                )}
+              </div>
+            )}
+            {onPickPhoto && (
+              <input
+                ref={photoRef}
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) onPickPhoto(file);
+                }}
+              />
+            )}
+          </div>
         )}
         <label htmlFor="chat-message" className="sr-only">
           {mode?.kind === "edit" ? "Edit message" : "Message"}
@@ -258,15 +289,17 @@ export function Composer({
           maxLength={MAX_MESSAGE_LENGTH}
           placeholder="Type a message…"
           autoComplete="off"
-          className="input max-h-40 flex-1 resize-none rounded-2xl"
+          className="input order-2 max-h-40 min-w-0 flex-1 resize-none rounded-2xl"
         />
-        {showMic && onSendVoice ? (
-          <VoiceRecorder onSend={onSendVoice} onActiveChange={setVoiceActive} />
-        ) : (
-          <button type="submit" disabled={busy || !value.trim()} className="btn-primary btn-icon h-11 w-11 rounded-full" aria-label={mode?.kind === "edit" ? "Save edit" : "Send"}>
-            <SendHorizontal aria-hidden className="h-4 w-4" />
-          </button>
-        )}
+        <div className={`order-4 ${voiceActive ? "min-w-0 flex-1" : "shrink-0"}`}>
+          {showMic && onSendVoice ? (
+            <VoiceRecorder onSend={onSendVoice} onActiveChange={setVoiceActive} />
+          ) : (
+            <button type="submit" disabled={busy || !value.trim()} className="btn-primary btn-icon h-11 w-11 rounded-full" aria-label={mode?.kind === "edit" ? "Save edit" : "Send"}>
+              <SendHorizontal aria-hidden className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
     </form>
   );

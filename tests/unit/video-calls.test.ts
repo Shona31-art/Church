@@ -49,3 +49,26 @@ describe("built-in calls", () => {
   });
 
 });
+
+describe("WhatsApp-style calls", () => {
+  test("an unanswered two-person call lapses after a minute; group and answered calls don't", async () => {
+    const { isLiveCall } = await import("@/lib/video-call-rules");
+    const now = new Date("2026-11-02T10:00:00Z");
+    const base = { ended_at: null, expires_at: "2026-11-02T12:00:00Z" };
+    expect(isLiveCall({ ...base, started_at: "2026-11-02T09:59:30Z", connected_at: null }, true, now)).toBe(true);
+    expect(isLiveCall({ ...base, started_at: "2026-11-02T09:58:30Z", connected_at: null }, true, now)).toBe(false);
+    expect(isLiveCall({ ...base, started_at: "2026-11-02T09:30:00Z", connected_at: "2026-11-02T09:30:10Z" }, true, now)).toBe(true);
+    expect(isLiveCall({ ...base, started_at: "2026-11-02T09:30:00Z", connected_at: null }, false, now)).toBe(true);
+  });
+
+  test("call history lines become call bubbles", async () => {
+    const { parseCallLog, humanCallLength } = await import("@/lib/chat");
+    expect(parseCallLog("📞 Voice call · 0:10")).toEqual({ kind: "voice", missed: false, length: "10 secs" });
+    expect(parseCallLog("📹 Missed video call")).toEqual({ kind: "video", missed: true, length: null });
+    expect(parseCallLog("📞 I started a voice call — tap “Join call” at the top of this chat.")).toBeNull();
+    expect(parseCallLog("hello")).toBeNull();
+    expect(humanCallLength("1:05")).toBe("1 min");
+    expect(humanCallLength("12:40")).toBe("12 mins");
+    expect(humanCallLength("1:02:10")).toBe("1 hr 2 mins");
+  });
+});

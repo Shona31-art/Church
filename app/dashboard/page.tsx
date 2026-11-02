@@ -157,15 +157,25 @@ export default async function DashboardHomePage() {
       : none,
   ]);
 
-  const birthdays = bdayRes.data
-    ? upcomingBirthdays(
-        (bdayRes.data as any[])
-          .filter((b) => b.app_users && b.app_users.status !== "disabled")
-          .map((b) => ({ userId: b.user_id, name: b.app_users.name, birthDate: b.birth_date })),
-        now,
-        7
-      )
-    : [];
+  // Children's birthdays (member_children.sql); a missing table just means none.
+  const childRes =
+    shepherd && has("pastoral_care")
+      ? await supabase
+          .from("member_children")
+          .select("id, user_id, name, birth_date, parent:app_users!member_children_user_id_fkey(name, status)")
+          .eq("church_id", me.church_id)
+          .not("birth_date", "is", null)
+      : { data: null };
+  type BirthdayPerson = { userId: string; name: string; birthDate: string; childId?: string; parentName?: string };
+  const birthdayPeople: BirthdayPerson[] = [
+    ...((bdayRes.data as any[] | null) ?? [])
+      .filter((b) => b.app_users && b.app_users.status !== "disabled")
+      .map((b) => ({ userId: b.user_id, name: b.app_users.name, birthDate: b.birth_date })),
+    ...((childRes.data as any[] | null) ?? [])
+      .filter((c) => c.parent && c.parent.status !== "disabled")
+      .map((c) => ({ userId: c.user_id, name: c.name, birthDate: c.birth_date, childId: c.id, parentName: c.parent.name })),
+  ];
+  const birthdays = upcomingBirthdays(birthdayPeople, now, 7);
   const followUps: { id: string; member_name: string; follow_up_date: string }[] = followRes.data ?? [];
   const events: any[] = eventsRes.data ?? [];
   const announcements: any[] = announcementsRes.data ?? [];
@@ -391,15 +401,18 @@ export default async function DashboardHomePage() {
         {shepherd && has("pastoral_care") && (
           <Section title="Birthdays this week" actions={<Link href="/dashboard/pastoral-care" className="btn-ghost btn-sm">Care log</Link>}>
             {birthdays.length === 0 ? (
-              <EmptyLine text="No birthdays in the next 7 days. Add birth dates on member profiles to get reminders here." />
+              <EmptyLine text="No birthdays in the next 7 days. Add birth dates (and children) on member profiles to get reminders here." />
             ) : (
               <ul className="divide-y divide-line">
                 {birthdays.map((b) => (
-                  <li key={b.userId} className="flex items-center justify-between gap-3 py-2.5">
+                  <li key={b.childId ?? b.userId} className="flex items-center justify-between gap-3 py-2.5">
                     <div className="flex min-w-0 items-center gap-3">
                       <Cake aria-hidden className="h-4 w-4 shrink-0 text-gold" />
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{b.name}</p>
+                        <p className="truncate text-sm font-medium">
+                          {b.name}
+                          {b.parentName && <span className="font-normal text-ink/60"> · child of {b.parentName}</span>}
+                        </p>
                         <p className="text-xs text-ink/60">
                           {describeDaysUntil(b.daysUntil)} · turning {b.turningAge}
                         </p>

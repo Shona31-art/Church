@@ -71,6 +71,19 @@ export async function setPushPreference(category: NotificationCategory, enabled:
   return { ok: true };
 }
 
+/** Input: enabled. Whether message notifications show what was said (WhatsApp-style) or just "Sent you a message". */
+export async function setShowMessagePreviews(enabled: boolean): Promise<Result> {
+  const me = await getCurrentAppUser();
+  if (!me) return SIGNED_OUT;
+  if (typeof enabled !== "boolean") return { ok: false, error: "That didn't look right. Refresh and try again." };
+  const { error } = await createClient().from("notification_preferences").upsert({ user_id: me.id, show_previews: enabled }, { onConflict: "user_id" });
+  if (error) {
+    console.error("[push] save preview setting failed:", error.message);
+    return { ok: false, error: error.code === "42703" ? "This setting needs a database update first (chat_notifications_v2.sql)." : "Couldn't save that setting. Try again." };
+  }
+  return { ok: true };
+}
+
 /** Sends a test pop-up to all of the signed-in person's devices (ignores category settings). */
 export async function sendTestPush(): Promise<{ ok: true; sent: number } | { ok: false; error: string }> {
   const me = await getCurrentAppUser();

@@ -323,3 +323,117 @@ export async function hideChatForMe(channelId: string): Promise<ChatActionResult
   const now = new Date().toISOString();
   return saveMySettings(channelId, { hidden_at: now, cleared_at: now });
 }
+
+// ---------------------------------------------------------------------------
+// Forwarding (chat_v4.sql adds the "Forwarded" label)
+// ---------------------------------------------------------------------------
+
+export interface ForwardTarget {
+  id: string;
+  name: string;
+  isDm: boolean;
+}
+
+/** The chats you could forward to: every chat you can see, private ones by the other person's name. */
+export async function listForwardTargets(): Promise<{ targets?: ForwardTarget[]; error?: string }> {
+  const me = await getCurrentAppUser();
+  if (!me?.church_id) return { error: "Your session has expired — sign in again." };
+  const supabase = createClient();
+  // RLS: only chats this person can see.
+  const { data: channels, error } = await supabase.from("chat_channels").select("id, name, is_dm").eq("church_id", me.church_id);
+  if (error) return { error: "Couldn't load your chats — try again." };
+  const dmIds = (channels ?? []).filter((c) => c.is_dm).map((c) => c.id);
+  const { data: others } = dmIds.length
+    ? await supabase.from("chat_channel_members").select("channel_id, app_users(name)").in("channel_id", dmIds).neq("user_id", me.id)
+    : { data: [] };
+  const dmName = new Map(((others ?? []) as any[]).map((o) => [o.channel_id as string, (o.app_users?.name as string) ?? "Former member"]));
+  const targets = (channels ?? [])
+    .map((c) => ({ id: c.id, name: c.is_dm ? dmName.get(c.id) ?? "Former member" : c.name, isDm: c.is_dm }))
+    .sort((a, b) => Number(a.isDm) - Number(b.isDm) || a.name.localeCompare(b.name));
+  return { targets };
+}
+
+const FORWARD_LIMIT = 5;
+
+/**
+ * Forward a message to up to 5 chats, like WhatsApp. Text, photos and voice
+ * notes (the file is copied into each chat, so it stays if the original is
+ * deleted). Each copy is posted as you, under the usual posting rules — a
+ * chat you can't post in (or that doesn't allow photos) is skipped.
+ */
+export async function forwardMessage(messageId: string, targetIds: string[]): Promise<{ sent?: number; error?: string }> {
+  const me = await getCurrentAppUser();
+  if (!me?.church_id) return { error: "Your session has expired — sign in again." };
+  const parsed = z.object({ messageId: z.string().uuid(), targets: z.array(z.string().uuid()).min(1, "Choose a chat.").max(FORWARD_LIMIT, `Forward to up to ${FORWARD_LIMIT} chats at a time.`) }).safeParse({ messageId, targets: targetIds });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Choose a chat." };
+
+  const supabase = createClient();
+  // RLS: you can only forward what you can read.
+  const { data: source } = await supabase
+    .from("chat_messages")
+    .select("id, channel_id, content, kind, media_path, media_duration_ms, deleted_at, media_expired_at")
+    .eq("id", parsed.data.messageId)
+    .maybeSingle();
+  if (!source || source.deleted_at) return { error: "That message is no longer available." };
+  if (source.kind === "poll") return { error: "Polls can't be forwarded." };
+  if (source.kind !== "text" && (!source.media_path || source.media_expired_at)) return { error: "That file has expired, so it can't be forwarded." };
+
+  const admin = createAdminClient();
+  let sent = 0;
+  for (const target of [...new Set(parsed.data.targets)]) {
+    let path: string | null = null;
+    if (source.media_path) {
+      const ext = source.media_path.split(".").pop() ?? "bin";
+      path = `${me.church_id}/${target}/${me.id}/${crypto.randomUUID()}.${ext}`;
+      const { error: copyError } = await admin.storage.from(CHAT_MEDIA_BUCKET).copy(source.media_path, path);
+      if (copyError) {
+        console.error("[chat] forward copy failed:", copyError.message);
+        continue;
+      }
+    }
+    const { error } = await supabase.from("chat_messages").insert({
+      channel_id: target,
+      sender_id: me.id,
+      content: source.content,
+      kind: source.kind,
+      media_path: path,
+      media_duration_ms: source.media_duration_ms,
+      forwarded: true,
+    });
+    if (error) {
+      if (path) await admin.storage.from(CHAT_MEDIA_BUCKET).remove([path]);
+      continue;
+    }
+    sent++;
+  }
+  if (!sent) return { error: "Couldn't forward to those chats — you may not be able to post there." };
+  return { sent };
+}
+
+// ---------------------------------------------------------------------------
+// Archive and disappearing messages (chat_v4.sql)
+// ---------------------------------------------------------------------------
+
+/** Archive (or unarchive) a chat — for you only. It moves to "Archived" at the bottom of your list. */
+export async function setChatArchived(channelId: string, archived: boolean): Promise<ChatActionResult> {
+  if (typeof archived !== "boolean") return { error: "That didn't look right — refresh and try again." };
+  const result = await saveMySettings(channelId, { archived_at: archived ? new Date().toISOString() : null });
+  return result.error?.includes("chat_v3") ? { error: "Archiving needs a database update: run supabase/chat_v4.sql." } : result;
+}
+
+/** Disappearing messages: 24 hours, 7 days, 90 days, or off (null). The database decides who may change it. */
+export async function setChatDisappearing(channelId: string, seconds: number | null): Promise<ChatActionResult> {
+  const me = await requireChatUser();
+  if (!me) return { error: "Your session has expired — sign in again." };
+  if (!z.string().uuid().safeParse(channelId).success) return { error: "That chat couldn't be found." };
+  if (seconds !== null && ![86400, 604800, 7776000].includes(seconds)) return { error: "Choose 24 hours, 7 days or 90 days." };
+  const { error } = await createClient().rpc("set_chat_disappearing", { target_channel: channelId, seconds });
+  if (error) {
+    console.error("[chat] disappearing setting failed:", error.message);
+    if (/pastors and church admins/.test(error.message)) return { error: "In group chats, only pastors and church admins can change this." };
+    if (/function|does not exist/i.test(error.message)) return { error: "This needs a database update: run supabase/chat_v4.sql." };
+    return { error: "Couldn't change that — please try again." };
+  }
+  revalidatePath(`/dashboard/chat/${channelId}`);
+  return {};
+}

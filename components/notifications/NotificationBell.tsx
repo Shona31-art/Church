@@ -43,6 +43,14 @@ export function NotificationsProvider({ userId, initialUnread, children }: { use
     }
   }, []);
 
+  // The number on the app icon (installed app), kept in step with the bell —
+  // like WhatsApp's unread badge. Phones without support just ignore it.
+  useEffect(() => {
+    const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+    if (!nav.setAppBadge) return;
+    (unread > 0 ? nav.setAppBadge(unread) : nav.clearAppBadge?.())?.catch(() => undefined);
+  }, [unread]);
+
   // Load the list the first time the panel opens.
   useEffect(() => {
     if (open && items === null) refresh();

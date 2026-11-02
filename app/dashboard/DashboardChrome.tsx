@@ -18,6 +18,9 @@ import { HapticClicks } from "@/components/Haptics";
 import { OfflineQueueSender } from "@/components/OfflineQueue";
 import { WelcomeTour } from "@/components/WelcomeTour";
 import { NotificationBell, NotificationsProvider } from "@/components/notifications/NotificationBell";
+import { IncomingCall } from "@/components/calls/IncomingCall";
+import { MessageBanner } from "@/components/notifications/MessageBanner";
+import { PresenceHeartbeat } from "@/components/chat/PresenceHeartbeat";
 // Imported for its side effect: starts listening for the browser's one-time install prompt as early as possible.
 import "@/components/install/install-store";
 
@@ -85,6 +88,9 @@ export function DashboardChrome({
 
   return (
     <NotificationsProvider userId={userId} initialUnread={initialUnread}>
+      <IncomingCall userId={userId} />
+      <MessageBanner userId={userId} />
+      <PresenceHeartbeat />
       <div className="min-h-screen min-h-dvh md:flex">
         <a
           href="#main"

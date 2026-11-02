@@ -36,6 +36,7 @@ export const AUDIT_CATEGORIES: Record<string, string> = {
   counseling: "Counseling",
   counseling_settings: "Counseling settings",
   birthday: "Birthdays",
+  child: "Children",
   jigsaw_picture: "Jigsaw pictures",
   billing: "Billing",
   subscription: "Subscriptions",
@@ -72,6 +73,7 @@ const NOUNS: Record<string, string> = {
   chat_restriction: "chat restriction",
   counseling_settings: "counseling settings",
   birthday: "birthday",
+  child: "child",
   jigsaw_picture: "jigsaw picture",
   subscription: "subscription",
   church_module: "church feature",
@@ -81,6 +83,8 @@ const NOUNS: Record<string, string> = {
 };
 
 const SPECIFIC: Record<string, string> = {
+  "video_call.started": "Started a video call",
+  "video_call.ended": "Ended a video call for everyone",
   "auth.signed_in": "Signed in",
   "auth.signed_out": "Signed out",
   "member.role_changed": "Changed a member's role",

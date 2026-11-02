@@ -20,6 +20,14 @@ export async function middleware(request: NextRequest) {
     return new NextResponse(SETUP_PAGE, { status: 503, headers: { "content-type": "text/html; charset=utf-8" } });
   }
 
+  // Server actions (button presses that call the server, e.g. each game answer)
+  // skip the session check here: every action checks the session itself, and
+  // refreshes the cookie if needed, so doing it here too only adds a round
+  // trip to Supabase before every click. A redirect wouldn't help an action anyway.
+  if (request.method === "POST" && request.headers.has("next-action")) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

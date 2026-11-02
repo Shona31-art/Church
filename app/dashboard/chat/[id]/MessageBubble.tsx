@@ -1,8 +1,9 @@
 "use client";
 
-import { Ban, Check, CheckCheck, ImageOff, MicOff } from "lucide-react";
+import { Ban, Check, CheckCheck, Forward, ImageOff, MicOff, Star } from "lucide-react";
 import { formatTime } from "@/lib/format";
-import { REACTION_LABELS, messagePreview, type ChatMessage, type Reaction, type ReactionSummary } from "@/lib/chat";
+import { REACTION_LABELS, messagePreview, splitMentions, type ChatMessage, type PollVote, type Reaction, type ReactionSummary } from "@/lib/chat";
+import { PollCard } from "./PollCard";
 import { Avatar } from "@/components/ui/Avatar";
 import { MessageMenu } from "./MessageMenu";
 import { VoicePlayer } from "./VoicePlayer";
@@ -26,6 +27,12 @@ export function MessageBubble({
   onDelete,
   onJumpTo,
   receipt,
+  starred = false,
+  onStar,
+  onForward,
+  mentionNames = [],
+  mentionsMe = false,
+  poll,
 }: {
   message: ChatMessage;
   isMine: boolean;
@@ -43,12 +50,21 @@ export function MessageBubble({
   onJumpTo: (messageId: string) => void;
   /** Ticks on my own messages in a DM (read receipts). */
   receipt?: "sending" | "sent" | "read";
+  starred?: boolean;
+  onStar?: () => void;
+  onForward?: () => void;
+  /** Names of the people @mentioned in this message, to highlight. */
+  mentionNames?: string[];
+  /** I'm @mentioned here: the bubble gets a gold edge. */
+  mentionsMe?: boolean;
+  /** For a poll message: its options, live votes and how to vote. */
+  poll?: { options: string[]; allowMultiple: boolean; votes: PollVote[]; currentUserId: string; nameOf: (id: string) => string; onVote?: (choices: number[]) => void };
 }) {
   const deleted = Boolean(message.deleted_at);
   const removedByModerator = deleted && message.deleted_by && message.deleted_by !== message.sender_id;
   // Group chats show who's talking; in a DM the page header already does.
   const showAvatarColumn = !isMine && !isDm;
-  const hasMenu = !message.pending && !deleted && Boolean(onReact || onReply || onEdit || onDelete);
+  const hasMenu = !message.pending && !deleted && Boolean(onReact || onReply || onEdit || onDelete || onStar || onForward);
 
   return (
     <div id={`msg-${message.id}`} className={`group flex gap-2 scroll-mt-24 ${isMine ? "justify-end" : "justify-start"} ${showHeader ? "mt-3" : "mt-0.5"}`}>
@@ -63,9 +79,14 @@ export function MessageBubble({
                 : isMine
                 ? `bg-ember text-on-ember ${showHeader ? "rounded-tr-md" : ""}`
                 : `border border-line bg-surface ${showHeader ? "rounded-tl-md" : ""}`
-            } ${message.pending ? "opacity-70" : ""}`}
+            } ${message.pending ? "opacity-70" : ""} ${mentionsMe && !deleted ? "ring-2 ring-gold/70" : ""}`}
           >
             {showHeader && !isMine && !isDm && <p className="mb-0.5 text-xs font-semibold text-gold-deep">{sender.name}</p>}
+            {message.forwarded && !deleted && (
+              <p className={`mb-0.5 flex items-center gap-1 text-xs italic ${isMine ? "text-on-ember/75" : "text-ink/60"}`}>
+                <Forward aria-hidden className="h-3 w-3" /> Forwarded
+              </p>
+            )}
 
             {quoted && !deleted && (
               <button
@@ -107,11 +128,35 @@ export function MessageBubble({
                   Voice note expired
                 </p>
               )
+            ) : message.kind === "poll" ? (
+              poll ? (
+                <PollCard question={message.content} options={poll.options} allowMultiple={poll.allowMultiple} votes={poll.votes} currentUserId={poll.currentUserId} nameOf={poll.nameOf} onVote={poll.onVote} onDark={isMine} />
+              ) : (
+                <p className="whitespace-pre-wrap break-words">📊 {message.content}</p>
+              )
             ) : (
-              <p className="whitespace-pre-wrap break-words">{message.content}</p>
+              <p className="whitespace-pre-wrap break-words">
+                {mentionNames.length
+                  ? splitMentions(message.content, mentionNames).map((part, i) =>
+                      part.mention ? (
+                        <span key={i} className={`font-semibold ${isMine ? "underline" : "text-gold-deep"}`}>
+                          {part.text}
+                        </span>
+                      ) : (
+                        <span key={i}>{part.text}</span>
+                      )
+                    )
+                  : message.content}
+              </p>
             )}
 
             <p className={`mt-1 flex items-center justify-end gap-1.5 text-eyebrow tabular ${isMine && !deleted ? "text-on-ember/65" : "text-ink/60"}`}>
+              {starred && !deleted && (
+                <span title="Starred">
+                  <Star aria-hidden className="h-3 w-3 fill-current" />
+                  <span className="sr-only">Starred</span>
+                </span>
+              )}
               {message.edited_at && !deleted && <span>Edited</span>}
               <time dateTime={message.created_at}>{message.pending ? "Sending…" : formatTime(message.created_at)}</time>
               {receipt && receipt !== "sending" && !deleted && (
@@ -135,6 +180,9 @@ export function MessageBubble({
                 onReply={onReply}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                starred={starred}
+                onStar={onStar}
+                onForward={onForward}
               />
             </div>
           )}

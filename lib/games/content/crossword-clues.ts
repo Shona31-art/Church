@@ -6,6 +6,7 @@
 // Kids mode (simple wording, well-known stories).
 
 import type { Level } from "../catalog";
+import { MORE_CROSSWORD_CLUES } from "./crossword-clues-more";
 
 export interface CrosswordClue {
   answer: string;
@@ -15,7 +16,7 @@ export interface CrosswordClue {
   kids?: boolean;
 }
 
-export const CROSSWORD_CLUES: CrosswordClue[] = [
+const BASE_CLUES: CrosswordClue[] = [
   // --- Easy ---------------------------------------------------------------
   { answer: "NOAH", clue: "Built an ark before the flood", reference: "Genesis 6:14", level: "easy", kids: true },
   { answer: "MOSES", clue: "Led Israel out of Egypt", reference: "Exodus 3:10", level: "easy", kids: true },
@@ -107,3 +108,6 @@ export const CROSSWORD_CLUES: CrosswordClue[] = [
   { answer: "SHADRACH", clue: "One of three thrown into the fiery furnace", reference: "Daniel 3:20", level: "hard" },
   { answer: "BEREA", clue: "Its people examined the Scriptures daily", reference: "Acts 17:10-11", level: "hard" },
 ];
+
+/** Every clue: the originals above plus crossword-clues-more.ts. */
+export const CROSSWORD_CLUES: CrosswordClue[] = [...BASE_CLUES, ...MORE_CROSSWORD_CLUES];

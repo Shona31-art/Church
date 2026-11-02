@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { ChevronDown, Pencil, Reply, Trash2 } from "lucide-react";
+import { ChevronDown, Forward, Pencil, Reply, Star, StarOff, Trash2 } from "lucide-react";
 import { REACTIONS, REACTION_LABELS, type Reaction } from "@/lib/chat";
 
 /**
@@ -17,6 +17,9 @@ export function MessageMenu({
   onReply,
   onEdit,
   onDelete,
+  starred = false,
+  onStar,
+  onForward,
 }: {
   align: "left" | "right";
   senderLabel: string;
@@ -25,6 +28,9 @@ export function MessageMenu({
   onReply?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  starred?: boolean;
+  onStar?: () => void;
+  onForward?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -113,6 +119,16 @@ export function MessageMenu({
           {onReply && (
             <button type="button" role="menuitem" className={itemClass} onClick={() => run(onReply)}>
               <Reply aria-hidden className="h-4 w-4 text-ink/60" /> Reply
+            </button>
+          )}
+          {onForward && (
+            <button type="button" role="menuitem" className={itemClass} onClick={() => run(onForward)}>
+              <Forward aria-hidden className="h-4 w-4 text-ink/60" /> Forward
+            </button>
+          )}
+          {onStar && (
+            <button type="button" role="menuitem" className={itemClass} onClick={() => run(onStar)}>
+              {starred ? <StarOff aria-hidden className="h-4 w-4 text-ink/60" /> : <Star aria-hidden className="h-4 w-4 text-ink/60" />} {starred ? "Unstar" : "Star"}
             </button>
           )}
           {onEdit && (

@@ -83,3 +83,28 @@ describe("crossword hints", () => {
     expect(CROSSWORD_HINTS.easy).toBeGreaterThan(CROSSWORD_HINTS.hard);
   });
 });
+
+describe("numbered levels (buildStageCrossword)", () => {
+  test("every level 1–100 has its own clues: no answer appears in two levels", async () => {
+    const { buildStageCrossword } = await import("@/lib/games/crossword");
+    const { stageLevel, STAGE_COUNT } = await import("@/lib/games/stages");
+    const seenIn = new Map<string, number>();
+    const short: string[] = [];
+    for (let stage = 1; stage <= STAGE_COUNT; stage++) {
+      const p = buildStageCrossword(stage);
+      const target = CROSSWORD_LEVELS[stageLevel(stage)].target;
+      if (p.entries.length < target) short.push(`${stage}:${p.entries.length}/${target}`);
+      for (const e of p.entries) {
+        expect(seenIn.get(e.answer), `${e.answer} in level ${stage}`).toBeUndefined();
+        seenIn.set(e.answer, stage);
+      }
+    }
+    expect(short).toEqual([]);
+  });
+
+  test("a level is always the same puzzle", async () => {
+    const { buildStageCrossword } = await import("@/lib/games/crossword");
+    expect(buildStageCrossword(42)).toEqual(buildStageCrossword(42));
+    expect(buildStageCrossword(42)).not.toEqual(buildStageCrossword(43));
+  });
+});

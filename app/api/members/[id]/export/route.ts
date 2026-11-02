@@ -25,6 +25,7 @@ import { AVATAR_BUCKET } from "@/lib/avatar-path";
 // [table, column that identifies the person]
 const SOURCES: [string, string][] = [
   ["member_birthdays", "user_id"],
+  ["member_children", "user_id"],
   ["prayer_board_items", "user_id"],
   ["prayer_comments", "user_id"],
   ["prayer_intercessions", "user_id"],

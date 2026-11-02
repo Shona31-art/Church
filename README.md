@@ -78,6 +78,12 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 41 | `plans_v3.sql` | Plans: Basic unchanged (R299, 50 members); Premium for 50–150 members (R799); Unlimited (the Enterprise slot) R1,300 with unlimited members and every feature, payable online |
 | 42 | `activity_log.sql` | Audit log: records every add/edit/delete people make in every church (field names only, never private content), for the platform Audit log page |
 | 43 | `pastor_alerts.sql` | Pastor alerts for shared counseling conversations and new prayer requests, plus each pastor's WhatsApp alert setting |
+| 44 | `member_children.sql` | Members' children: names and optional birthdays, added by the parent (My account → My children) or by pastors/church admins on the member's profile. Seen only by the parent and their church's pastors/admins; children's birthdays show in "Birthdays this week"; they move with the parent to a new church; changes are audit-logged |
+| 45 | `games_differences.sql` | Lets the scoreboard record the new Spot the difference game |
+| 46 | `sermon_video.sql` | Sermon videos uploaded from a phone or computer: a public `sermon-video` bucket (MP4, MOV, M4V or WebM, up to 1 GB per file); uploads only through one-time links the server issues to sermon editors. **Also raise Supabase's project-wide upload limit** (Storage → Settings; 50 MB on the Free plan) or larger videos are refused |
+| 47 | `video_calls.sql` | Voice and video calls from private chats, group chats and approved pastor appointments, run on Daily.co (set `DAILY_API_KEY`). A plan feature (`video_calls`: trial, Premium, Unlimited, Sponsored — not Basic). `video_calls` table: visible only to people who can see that chat or appointment; written only by the server |
+| 48 | `chat_notifications_v2.sql` | WhatsApp-style message notifications: pop-ups and bell items show the message text ("Alice: See you at 6"; voice notes and photos as 🎤/📷), one pop-up per chat that updates with each new message, previews replaced if the message is deleted or edited before it's read. Each person can hide message text (`notification_preferences.show_previews`). **Add the Update event to the notifications webhook** (see "Notification pop-ups") |
+| 49 | `chat_v4.sql` | More WhatsApp features: online & last seen in private chats (`user_presence`, both people must share it; hide yours under My account → Chat privacy), forwarded messages, private starred messages, @mentions in groups (notify even when muted), polls with live votes (`chat_polls`, `chat_poll_votes`, made and voted on only through `create_chat_poll()` / `vote_chat_poll()`), archive (per person), disappearing messages (24 h / 7 d / 90 d; DMs either person, groups pastors/admins; hidden at once, deleted by the nightly job). Message search needs no change. Plain-language notes at the top of the file |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so
@@ -195,9 +201,11 @@ environment (dev and production each get their own keys and webhook):
    Environment Variables, then redeploy. **Don't change the keys later:**
    every device would have to turn pop-ups on again.
 2. **Webhook.** Supabase → Database → Webhooks → Create: table
-   `notifications`, event **Insert** only, type HTTP Request, method POST,
-   URL `https://<your-domain>/api/notifications/push`, add header
-   `x-webhook-secret` = your `NOTIFICATIONS_WEBHOOK_SECRET`.
+   `notifications`, events **Insert** and **Update**, type HTTP Request,
+   method POST, URL `https://<your-domain>/api/notifications/push`, add
+   header `x-webhook-secret` = your `NOTIFICATIONS_WEBHOOK_SECRET`. (Update
+   lets every new chat message pop up, WhatsApp-style — migration #48. If your
+   webhook only has Insert, only the first unread message in each chat pops up.)
 
 Then on a phone: open the live site (HTTPS) → My account → Notifications →
 Turn on → Send a test. On iPhone, add the app to the Home Screen first (iOS 16.4+).

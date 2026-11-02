@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Award, BookOpenText, CalendarCheck, Flame, Grid3x3, Library, ListOrdered, Medal, MessageSquareQuote, Route, Shuffle, Smile, SmilePlus, SquarePen, TextCursorInput, type LucideIcon, Puzzle, ChevronDown, ChevronRight } from "lucide-react";
+import { Award, BookOpenText, CalendarCheck, Flame, Grid3x3, Library, ListOrdered, Medal, MessageSquareQuote, Route, Shuffle, Smile, SmilePlus, SquarePen, TextCursorInput, type LucideIcon, Puzzle, ScanSearch, ChevronDown, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
@@ -25,6 +25,7 @@ const ICONS: Record<GameKey, LucideIcon> = {
   books_order: Library,
   maze: Route,
   jigsaw: Puzzle,
+  differences: ScanSearch,
 };
 
 // Scoreboard window: the last 90 days keeps the query bounded as a church's

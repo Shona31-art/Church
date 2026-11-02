@@ -38,14 +38,14 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  * soonest first. `today` is passed in (not read from the clock) so the result
  * is deterministic and testable; callers pass the church's local date.
  */
-export function upcomingBirthdays(
-  people: BirthdayInput[],
+export function upcomingBirthdays<T extends BirthdayInput>(
+  people: T[],
   today: Date,
   windowDays = 7
-): UpcomingBirthday[] {
+): (T & UpcomingBirthday)[] {
   const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
   const year = today.getFullYear();
-  const results: UpcomingBirthday[] = [];
+  const results: (T & UpcomingBirthday)[] = [];
 
   for (const person of people) {
     const parsed = parseIsoDate(person.birthDate);
@@ -72,4 +72,15 @@ export function describeDaysUntil(days: number): string {
   if (days === 0) return "Today";
   if (days === 1) return "Tomorrow";
   return `In ${days} days`;
+}
+
+/** Age in whole years on `today` (null for a bad or future date). */
+export function ageOn(birthDate: string, today: Date): number | null {
+  const parsed = parseIsoDate(birthDate);
+  if (!parsed) return null;
+  const m = today.getMonth() + 1;
+  const d = today.getDate();
+  let age = today.getFullYear() - parsed.y;
+  if (m < parsed.m || (m === parsed.m && d < parsed.d)) age -= 1;
+  return age >= 0 ? age : null;
 }

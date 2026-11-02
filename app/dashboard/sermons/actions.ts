@@ -154,6 +154,7 @@ export async function saveSermon(_prev: FormState, formData: FormData): Promise<
     const parsedId = z.string().uuid().safeParse(existingId);
     const updatedAt = String(formData.get("updated_at") ?? "");
     if (!parsedId.success || !updatedAt) return { error: "That sermon couldn't be found.", values };
+    const { data: before } = await supabase.from("sermons").select("audio_url, video_url").eq("id", parsedId.data).eq("church_id", me.church_id).maybeSingle();
     const { data: updated, error } = await supabase
       .from("sermons")
       .update(row)
@@ -167,6 +168,11 @@ export async function saveSermon(_prev: FormState, formData: FormData): Promise<
     }
     if (!updated?.length) return { error: "Someone else changed this sermon while you were editing. Reload to see the latest.", values };
     id = parsedId.data;
+    // A recording that was replaced or removed is deleted from storage.
+    await removeUploads({
+      audio: before?.audio_url !== row.audio_url ? before?.audio_url : null,
+      video: before?.video_url !== row.video_url ? before?.video_url : null,
+    });
   } else {
     const { data: created, error } = await supabase
       .from("sermons")
@@ -228,21 +234,68 @@ export async function requestSermonAudioUpload(input: { contentType: string; byt
   return { ok: true, path, token: data.token, url: admin.storage.from(AUDIO_BUCKET).getPublicUrl(path).data.publicUrl };
 }
 
+const VIDEO_BUCKET = "sermon-video";
+const VIDEO_TYPES: Record<string, string> = {
+  "video/mp4": "mp4",
+  "video/quicktime": "mov",
+  "video/x-m4v": "m4v",
+  "video/webm": "webm",
+};
+const MAX_VIDEO_MB = 1024; // keep in step with VideoField.tsx and sermon_video.sql
+
+/**
+ * A one-time upload link for a sermon video, after checking who's asking.
+ * Like audio: the browser sends the file straight to storage (never through
+ * the app server) and puts the returned public link in the sermon's Video field.
+ */
+export async function requestSermonVideoUpload(input: { contentType: string; bytes: number }): Promise<{ ok: true; uploadUrl: string; url: string } | { ok: false; error: string }> {
+  const me = await requireSermonEditor();
+  if (!me) return { ok: false, error: "Only people who can add sermons can upload videos." };
+  const ext = VIDEO_TYPES[(input.contentType || "").toLowerCase()];
+  if (!ext) return { ok: false, error: "That video type isn't supported. Use MP4 (best), MOV, M4V or WebM." };
+  if (!Number.isFinite(input.bytes) || input.bytes <= 0) return { ok: false, error: "That file looks empty." };
+  if (input.bytes > MAX_VIDEO_MB * 1024 * 1024) return { ok: false, error: `That video is over ${MAX_VIDEO_MB / 1024} GB. Export it at a lower quality (720p is plenty), or post it on YouTube and paste the link.` };
+  const path = `${me.church_id}/${crypto.randomUUID()}.${ext}`;
+  const admin = createAdminClient();
+  const { data, error } = await admin.storage.from(VIDEO_BUCKET).createSignedUploadUrl(path);
+  if (error || !data) {
+    console.error("[sermons] video upload link failed:", error?.message);
+    return { ok: false, error: /not.*found/i.test(error?.message ?? "") ? "Video uploads need a database update: run supabase/sermon_video.sql." : "Couldn't start the upload — please try again." };
+  }
+  return { ok: true, uploadUrl: data.signedUrl, url: admin.storage.from(VIDEO_BUCKET).getPublicUrl(path).data.publicUrl };
+}
+
+/** The storage path of a file we host, from its public link (null for outside links like YouTube). */
+function uploadedPath(url: string | null | undefined, bucket: string): string | null {
+  const marker = `/storage/v1/object/public/${bucket}/`;
+  return url?.includes(marker) ? url.split(marker)[1].split("?")[0] : null;
+}
+
+/** Removes our copies of recordings no longer used (best-effort: a failure leaves a stray file, never breaks a save). */
+async function removeUploads(urls: { audio?: string | null; video?: string | null }) {
+  const admin = createAdminClient();
+  const audio = uploadedPath(urls.audio, AUDIO_BUCKET);
+  const video = uploadedPath(urls.video, VIDEO_BUCKET);
+  const results = await Promise.all([
+    audio ? admin.storage.from(AUDIO_BUCKET).remove([audio]) : null,
+    video ? admin.storage.from(VIDEO_BUCKET).remove([video]) : null,
+  ]);
+  for (const r of results) if (r?.error) console.error("[sermons] removing an old recording failed:", r.error.message);
+}
+
 export async function deleteSermon(_prev: FormState, formData: FormData): Promise<FormState> {
   const me = await requireSermonEditor();
   if (!me) return { error: SESSION_EXPIRED };
   const id = z.string().uuid().safeParse(formData.get("sermon_id"));
   if (!id.success) return { error: "That sermon couldn't be found." };
 
-  const { data: deleted, error } = await createClient().from("sermons").delete().eq("id", id.data).eq("church_id", me.church_id).select("id, audio_url");
+  const { data: deleted, error } = await createClient().from("sermons").delete().eq("id", id.data).eq("church_id", me.church_id).select("id, audio_url, video_url");
   if (error || !deleted?.length) {
     if (error) console.error("[sermons] delete failed:", error.message);
     return { error: "Couldn't delete the sermon — please try again." };
   }
-  // An uploaded recording goes with the sermon.
-  const marker = `/storage/v1/object/public/${AUDIO_BUCKET}/`;
-  const audioUrl = deleted[0].audio_url as string | null;
-  if (audioUrl?.includes(marker)) await createAdminClient().storage.from(AUDIO_BUCKET).remove([audioUrl.split(marker)[1].split("?")[0]]);
+  // Uploaded recordings go with the sermon.
+  await removeUploads({ audio: deleted[0].audio_url, video: deleted[0].video_url });
   revalidatePath("/dashboard/sermons");
   flash("Sermon deleted.");
   redirect("/dashboard/sermons");

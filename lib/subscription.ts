@@ -25,6 +25,7 @@ export const MODULE_KEYS = [
   "ai_assist", // AI helper buttons inside announcements, prayers, quiz questions
   "chat_voice", // voice notes in chat (Storage)
   "chat_photos", // photo sharing in chat (Storage) — in no plan by default
+  "video_calls", // video calls in chats and for pastor appointments (Daily.co, billed per minute)
 ] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 
@@ -52,6 +53,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   ai_assist: "AI writing help",
   chat_voice: "Chat voice notes",
   chat_photos: "Chat photo sharing",
+  video_calls: "Video calls",
 };
 
 export const PLAN_LABELS: Record<string, string> = {

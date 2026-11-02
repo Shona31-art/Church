@@ -5,7 +5,8 @@ import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
 import { can } from "@/lib/permissions";
 import { formatDate, formatRelative } from "@/lib/format";
-import { isDirectMediaFile, isSafeHttpUrl, youtubeEmbedUrl } from "@/lib/media";
+import { isSafeHttpUrl, mediaEmbed, playableFileUrl } from "@/lib/media";
+import { MediaEmbedFrame } from "@/components/ui/MediaEmbedFrame";
 import { PageHeader, Section } from "@/components/ui/PageHeader";
 import { DeleteNoteButton, NoteForm, SermonAdminActions } from "../SermonControls";
 import { PrivacyNote } from "@/components/ui/PrivacyNote";
@@ -23,10 +24,15 @@ export default async function SermonDetailPage({ params }: { params: { id: strin
   ]);
   if (!sermon) notFound();
 
-  const youtube = youtubeEmbedUrl(sermon.video_url);
-  const video = !youtube && isDirectMediaFile(sermon.video_url) ? sermon.video_url : null;
-  const otherVideoLink = !youtube && !video && isSafeHttpUrl(sermon.video_url) ? sermon.video_url : null;
-  const audio = isSafeHttpUrl(sermon.audio_url) ? sermon.audio_url : null;
+  // Each link plays on the page when we can: a known service's player
+  // (YouTube, Facebook, Vimeo, Google Drive, SoundCloud, Spotify), or a plain
+  // player for a file. Anything else is a button that opens the link.
+  const videoEmbed = mediaEmbed(sermon.video_url);
+  const video = !videoEmbed ? playableFileUrl(sermon.video_url) : null;
+  const otherVideoLink = !videoEmbed && !video && isSafeHttpUrl(sermon.video_url) ? sermon.video_url : null;
+  const audioEmbed = mediaEmbed(sermon.audio_url);
+  const audio = !audioEmbed ? playableFileUrl(sermon.audio_url) : null;
+  const otherAudioLink = !audioEmbed && !audio && isSafeHttpUrl(sermon.audio_url) ? sermon.audio_url : null;
   const list = (items: string[] | null) => (items ?? []).filter(Boolean);
 
   return (
@@ -38,30 +44,20 @@ export default async function SermonDetailPage({ params }: { params: { id: strin
         actions={can(me.role, "manageSermons") ? <SermonAdminActions id={sermon.id} title={sermon.title} /> : null}
       />
 
-      {youtube && (
-        <div className="aspect-video overflow-hidden rounded-2xl bg-ink/5">
-          <iframe
-            src={youtube}
-            title={`Video: ${sermon.title}`}
-            className="h-full w-full"
-            allow="accelerometer; encrypted-media; picture-in-picture"
-            allowFullScreen
-            loading="lazy"
-            referrerPolicy="strict-origin-when-cross-origin"
-          />
-        </div>
-      )}
-      {video && <video controls preload="metadata" className="w-full rounded-2xl" src={video} />}
+      {videoEmbed && <MediaEmbedFrame embed={videoEmbed} title={`Video: ${sermon.title}`} />}
+      {video && <video controls preload="metadata" playsInline className="w-full rounded-2xl bg-ink" src={video} />}
       {otherVideoLink && (
         <a href={otherVideoLink} target="_blank" rel="noopener noreferrer" className="btn-secondary">
           Watch the video ↗
         </a>
       )}
-      {audio && (isDirectMediaFile(audio) ? <audio controls preload="metadata" className="w-full" src={audio} /> : (
-        <a href={audio} target="_blank" rel="noopener noreferrer" className="btn-secondary">
+      {audioEmbed && <MediaEmbedFrame embed={audioEmbed} title={`Audio: ${sermon.title}`} />}
+      {audio && <audio controls preload="metadata" className="w-full" src={audio} />}
+      {otherAudioLink && (
+        <a href={otherAudioLink} target="_blank" rel="noopener noreferrer" className="btn-secondary">
           Listen ↗
         </a>
-      ))}
+      )}
 
       {sermon.ai_summary && (
         <Section title="Summary">

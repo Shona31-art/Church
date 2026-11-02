@@ -121,7 +121,7 @@ export async function startGame(game: string, level: string, timed: boolean, mod
     seed = stageSeed(game, stage);
   }
 
-  const built = await ENGINES[game].build(level as Level, seed, { supabase: createClient(), churchId: me.church_id!, kids: mode === "kids" });
+  const built = await ENGINES[game].build(level as Level, seed, { supabase: createClient(), churchId: me.church_id!, kids: mode === "kids", stage });
   if ("error" in built) return { error: built.error };
 
   const row: Record<string, unknown> = { church_id: me.church_id, user_id: me.id, game_type: game, level, timed, mode, seed, puzzle: built.puzzle, max_correct: built.maxCorrect };
@@ -139,15 +139,24 @@ export async function startGame(game: string, level: string, timed: boolean, mod
   return { sessionId: data!.id, game, level: level as Level, timed, mode, parSeconds: GAMES[game].parSeconds[level as Level], view: built.view, stage };
 }
 
-async function loadOwnSession(sessionId: string, userId: string) {
-  if (!z.string().uuid().safeParse(sessionId).success) return null;
-  const { data } = await createAdminClient()
-    .from("game_sessions")
-    .select("*")
-    .eq("id", sessionId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  return data;
+/**
+ * For each answer during a game (quiz picks, question answers, verse checks,
+ * hints): who's signed in and their game, looked up at the same time.
+ *
+ * Kept deliberately light, because the player is waiting to see whether they
+ * were right: the plan and profile checks already happened when the game was
+ * started (startGame) and happen again when it's finished (finishGame), so
+ * here it's just "signed in, and this is your own unfinished game". Two
+ * round trips (sign-in check + game, together; then the save) instead of six.
+ */
+async function loadPlayingSession(sessionId: string) {
+  if (!z.string().uuid().safeParse(sessionId).success) return { signedIn: true, session: null };
+  const [{ data: auth }, { data: session }] = await Promise.all([
+    createClient().auth.getUser(),
+    createAdminClient().from("game_sessions").select("*").eq("id", sessionId).maybeSingle(),
+  ]);
+  const userId = auth.user?.id ?? null;
+  return { signedIn: Boolean(userId), session: session && userId && session.user_id === userId ? session : null };
 }
 
 /**
@@ -155,9 +164,8 @@ async function loadOwnSession(sessionId: string, userId: string) {
  * correct answer. The first choice for a question is the one that counts.
  */
 export async function revealQuizAnswer(sessionId: string, questionIndex: number, choice: number): Promise<{ error?: string; correctIndex?: number; chosen?: number }> {
-  const me = await requirePlayer();
-  if (!me) return { error: "Your session has expired — sign in again." };
-  const session = await loadOwnSession(sessionId, me.id);
+  const { signedIn, session } = await loadPlayingSession(sessionId);
+  if (!signedIn) return { error: "Your session has expired — sign in again." };
   if (!session || session.game_type !== "quiz" || session.finished_at) return { error: "This game has ended — start a new one." };
 
   const key = session.puzzle as QuizKey;
@@ -187,9 +195,8 @@ export async function answerSetQuestion(
   index: number,
   answer: number | string
 ): Promise<{ error?: string; correct?: boolean; answer?: string; reference?: string; answerIndex?: number }> {
-  const me = await requirePlayer();
-  if (!me) return { error: "Your session has expired — sign in again." };
-  const session = await loadOwnSession(sessionId, me.id);
+  const { signedIn, session } = await loadPlayingSession(sessionId);
+  if (!signedIn) return { error: "Your session has expired — sign in again." };
   if (!session || !["emoji", "who_said", "verse_fill"].includes(session.game_type) || session.finished_at) return { error: "This game has ended — start a new one." };
 
   const puzzle = session.puzzle as SetPuzzle;
@@ -212,9 +219,8 @@ export async function answerSetQuestion(
  * scores unless the verse was revealed first.
  */
 export async function checkVerseAttempt(sessionId: string, verseIndex: number, words: string[]): Promise<{ error?: string; correct?: boolean; triesLeft?: number }> {
-  const me = await requirePlayer();
-  if (!me) return { error: "Your session has expired — sign in again." };
-  const session = await loadOwnSession(sessionId, me.id);
+  const { signedIn, session } = await loadPlayingSession(sessionId);
+  if (!signedIn) return { error: "Your session has expired — sign in again." };
   if (!session || session.game_type !== "verse_puzzle" || session.finished_at) return { error: "This game has ended — start a new one." };
   const verses = (session.puzzle as { verses: PuzzleVerse[] }).verses;
   if (!Number.isInteger(verseIndex) || verseIndex < 0 || verseIndex >= verses.length) return { error: "That verse isn't in this game." };
@@ -234,9 +240,8 @@ export async function checkVerseAttempt(sessionId: string, verseIndex: number, w
 
 /** Verse puzzle: shows the verse (no point for it). */
 export async function revealVerse(sessionId: string, verseIndex: number): Promise<{ error?: string; text?: string }> {
-  const me = await requirePlayer();
-  if (!me) return { error: "Your session has expired — sign in again." };
-  const session = await loadOwnSession(sessionId, me.id);
+  const { signedIn, session } = await loadPlayingSession(sessionId);
+  if (!signedIn) return { error: "Your session has expired — sign in again." };
   if (!session || session.game_type !== "verse_puzzle" || session.finished_at) return { error: "This game has ended — start a new one." };
   const verses = (session.puzzle as { verses: PuzzleVerse[] }).verses;
   if (!Number.isInteger(verseIndex) || verseIndex < 0 || verseIndex >= verses.length) return { error: "That verse isn't in this game." };
@@ -255,9 +260,8 @@ export async function revealVerse(sessionId: string, verseIndex: number): Promis
  * level (CROSSWORD_HINTS); asking again for a square already hinted is free.
  */
 export async function crosswordHint(sessionId: string, row: number, col: number): Promise<{ error?: string; letter?: string; hintsLeft?: number }> {
-  const me = await requirePlayer();
-  if (!me) return { error: "Your session has expired — sign in again." };
-  const session = await loadOwnSession(sessionId, me.id);
+  const { signedIn, session } = await loadPlayingSession(sessionId);
+  if (!signedIn) return { error: "Your session has expired — sign in again." };
   if (!session || session.game_type !== "crossword" || session.finished_at) return { error: "This game has ended — start a new one." };
   if (!Number.isInteger(row) || !Number.isInteger(col)) return { error: "Choose a square first." };
 
@@ -279,9 +283,14 @@ export async function crosswordHint(sessionId: string, row: number, col: number)
 
 /** Input: session id and the game's answers. Marks them, saves the score, returns the result. */
 export async function finishGame(sessionId: string, answers: unknown): Promise<FinishResult> {
-  const me = await requirePlayer();
+  // The full player check and the game are loaded at the same time.
+  const validId = z.string().uuid().safeParse(sessionId).success;
+  const [me, { data: found }] = await Promise.all([
+    requirePlayer(),
+    validId ? createAdminClient().from("game_sessions").select("*").eq("id", sessionId).maybeSingle() : Promise.resolve({ data: null }),
+  ]);
   if (!me) return { error: "Your session has expired — sign in again. Your game wasn't saved." };
-  const session = await loadOwnSession(sessionId, me.id);
+  const session = found && found.user_id === me.id ? found : null;
   if (!session) return { error: "That game couldn't be found — start a new one." };
   if (session.finished_at) return { error: "This game was already finished." };
 

@@ -19,7 +19,9 @@ import {
   messagePreview,
   startsGroup,
   summarizeReactions,
+  mentionedIds,
   type ChatMessage,
+  type PollVote,
   type ChatReaction,
   type Reaction,
 } from "@/lib/chat";
@@ -27,6 +29,8 @@ import { formatDateTime } from "@/lib/format";
 import { toCompressedImage } from "@/lib/image-resize";
 import { deleteChatMessage, editChatMessage, unblockMember } from "../actions";
 import { MessageBubble } from "./MessageBubble";
+import { ForwardDialog } from "./ForwardDialog";
+import { PollDialog } from "./PollDialog";
 import { Composer } from "./Composer";
 import type { RecordedVoiceNote } from "./VoiceRecorder";
 import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
@@ -65,6 +69,13 @@ export function ChatThread({
   currentUserId,
   canModerate,
   directory,
+  v4 = false,
+  aroundMessage = false,
+  focusMessageId = null,
+  initialStarred = [],
+  initialPolls = {},
+  initialVotes = [],
+  disappearAfter = null,
 }: {
   channelId: string;
   churchId: string;
@@ -91,6 +102,17 @@ export function ChatThread({
   currentUserId: string;
   canModerate: boolean;
   directory: Record<string, ChatPerson>;
+  /** chat_v4.sql has been run: stars, forwarding, polls, @mentions, disappearing messages. */
+  v4?: boolean;
+  /** Showing the messages around an older one (opened from search or starred). */
+  aroundMessage?: boolean;
+  /** Scroll to and highlight this message when the chat opens. */
+  focusMessageId?: string | null;
+  initialStarred?: string[];
+  initialPolls?: Record<string, { options: string[]; allowMultiple: boolean }>;
+  initialVotes?: PollVote[];
+  /** Disappearing messages: seconds, or null when off. */
+  disappearAfter?: number | null;
 }) {
   // One client for the component's lifetime, so the realtime subscription
   // isn't torn down and rebuilt on every render.
@@ -107,6 +129,13 @@ export function ChatThread({
   const [otherReadAt, setOtherReadAt] = useState<string | null>(initialOtherReadAt);
   const [typers, setTypers] = useState<Record<string, number>>({});
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [starred, setStarred] = useState<Set<string>>(() => new Set(initialStarred));
+  const [polls, setPolls] = useState(initialPolls);
+  const [votes, setVotes] = useState<PollVote[]>(initialVotes);
+  const [forwarding, setForwarding] = useState<ChatMessage | null>(null);
+  const [pollOpen, setPollOpen] = useState(false);
+  // People picked from the @ list while writing this message (id → name).
+  const [picked, setPicked] = useState<Record<string, string>>({});
   const router = useRouter();
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const lastTypingSentRef = useRef(0);
@@ -123,8 +152,16 @@ export function ChatThread({
     return () => clearInterval(timer);
   }, []);
 
+  const focusedRef = useRef(false);
   useEffect(() => {
+    // Opened at a particular message (search / starred): go there instead of the bottom, once.
+    if (focusMessageId && !focusedRef.current) {
+      focusedRef.current = true;
+      setTimeout(() => jumpTo(focusMessageId), 150);
+      return;
+    }
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- jumpTo is stable enough; only re-run for new messages
   }, [messages.length]);
 
   // Phones: when the message box gets focus, the keyboard slides up. Once it
@@ -159,6 +196,9 @@ export function ChatThread({
       media_path: row.media_path ?? null,
       media_duration_ms: row.media_duration_ms ?? null,
       media_expired_at: row.media_expired_at ?? null,
+      forwarded: row.forwarded ?? false,
+      mentions: row.mentions ?? [],
+      expires_at: row.expires_at ?? null,
     });
     const filter = `channel_id=eq.${channelId}`;
 
@@ -166,6 +206,14 @@ export function ChatThread({
       .channel(`chat:${channelId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages", filter }, ({ new: row }) => {
         const msg = toMessage(row);
+        if (msg.kind === "poll") {
+          supabase
+            .from("chat_polls")
+            .select("message_id, options, allow_multiple")
+            .eq("message_id", msg.id)
+            .maybeSingle()
+            .then(({ data }) => data && setPolls((p) => ({ ...p, [data.message_id]: { options: data.options, allowMultiple: data.allow_multiple } })));
+        }
         setMessages((prev) => {
           if (prev.some((m) => m.id === msg.id)) return prev;
           // Replace my own optimistic copy if the realtime event wins the race.
@@ -190,6 +238,17 @@ export function ChatThread({
           const rest = prev.filter((r) => !(r.message_id === target.message_id && r.user_id === target.user_id));
           return added ? [...rest, added] : rest;
         });
+      })
+      // Poll votes (chat_v4.sql): live results. A change of vote is a delete
+      // then an insert; deletes can't be filtered live, so on any new vote the
+      // poll's votes are re-read.
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_poll_votes", filter }, ({ new: row }) => {
+        const messageId = (row as PollVote).message_id;
+        supabase
+          .from("chat_poll_votes")
+          .select("message_id, user_id, option_index")
+          .eq("message_id", messageId)
+          .then(({ data }) => data && setVotes((prev) => [...prev.filter((v) => v.message_id !== messageId), ...(data as PollVote[])]));
       })
       // Read receipts: RLS only lets these through if both of us share
       // receipts, so otherwise ticks simply stay at ✓.
@@ -279,9 +338,11 @@ export function ChatThread({
     }
 
     const quoting = replyTo;
+    const mentions = v4 && !isDm ? mentionedIds(content, picked) : [];
     setBusy(true);
     setDraft("");
     setReplyTo(null);
+    setPicked({});
     // Shown immediately; swapped for the real row when the insert (or the
     // realtime event, whichever is first) comes back.
     const optimistic: ChatMessage = {
@@ -298,6 +359,7 @@ export function ChatThread({
       media_path: null,
       media_duration_ms: null,
       media_expired_at: null,
+      mentions,
       pending: true,
     };
     setMessages((prev) => [...prev, optimistic]);
@@ -305,6 +367,7 @@ export function ChatThread({
     // Before chat_v2.sql there's no reply_to_id column to write.
     const row: Record<string, unknown> = { channel_id: channelId, sender_id: currentUserId, content };
     if (v2) row.reply_to_id = quoting?.id ?? null;
+    if (mentions.length) row.mentions = mentions;
     const { data, error } = await supabase.from("chat_messages").insert(row).select("id, created_at").single();
     setBusy(false);
     if (error || !data) {
@@ -475,6 +538,54 @@ export function ChatThread({
     }
   }
 
+  async function toggleStar(message: ChatMessage) {
+    const on = !starred.has(message.id);
+    setStarred((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(message.id);
+      else next.delete(message.id);
+      return next;
+    });
+    const { error } = on
+      ? await supabase.from("chat_starred_messages").insert({ user_id: currentUserId, message_id: message.id, channel_id: channelId })
+      : await supabase.from("chat_starred_messages").delete().eq("user_id", currentUserId).eq("message_id", message.id);
+    if (error && !/duplicate/i.test(error.message)) {
+      setStarred((prev) => {
+        const next = new Set(prev);
+        if (on) next.delete(message.id);
+        else next.add(message.id);
+        return next;
+      });
+      showToast("Couldn't save that — try again.", "error");
+    } else if (on) showToast("Starred. Find it under Chats → Starred.", "success");
+  }
+
+  async function vote(messageId: string, choices: number[]) {
+    const previous = votes;
+    setVotes((prev) => [...prev.filter((v) => !(v.message_id === messageId && v.user_id === currentUserId)), ...choices.map((option_index) => ({ message_id: messageId, user_id: currentUserId, option_index }))]);
+    const { error } = await supabase.rpc("vote_chat_poll", { target_message: messageId, choices });
+    if (error) {
+      setVotes(previous);
+      showToast(error.message.includes("option") ? error.message : "Couldn't save your vote — try again.", "error");
+    }
+  }
+
+  async function createPoll(question: string, options: string[], multiple: boolean): Promise<string | null> {
+    const { data, error } = await supabase.rpc("create_chat_poll", { target_channel: channelId, question, poll_options: options, multiple });
+    if (error || !data) return /2 to 12|300|100 characters/.test(error?.message ?? "") ? error!.message : /post/.test(error?.message ?? "") ? "You can't post in this chat right now." : "Couldn't send the poll — try again.";
+    const id = data as string;
+    setPolls((p) => ({ ...p, [id]: { options, allowMultiple: multiple } }));
+    setMessages((prev) =>
+      prev.some((m) => m.id === id)
+        ? prev
+        : [
+            ...prev,
+            { id, channel_id: channelId, sender_id: currentUserId, content: question, created_at: new Date().toISOString(), kind: "poll", edited_at: null, deleted_at: null, deleted_by: null, reply_to_id: null, media_path: null, media_duration_ms: null, media_expired_at: null },
+          ]
+    );
+    return null;
+  }
+
   function jumpTo(messageId: string) {
     const el = document.getElementById(`msg-${messageId}`);
     if (!el) return showToast("That message is older than what's shown here.", "info");
@@ -483,6 +594,9 @@ export function ChatThread({
   }
 
   const deletingOthers = deleting && deleting.sender_id !== currentUserId;
+  // Disappearing messages vanish on time, even while the chat is open.
+  const shown = messages.filter((m) => !m.expires_at || new Date(m.expires_at).getTime() > now);
+  const disappearText = disappearAfter ? { 86400: "24 hours", 604800: "7 days", 7776000: "90 days" }[disappearAfter] : null;
 
   return (
     <div
@@ -491,10 +605,13 @@ export function ChatThread({
       className="chat-thread card-elevated flex min-h-[26rem] flex-col overflow-hidden rounded-2xl"
     >
       <div ref={logRef} className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5" role="log" aria-live="polite" aria-label="Messages">
-        {truncated && <p className="mb-2 text-center text-xs text-ink/60">Showing the most recent messages.</p>}
+        {truncated && <p className="mb-2 text-center text-xs text-ink/60">{aroundMessage ? "Showing the messages around the one you opened." : "Showing the most recent messages."}</p>}
+        {disappearText && (
+          <p className="mx-auto mb-3 w-fit rounded-full border border-line bg-parchment px-3 py-1 text-center text-xs text-ink/70">⏱ Disappearing messages are on: new messages disappear after {disappearText}.</p>
+        )}
 
-        {messages.map((m, i) => {
-          const previous = messages[i - 1];
+        {shown.map((m, i) => {
+          const previous = shown[i - 1];
           const newDay = !previous || dayKey(previous.created_at) !== dayKey(m.created_at);
           const isMine = m.sender_id === currentUserId;
           const quoted = m.reply_to_id ? byId.get(m.reply_to_id) : undefined;
@@ -539,12 +656,29 @@ export function ChatThread({
                 onDelete={canDeleteMessage(m, currentUserId, canModerate) ? () => setDeleting(m) : undefined}
                 onJumpTo={jumpTo}
                 receipt={isDm && isMine ? receiptStatus(m, otherReadAt) : undefined}
+                starred={starred.has(m.id)}
+                onStar={v4 && !m.pending ? () => toggleStar(m) : undefined}
+                onForward={v4 && !m.pending && m.kind !== "poll" ? () => setForwarding(m) : undefined}
+                mentionNames={(m.mentions ?? []).map((id) => person(id).name)}
+                mentionsMe={(m.mentions ?? []).includes(currentUserId)}
+                poll={
+                  m.kind === "poll" && polls[m.id]
+                    ? {
+                        options: polls[m.id].options,
+                        allowMultiple: polls[m.id].allowMultiple,
+                        votes: votes.filter((v) => v.message_id === m.id),
+                        currentUserId,
+                        nameOf: (id) => person(id).name,
+                        onVote: m.deleted_at ? undefined : (choices) => vote(m.id, choices),
+                      }
+                    : undefined
+                }
               />
             </div>
           );
         })}
 
-        {!messages.length && (
+        {!shown.length && (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <p className="font-display text-lg font-semibold">No messages yet</p>
             <p className="mt-1 text-sm text-ink/60">Say hello — {isDm ? "only the two of you can read this." : "everyone in this channel will see it."}</p>
@@ -571,6 +705,15 @@ export function ChatThread({
         onPickPhoto={photosEnabled ? sendPhoto : undefined}
         photoBusy={photoBusy}
         onTyping={v2 ? announceTyping : undefined}
+        mentionPeople={
+          v4 && !isDm
+            ? Object.entries(directory)
+                .filter(([id]) => id !== currentUserId)
+                .map(([id, p]) => ({ id, name: p.name }))
+            : undefined
+        }
+        onMention={(id, name) => setPicked((p) => ({ ...p, [id]: name }))}
+        onCreatePoll={v4 ? () => setPollOpen(true) : undefined}
         typingText={typingLine(Object.keys(typers).map((id) => person(id).name), isDm)}
         notice={
           blockedOther ? (
@@ -588,6 +731,9 @@ export function ChatThread({
           ) : null
         }
       />
+
+      {forwarding && <ForwardDialog messageId={forwarding.id} currentChannelId={channelId} onClose={() => setForwarding(null)} />}
+      {pollOpen && <PollDialog onCreate={createPoll} onClose={() => setPollOpen(false)} />}
 
       <dialog
         ref={deleteDialogRef}

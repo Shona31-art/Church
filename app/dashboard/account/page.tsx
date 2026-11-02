@@ -13,6 +13,10 @@ import { AlertChannels } from "@/components/notifications/AlertChannels";
 import { makeConfigured } from "@/lib/alert-delivery";
 import { InstallApp } from "@/components/install/InstallApp";
 import { EmailChangeForm } from "./EmailChangeForm";
+import { PreviewSetting } from "@/components/notifications/PreviewSetting";
+import { LastSeenSetting } from "@/components/chat/LastSeenSetting";
+import { ChildrenList } from "@/components/members/ChildrenList";
+import { loadChildren } from "@/lib/children";
 
 export default async function MyAccountPage({ searchParams }: { searchParams: { email?: string } }) {
   const me = (await getCurrentAppUser())!;
@@ -30,6 +34,7 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
     supabase.from("app_users").select("about, dm_privacy, share_read_receipts").eq("id", me.id).maybeSingle(),
     getAvatarUrls([me.id]),
   ]);
+  const children = me.church_id ? await loadChildren(me.id) : null;
   const photosReady = !chatProfile.error;
 
   // People I've blocked (RLS: only my own blocks are visible).
@@ -45,6 +50,11 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
     prayer_care: prefsRes.data?.push_prayer_care ?? true,
     alerts: prefsRes.data?.push_alerts ?? true,
   };
+
+  // Last seen (chat_v4.sql); no row yet = shared (the default).
+  const presenceRes = await supabase.from("user_presence").select("show_last_seen").eq("user_id", me.id).maybeSingle();
+  // Message previews (chat_notifications_v2.sql); hidden until that's run.
+  const previewRes = await supabase.from("notification_preferences").select("show_previews").eq("user_id", me.id).maybeSingle();
 
   // WhatsApp alerts are for the people who get pastor & admin alerts, and only
   // show once the platform has them switched on (MAKE_WEBHOOK_URL).
@@ -80,6 +90,7 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
             shareReadReceipts={chatProfile.data?.share_read_receipts ?? true}
             blocked={blocked}
           />
+          {!presenceRes.error && <LastSeenSetting initial={presenceRes.data?.show_last_seen ?? true} />}
         </Section>
       )}
 
@@ -99,6 +110,7 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
         <div id="notifications" className="scroll-mt-24">
           <Section title="Notifications" description="Get a pop-up on your phone or computer when something happens, even when the app is closed.">
             <PushSettings initialPreferences={pushPrefs} />
+            {!previewRes.error && <PreviewSetting initial={previewRes.data?.show_previews ?? true} />}
             {channelRes && !channelRes.error && (
               <AlertChannels
                 initial={channelRes.data?.whatsapp_alerts ?? true}
@@ -113,6 +125,14 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
       <Section title="My details">
         <ProfileForm name={me.name} email={me.email} phone={profile?.phone ?? null} birthDate={birthday?.birth_date ?? ""} />
       </Section>
+
+      {children && (
+        <div id="children" className="scroll-mt-24">
+          <Section title="My children" description="Add your children's names and birthdays so your pastors can pray for them and celebrate with your family.">
+            <ChildrenList parentId={me.id} items={children} self />
+          </Section>
+        </div>
+      )}
 
       {church && (
         <Section title="My church">

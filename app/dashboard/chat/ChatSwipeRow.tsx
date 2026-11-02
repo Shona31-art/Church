@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, BellOff, CheckCheck, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Bell, BellOff, CheckCheck, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { createClient } from "@/lib/supabase/client";
 import { SwipeActions, type SwipeAction } from "@/components/ui/SwipeActions";
 import { showToast } from "@/components/ui/Toaster";
-import { hideChatForMe, setChatMute } from "./actions";
+import { hideChatForMe, setChatArchived, setChatMute } from "./actions";
 
 /**
  * A chat-list row with swipe-left shortcuts: mark as read, mute / unmute and,
@@ -18,12 +18,14 @@ export function ChatSwipeRow({
   channelId,
   unread,
   muted,
+  archived = false,
   dmName,
   children,
 }: {
   channelId: string;
   unread: number;
   muted: boolean;
+  archived?: boolean;
   /** Set for a private chat: the other person's name. Enables "Delete". */
   dmName?: string;
   children: React.ReactNode;
@@ -65,6 +67,17 @@ export function ChatSwipeRow({
       const result = await setChatMute(channelId, muted ? null : "8h");
       if (result.error) return showToast(result.error, "error");
       showToast(muted ? "Notifications back on." : "Muted for 8 hours.", "success");
+      router.refresh();
+    },
+  });
+
+  actions.push({
+    label: archived ? "Unarchive" : "Archive",
+    icon: archived ? <ArchiveRestore className="h-5 w-5" /> : <Archive className="h-5 w-5" />,
+    onAction: async () => {
+      const result = await setChatArchived(channelId, !archived);
+      if (result.error) return showToast(result.error, "error");
+      showToast(archived ? "Chat moved back to your list." : "Chat archived.", "success");
       router.refresh();
     },
   });

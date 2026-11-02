@@ -48,6 +48,29 @@ export async function GET(request: Request) {
   const started = Date.now();
   let expired = 0;
 
+  // Disappearing messages (chat_v4.sql): delete those whose time is up, then
+  // their voice notes and photos. They're already hidden from everyone; this
+  // removes them for good. Best effort: a failure is retried the next night.
+  let disappeared = 0;
+  try {
+    for (let round = 0; round < 10; round++) {
+      const { data: files, error } = await admin.rpc("purge_expired_chat_messages", { batch: 500 });
+      if (error) {
+        if (!/function|does not exist/i.test(error.message)) console.error("[cron] disappearing messages failed:", error.message);
+        break;
+      }
+      const paths = ((files ?? []) as { media_path: string }[]).map((f) => f.media_path).filter(Boolean);
+      if (paths.length) {
+        const { error: removeError } = await admin.storage.from(CHAT_MEDIA_BUCKET).remove(paths);
+        if (removeError) console.error("[cron] removing disappeared files failed:", removeError.message);
+      }
+      disappeared += paths.length;
+      if (!files || (files as unknown[]).length < 500) break;
+    }
+  } catch (error) {
+    console.error("[cron] disappearing messages failed:", error);
+  }
+
   try {
     while (Date.now() - started < TIME_BUDGET_MS) {
       const { data: due, error } = await admin
@@ -98,5 +121,5 @@ export async function GET(request: Request) {
     console.error("[cron] end cancelled subscriptions failed (retries tomorrow):", (error as Error).message);
   }
 
-  return NextResponse.json({ expired, notificationsDeleted, subscriptionsEnded });
+  return NextResponse.json({ expired, notificationsDeleted, subscriptionsEnded, disappearedFiles: disappeared });
 }

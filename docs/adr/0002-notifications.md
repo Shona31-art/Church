@@ -125,3 +125,21 @@ and revisit if a security advisory appears.
 3. [ ] Bell, live badge, notifications page
 4. [ ] Web Push: subscriptions, service worker handlers, `/api/notifications/push`, settings
 5. [ ] Nightly cleanup of notifications older than 90 days (existing cron)
+
+## Update (migration #48, `chat_notifications_v2.sql`): message previews
+
+The church asked for notifications that work like WhatsApp's, so the "no
+message text" rule above is relaxed **for chat messages only**:
+
+- Message pop-ups and bell items show the latest message ("Alice: See you at
+  6"; voice notes and photos as "🎤 Voice message" / "📷 Photo"), cut to 140
+  characters. Prayer, counselling and care notifications still never carry
+  their content.
+- Each person can turn this off (My account → Notifications → "Show message
+  text"); then they get the old "Sent you a message" wording. Recommended for
+  shared phones and lock screens others can see.
+- The text lives only in the recipient's own notification rows (private by
+  RLS, deleted after 90 days), and in the encrypted Web Push payload. A message
+  deleted or edited before it's read has its preview replaced.
+- The webhook now also sends UPDATEs, so each new message in a chat updates
+  that chat's one pop-up ("Alice (3 messages)"), with a "Mark as read" button.

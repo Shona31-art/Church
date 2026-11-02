@@ -36,6 +36,12 @@ export interface PushMessage {
   link: string | null;
   /** Same tag replaces an older pop-up instead of stacking (e.g. one per chat). */
   tag?: string;
+  /** An incoming video call: delivered fast or not at all, and shown as a call (sw.js). */
+  call?: boolean;
+  /** A chat message: the pop-up gets a "Mark as read" button (sw.js), which needs the notification's id. */
+  messageId?: string;
+  /** Unread total for the app icon's badge (where the phone supports it). */
+  badge?: number;
 }
 
 /**
@@ -66,13 +72,18 @@ export async function sendPushToUser(userId: string, category: NotificationCateg
     body: message.body ?? "",
     url: safeNotificationLink(message.link),
     tag: message.tag,
+    ...(message.call ? { call: true } : {}),
+    ...(message.messageId ? { notificationId: message.messageId } : {}),
+    ...(typeof message.badge === "number" ? { badge: message.badge } : {}),
   });
 
   const results = await Promise.all(
     (devices ?? []).map(async (d) => {
       try {
         await webpush.sendNotification({ endpoint: d.endpoint, keys: { p256dh: d.p256dh, auth: d.auth } }, payload, {
-          TTL: 60 * 60 * 24, // deliver within a day if the phone is offline, then drop
+          // A call is only worth ringing for a minute; anything else, within a day.
+          TTL: message.call ? 60 : 60 * 60 * 24,
+          ...(message.call ? { urgency: "high" as const } : {}),
           timeout: SEND_TIMEOUT_MS,
         });
         await admin.from("push_subscriptions").update({ last_used_at: new Date().toISOString() }).eq("id", d.id);
@@ -90,4 +101,14 @@ export async function sendPushToUser(userId: string, category: NotificationCateg
     }),
   );
   return results.filter(Boolean).length;
+}
+
+/** How many unread bell items someone has: the number on the app icon. */
+export async function unreadCountFor(userId: string): Promise<number | undefined> {
+  const { count, error } = await createAdminClient().from("notifications").select("id", { count: "exact", head: true }).eq("user_id", userId).is("read_at", null);
+  if (error) {
+    console.error("[push] unread count failed:", error.message);
+    return undefined;
+  }
+  return count ?? 0;
 }

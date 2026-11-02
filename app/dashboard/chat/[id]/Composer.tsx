@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, Pencil, Reply, SendHorizontal, Smile, X } from "lucide-react";
-import { MAX_MESSAGE_LENGTH } from "@/lib/chat";
+import { BarChart3, ImagePlus, Pencil, Reply, SendHorizontal, Smile, X } from "lucide-react";
+import { MAX_MESSAGE_LENGTH, mentionQuery } from "@/lib/chat";
 import { VoiceRecorder, type RecordedVoiceNote } from "./VoiceRecorder";
 import { EmojiPicker } from "./EmojiPicker";
 
@@ -26,6 +26,9 @@ export function Composer({
   onTyping,
   typingText,
   notice,
+  mentionPeople,
+  onMention,
+  onCreatePoll,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -44,12 +47,38 @@ export function Composer({
   typingText?: string | null;
   /** Replaces the box entirely, e.g. "You blocked Alice" or a posting restriction. */
   notice?: React.ReactNode;
+  /** Group chats: people who can be @mentioned (shows a list as you type "@"). */
+  mentionPeople?: { id: string; name: string }[];
+  onMention?: (id: string, name: string) => void;
+  /** Opens "Create poll". */
+  onCreatePoll?: () => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
   const [voiceActive, setVoiceActive] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const showMic = Boolean(onSendVoice) && !value.trim() && mode?.kind !== "edit";
+  const [cursor, setCursor] = useState(0);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const mention = mentionPeople?.length && mode?.kind !== "edit" ? mentionQuery(value, cursor) : null;
+  const suggestions = mention
+    ? mentionPeople!.filter((p) => p.name.toLowerCase().split(/\s+/).some((w) => w.startsWith(mention.query.toLowerCase())) || p.name.toLowerCase().startsWith(mention.query.toLowerCase())).slice(0, 6)
+    : [];
+
+  /** Puts "@Name " in place of the "@que" being typed. */
+  function pickMention(person: { id: string; name: string }) {
+    if (!mention) return;
+    const next = `${value.slice(0, mention.start)}@${person.name} ${value.slice(cursor)}`;
+    if (next.length > MAX_MESSAGE_LENGTH) return;
+    onChange(next);
+    onMention?.(person.id, person.name);
+    const at = mention.start + person.name.length + 2;
+    setCursor(at);
+    requestAnimationFrame(() => {
+      ref.current?.focus();
+      ref.current?.setSelectionRange(at, at);
+    });
+  }
 
   // Grow with the text, up to ~6 lines, then scroll. Borders are added back
   // and the scrollbar stays hidden until it's actually needed (otherwise a
@@ -85,6 +114,13 @@ export function Composer({
   }, [mode]);
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (suggestions.length && ["ArrowDown", "ArrowUp", "Enter", "Tab"].includes(e.key)) {
+      e.preventDefault();
+      if (e.key === "ArrowDown") setMentionIndex((i) => (i + 1) % suggestions.length);
+      else if (e.key === "ArrowUp") setMentionIndex((i) => (i - 1 + suggestions.length) % suggestions.length);
+      else pickMention(suggestions[Math.min(mentionIndex, suggestions.length - 1)]);
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       onSubmit();
@@ -129,6 +165,23 @@ export function Composer({
       <p aria-hidden className="mb-1 h-4 truncate px-1 text-xs italic text-ink/60">
         {typingText}
       </p>
+
+      {suggestions.length > 0 && (
+        <ul role="listbox" aria-label="Mention someone" className="absolute bottom-full left-3 right-3 z-20 mb-1 max-h-60 overflow-y-auto rounded-2xl border border-line bg-surface p-1 shadow-pop">
+          {suggestions.map((p, i) => (
+            <li key={p.id} role="option" aria-selected={i === mentionIndex}>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => pickMention(p)}
+                className={`w-full rounded-xl px-3 py-2 text-left text-sm ${i === mentionIndex ? "bg-gold/15" : "hover:bg-ink/5"}`}
+              >
+                @{p.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {emojiOpen && (
         <EmojiPicker
@@ -180,6 +233,11 @@ export function Composer({
             />
           </>
         )}
+        {onCreatePoll && mode?.kind !== "edit" && !voiceActive && (
+          <button type="button" onClick={onCreatePoll} className="btn-ghost btn-icon h-11 w-11 rounded-full" aria-label="Create a poll">
+            <BarChart3 aria-hidden className="h-5 w-5" />
+          </button>
+        )}
         <label htmlFor="chat-message" className="sr-only">
           {mode?.kind === "edit" ? "Edit message" : "Message"}
         </label>
@@ -191,8 +249,11 @@ export function Composer({
           value={value}
           onChange={(e) => {
             onChange(e.target.value);
+            setCursor(e.target.selectionStart ?? e.target.value.length);
+            setMentionIndex(0);
             if (e.target.value) onTyping?.();
           }}
+          onSelect={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
           onKeyDown={onKeyDown}
           maxLength={MAX_MESSAGE_LENGTH}
           placeholder="Type a message…"

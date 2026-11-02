@@ -8,6 +8,7 @@
 import type { Level } from "./catalog";
 import { CROSSWORD_CLUES, type CrosswordClue } from "./content/crossword-clues";
 import { createRng, shuffle, type Rng } from "./random";
+import { STAGE_COUNT, stageLevel, stageSeed } from "./stages";
 
 export type Direction = "across" | "down";
 
@@ -177,15 +178,53 @@ function finish(placed: Placed[]): CrosswordPuzzle {
  * keeps the one that fits the most words, so it's still deterministic.
  */
 export function buildCrossword(level: Level, seed: number, clues: readonly CrosswordClue[] = CROSSWORD_CLUES): CrosswordPuzzle {
-  const { target, pool, maxSide } = CROSSWORD_LEVELS[level];
-  const candidates = clues.filter((c) => pool.includes(c.level));
+  const { pool } = CROSSWORD_LEVELS[level];
+  return finish(bestLayout(level, seed, clues.filter((c) => pool.includes(c.level))));
+}
+
+function bestLayout(level: Level, seed: number, candidates: readonly CrosswordClue[]): Placed[] {
+  const { target, maxSide } = CROSSWORD_LEVELS[level];
   let best: Placed[] = [];
   for (let attempt = 0; attempt < 12 && best.length < target; attempt++) {
     const rng = createRng(seed + attempt * 7919);
     const placed = layOut(shuffle(candidates, rng), target, maxSide, rng);
     if (placed.length > best.length) best = placed;
   }
-  return finish(best);
+  return best;
+}
+
+const LEVEL_ORDER: Level[] = ["easy", "medium", "hard"];
+const stageCache = new Map<number, CrosswordPuzzle>();
+
+/**
+ * The crossword for numbered level `stage` (1–100). Levels are dealt in order
+ * from one shared clue bank, and a clue used by one level is never used by
+ * another, so every level has its own questions. Each level takes clues of
+ * its own difficulty first; only if those can't fill the grid does it also
+ * use clues left over from easier levels. Pure and deterministic (cached).
+ */
+export function buildStageCrossword(stage: number, clues: readonly CrosswordClue[] = CROSSWORD_CLUES): CrosswordPuzzle {
+  const useCache = clues === CROSSWORD_CLUES;
+  if (useCache && stageCache.has(stage)) return stageCache.get(stage)!;
+
+  const used = new Set<string>();
+  let result: CrosswordPuzzle | null = null;
+  for (let s = 1; s <= Math.min(stage, STAGE_COUNT); s++) {
+    const level = stageLevel(s);
+    const seed = stageSeed("crossword", s);
+    const unused = clues.filter((c) => !used.has(c.answer));
+    let best = bestLayout(level, seed, unused.filter((c) => c.level === level));
+    if (best.length < CROSSWORD_LEVELS[level].target) {
+      const easier = LEVEL_ORDER.slice(0, LEVEL_ORDER.indexOf(level) + 1);
+      const wider = bestLayout(level, seed, unused.filter((c) => easier.includes(c.level)));
+      if (wider.length > best.length) best = wider;
+    }
+    for (const p of best) used.add(p.clue.answer);
+    const puzzle = finish(best);
+    if (useCache) stageCache.set(s, puzzle);
+    if (s === stage) result = puzzle;
+  }
+  return result!;
 }
 
 /** Every entry's cells, for marking and for the board. */

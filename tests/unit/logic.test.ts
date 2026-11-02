@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { upcomingBirthdays, describeDaysUntil } from "@/lib/birthdays";
+import { upcomingBirthdays, describeDaysUntil, ageOn } from "@/lib/birthdays";
 import { tokenize, scrambleOrder, isCorrectOrder, pickRound, PUZZLE_VERSES } from "@/lib/verse-puzzle";
 import { extractJson } from "@/lib/json";
 import { detectCrisisSignal } from "@/lib/crisis-detection";
@@ -47,6 +47,24 @@ describe("upcomingBirthdays", () => {
 
   test("ignores malformed dates instead of crashing", () => {
     expect(upcomingBirthdays([person("not-a-date"), person("1990-13-40")], today)).toEqual([]);
+  });
+
+  test("extra fields (e.g. a child's parent) pass through", () => {
+    const [b] = upcomingBirthdays([{ ...person("2018-10-02", "Thabo"), childId: "c1", parentName: "Matthew" }], today);
+    expect(b).toMatchObject({ name: "Thabo", childId: "c1", parentName: "Matthew", turningAge: 8 });
+  });
+});
+
+describe("ageOn", () => {
+  const today = new Date(2026, 8, 30);
+  test("counts whole years, not yet a year older before the birthday", () => {
+    expect(ageOn("2018-09-30", today)).toBe(8);
+    expect(ageOn("2018-10-01", today)).toBe(7);
+    expect(ageOn("2026-01-15", today)).toBe(0);
+  });
+  test("future or malformed dates give null", () => {
+    expect(ageOn("2027-01-01", today)).toBeNull();
+    expect(ageOn("nope", today)).toBeNull();
   });
 });
 

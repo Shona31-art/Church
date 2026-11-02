@@ -78,6 +78,7 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 41 | `plans_v3.sql` | Plans: Basic unchanged (R299, 50 members); Premium for 50–150 members (R799); Unlimited (the Enterprise slot) R1,300 with unlimited members and every feature, payable online |
 | 42 | `activity_log.sql` | Audit log: records every add/edit/delete people make in every church (field names only, never private content), for the platform Audit log page |
 | 43 | `pastor_alerts.sql` | Pastor alerts for shared counseling conversations and new prayer requests, plus each pastor's WhatsApp alert setting |
+| 44 | `member_children.sql` | Members' children: names and optional birthdays, added by the parent (My account → My children) or by pastors/church admins on the member's profile. Seen only by the parent and their church's pastors/admins; children's birthdays show in "Birthdays this week"; they move with the parent to a new church; changes are audit-logged |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so

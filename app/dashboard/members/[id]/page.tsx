@@ -16,6 +16,8 @@ import { ChatRestrictions, type ActiveRestriction } from "./ChatRestrictions";
 import { Avatar } from "@/components/ui/Avatar";
 import { getAvatarUrls } from "@/lib/avatars";
 import { BADGES, type BadgeKey } from "@/lib/games/progression";
+import { ChildrenList } from "@/components/members/ChildrenList";
+import { loadChildren } from "@/lib/children";
 
 const ACTIVITY_LABELS: Record<string, string> = {
   "member.invited": "Added and invited",
@@ -67,6 +69,7 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
   const canChangeAccess = canEditMemberRole(me, member);
   const department = (member as any).departments?.name as string | undefined;
   const photoUrl = (await getAvatarUrls([member.id])).get(member.id) ?? null;
+  const children = await loadChildren(member.id);
   // Bible games badges (bible_games_v3.sql); missing table → none shown.
   const { data: badgeRows } = await supabase.from("user_badges").select("badge_key").eq("user_id", member.id);
   const badgeTitles = (badgeRows ?? []).map((b) => BADGES[b.badge_key as BadgeKey]?.title).filter(Boolean);
@@ -145,6 +148,12 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
           />
         </Section>
       </div>
+
+      {children && (
+        <Section title="Children" description="Names and birthdays — visible to the member, pastors and church admins only.">
+          <ChildrenList parentId={member.id} items={children} self={isSelf} />
+        </Section>
+      )}
 
       <Section
         title="Login account"

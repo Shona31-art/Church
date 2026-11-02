@@ -13,6 +13,8 @@ import { AlertChannels } from "@/components/notifications/AlertChannels";
 import { makeConfigured } from "@/lib/alert-delivery";
 import { InstallApp } from "@/components/install/InstallApp";
 import { EmailChangeForm } from "./EmailChangeForm";
+import { ChildrenList } from "@/components/members/ChildrenList";
+import { loadChildren } from "@/lib/children";
 
 export default async function MyAccountPage({ searchParams }: { searchParams: { email?: string } }) {
   const me = (await getCurrentAppUser())!;
@@ -30,6 +32,7 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
     supabase.from("app_users").select("about, dm_privacy, share_read_receipts").eq("id", me.id).maybeSingle(),
     getAvatarUrls([me.id]),
   ]);
+  const children = me.church_id ? await loadChildren(me.id) : null;
   const photosReady = !chatProfile.error;
 
   // People I've blocked (RLS: only my own blocks are visible).
@@ -113,6 +116,14 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
       <Section title="My details">
         <ProfileForm name={me.name} email={me.email} phone={profile?.phone ?? null} birthDate={birthday?.birth_date ?? ""} />
       </Section>
+
+      {children && (
+        <div id="children" className="scroll-mt-24">
+          <Section title="My children" description="Add your children's names and birthdays so your pastors can pray for them and celebrate with your family.">
+            <ChildrenList parentId={me.id} items={children} self />
+          </Section>
+        </div>
+      )}
 
       {church && (
         <Section title="My church">

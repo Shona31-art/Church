@@ -56,6 +56,7 @@ export const MIGRATION_ORDER = [
   "plans_v3.sql",
   "activity_log.sql",
   "pastor_alerts.sql",
+  "member_children.sql",
 ];
 
 const SUPABASE_STUBS = `

@@ -5,11 +5,14 @@ import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
 import { can } from "@/lib/permissions";
 import { BOOKING_TYPE_LABELS, type BookingStatus } from "@/lib/booking";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime, todayInAppZone } from "@/lib/format";
 import { PageHeader, Section, DetailList } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { BookingBadge } from "../BookingBadge";
 import { CancelMyRequest, StatusActions } from "./StatusActions";
+import { videoCallState } from "@/lib/video-calls";
+import { bookingCallWindow } from "@/lib/video-call-rules";
+import { StartCallButton } from "@/components/calls/StartCallButton";
 
 export default async function BookingDetailPage({ params }: { params: { id: string } }) {
   const gate = await moduleGate("pastor_booking");
@@ -50,6 +53,10 @@ export default async function BookingDetailPage({ params }: { params: { id: stri
     blocked = Boolean(block);
   }
 
+  // Video call for an approved appointment (video_calls.sql): on its day.
+  const call = status === "approved" ? await videoCallState({ bookingId: booking.id }) : { available: false, activeCallId: null };
+  const callWindow = bookingCallWindow(booking.preferred_date, todayInAppZone());
+
   const typeLabel = BOOKING_TYPE_LABELS[booking.booking_type as keyof typeof BOOKING_TYPE_LABELS] ?? booking.booking_type;
 
   return (
@@ -70,6 +77,16 @@ export default async function BookingDetailPage({ params }: { params: { id: stri
           {blocked && <p>This pastor has marked this date as unavailable.</p>}
           {conflicts > 0 && <p>{conflicts} other approved booking{conflicts === 1 ? " is" : "s are"} already on this date for this pastor.</p>}
         </Alert>
+      )}
+
+      {call.available && callWindow !== "past" && (
+        <Section title="Video call" description="Meet face to face from wherever you are — only the two of you (and the church's pastors) can join.">
+          {callWindow === "open" ? (
+            <StartCallButton place={{ bookingId: booking.id }} activeCallId={call.activeCallId} />
+          ) : (
+            <p className="text-sm text-ink/70">A video call button appears here on {formatDate(booking.preferred_date, { weekday: "long" })}, the day of the appointment.</p>
+          )}
+        </Section>
       )}
 
       <Section title="Request">

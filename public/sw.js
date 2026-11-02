@@ -158,6 +158,16 @@ self.addEventListener("push", (event) => {
   } catch {
     // Not JSON: show a generic pop-up rather than nothing.
   }
+  // An incoming video call stays on screen until answered or dismissed, with
+  // a long ring-like vibration (Android; iPhones use their notification sound).
+  const call = data.call === true;
+  // A chat message gets WhatsApp's "Mark as read" button.
+  const message = typeof data.notificationId === "string";
+  // The unread count on the app icon, where the phone supports it (installed
+  // app on iPhone, Android launchers that show numbers, computers).
+  if (typeof data.badge === "number" && self.navigator.setAppBadge) {
+    (data.badge > 0 ? self.navigator.setAppBadge(data.badge) : self.navigator.clearAppBadge()).catch(() => {});
+  }
   event.waitUntil(
     self.registration.showNotification(data.title || "Grace", {
       body: data.body || "",
@@ -166,7 +176,18 @@ self.addEventListener("push", (event) => {
       // Same tag (e.g. one chat) replaces the older pop-up instead of stacking.
       tag: data.tag || undefined,
       renotify: Boolean(data.tag),
-      data: { url: safeUrl(data.url) },
+      data: { url: safeUrl(data.url), notificationId: message ? data.notificationId : null },
+      ...(message && !call ? { actions: [{ action: "read", title: "Mark as read" }] } : {}),
+      ...(call
+        ? {
+            requireInteraction: true,
+            vibrate: [700, 300, 700, 300, 700, 300, 700, 300, 700, 300, 700],
+            actions: [
+              { action: "join", title: "Join" },
+              { action: "dismiss", title: "Not now" },
+            ],
+          }
+        : {}),
     }),
   );
 });
@@ -174,6 +195,23 @@ self.addEventListener("push", (event) => {
 // Tapping a pop-up: reuse an open app window if there is one, otherwise open it.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  if (event.action === "dismiss") return;
+  // "Mark as read": tell the app (signed-in cookie), update the icon badge, don't open anything.
+  if (event.action === "read") {
+    const id = event.notification.data && event.notification.data.notificationId;
+    if (typeof id !== "string") return;
+    event.waitUntil(
+      fetch("/api/notifications/read", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ id }) })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((body) => {
+          if (body && typeof body.unread === "number" && self.navigator.setAppBadge) {
+            return body.unread > 0 ? self.navigator.setAppBadge(body.unread) : self.navigator.clearAppBadge();
+          }
+        })
+        .catch(() => {}),
+    );
+    return;
+  }
   const url = safeUrl(event.notification.data && event.notification.data.url);
   event.waitUntil(
     (async () => {

@@ -19,6 +19,8 @@ export function SetBoard({ sessionId, view, finish, finishing, promptStyle }: Bo
   const [typed, setTyped] = useState("");
   const [result, setResult] = useState<{ correct: boolean; answer: string; reference?: string; picked?: number; answerIndex?: number } | null>(null);
   const [busy, setBusy] = useState(false);
+  // The choice just tapped, shown straight away while the server checks it.
+  const [pending, setPending] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const question = view.questions[index];
@@ -27,9 +29,11 @@ export function SetBoard({ sessionId, view, finish, finishing, promptStyle }: Bo
   async function submit(answer: number | string) {
     if (result || busy) return;
     setBusy(true);
+    setPending(typeof answer === "number" ? answer : null);
     setError(null);
     const r = await callAction(() => answerSetQuestion(sessionId, index, answer), { error: CONNECTION_FAILED });
     setBusy(false);
+    setPending(null);
     if (r.error || r.correct === undefined) return setError(r.error ?? "Couldn't check that answer.");
     setResult({ correct: r.correct, answer: r.answer ?? "", reference: r.reference, picked: typeof answer === "number" ? answer : undefined, answerIndex: r.answerIndex });
     haptic(r.correct ? "success" : "error");
@@ -85,10 +89,17 @@ export function SetBoard({ sessionId, view, finish, finishing, promptStyle }: Bo
                 onClick={() => submit(i)}
                 disabled={Boolean(result) || busy}
                 className={`flex items-center justify-between gap-2 rounded-xl border px-4 py-3 text-left text-sm transition-colors ${
-                  isAnswer ? "border-success-line bg-success-tint text-success" : isWrongPick ? "border-danger-line bg-danger-tint text-danger" : "border-line bg-surface hover:border-line-strong"
+                  isAnswer
+                    ? "border-success-line bg-success-tint text-success"
+                    : isWrongPick
+                    ? "border-danger-line bg-danger-tint text-danger"
+                    : pending === i
+                    ? "border-gold bg-gold/10"
+                    : "border-line bg-surface hover:border-line-strong"
                 }`}
               >
                 <span>{choice}</span>
+                {pending === i && <span className="shrink-0 text-xs text-ink/60 motion-safe:animate-pulse">Checking…</span>}
                 {isAnswer && <CheckCircle2 aria-label="Correct answer" className="h-4 w-4 shrink-0" />}
                 {isWrongPick && <XCircle aria-label="Your answer" className="h-4 w-4 shrink-0" />}
               </button>
@@ -118,7 +129,7 @@ export function SetBoard({ sessionId, view, finish, finishing, promptStyle }: Bo
           />
           {!result && (
             <button type="submit" className="btn-primary" disabled={busy || !typed.trim()}>
-              Check
+              {busy ? "Checking…" : "Check"}
             </button>
           )}
         </form>

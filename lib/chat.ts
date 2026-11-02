@@ -29,7 +29,7 @@ export interface ChatMessage {
   sender_id: string;
   content: string;
   created_at: string;
-  kind: "text" | "voice" | "image";
+  kind: "text" | "voice" | "image" | "poll";
   edited_at: string | null;
   deleted_at: string | null;
   deleted_by: string | null;
@@ -37,6 +37,10 @@ export interface ChatMessage {
   media_path: string | null;
   media_duration_ms: number | null;
   media_expired_at: string | null;
+  /** chat_v4.sql: forwarded from another chat; people @mentioned; when it disappears. */
+  forwarded?: boolean;
+  mentions?: string[];
+  expires_at?: string | null;
   /** True until the server confirms the insert. */
   pending?: boolean;
 }
@@ -113,6 +117,7 @@ export function messagePreview(message: Pick<ChatMessage, "content" | "kind" | "
   if (message.deleted_at) return "This message was deleted";
   if (message.kind === "voice") return "Voice note";
   if (message.kind === "image") return message.content ? `Photo · ${message.content}` : "Photo";
+  if (message.kind === "poll") return `Poll: ${message.content}`;
   const text = message.content.replace(/\s+/g, " ").trim();
   return text.length > 90 ? `${text.slice(0, 89)}…` : text;
 }
@@ -241,3 +246,96 @@ export type DmPrivacy = keyof typeof DM_PRIVACY_OPTIONS;
 
 // Chat photos (behind the chat_photos plan switch).
 export const CHAT_PHOTO_MAX_DIMENSION = 1600;
+
+// ---------------------------------------------------------------------------
+// Online & last seen (chat_v4.sql)
+// ---------------------------------------------------------------------------
+
+/** The app says "I'm here" this often while open; anyone seen within ONLINE_WINDOW_MS shows as online. */
+export const PRESENCE_HEARTBEAT_MS = 60_000;
+export const ONLINE_WINDOW_MS = 90_000;
+
+/** "online", "last seen today at 14:02", "last seen yesterday at 09:15", "last seen 3 Oct". */
+export function lastSeenLabel(lastSeen: string, now: Date = new Date(), timeZone: string = APP_TIMEZONE): string {
+  const at = new Date(lastSeen);
+  if (now.getTime() - at.getTime() < ONLINE_WINDOW_MS) return "online";
+  const time = at.toLocaleTimeString("en-ZA", { timeZone, hour: "2-digit", minute: "2-digit", hour12: false });
+  const label = dayLabel(lastSeen, now, timeZone);
+  if (label === "Today") return `last seen today at ${time}`;
+  if (label === "Yesterday") return `last seen yesterday at ${time}`;
+  if (/^[A-Z][a-z]+day$/.test(label)) return `last seen ${label} at ${time}`;
+  return `last seen ${label}`;
+}
+
+// ---------------------------------------------------------------------------
+// @mentions (chat_v4.sql)
+// ---------------------------------------------------------------------------
+
+/**
+ * The people actually mentioned in a message: those picked from the @ list
+ * whose "@Name" is still in the text (deleting the text drops the mention).
+ */
+export function mentionedIds(text: string, picked: Readonly<Record<string, string>>): string[] {
+  return Object.entries(picked)
+    .filter(([, name]) => text.includes(`@${name}`))
+    .map(([id]) => id);
+}
+
+/** The "@query" being typed just before the cursor, if any (for the suggestion list). */
+export function mentionQuery(text: string, cursor: number): { query: string; start: number } | null {
+  const before = text.slice(0, cursor);
+  const match = /(^|\s)@([^\s@]{0,30})$/.exec(before);
+  return match ? { query: match[2], start: cursor - match[2].length - 1 } : null;
+}
+
+/** Splits text into plain parts and "@Name" mentions of the given names, for highlighting. */
+export function splitMentions(text: string, names: readonly string[]): { text: string; mention: boolean }[] {
+  const wanted = [...new Set(names.filter(Boolean))].sort((a, b) => b.length - a.length);
+  if (!wanted.length) return [{ text, mention: false }];
+  const escaped = wanted.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const parts: { text: string; mention: boolean }[] = [];
+  const re = new RegExp(`@(${escaped.join("|")})`, "g");
+  let last = 0;
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    if (m.index > last) parts.push({ text: text.slice(last, m.index), mention: false });
+    parts.push({ text: m[0], mention: true });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push({ text: text.slice(last), mention: false });
+  return parts;
+}
+
+// ---------------------------------------------------------------------------
+// Disappearing messages and polls (chat_v4.sql)
+// ---------------------------------------------------------------------------
+
+/** Keep in sync with the check on chat_channels.disappear_after_seconds. */
+export const DISAPPEAR_OPTIONS = [
+  { seconds: 86400, label: "24 hours" },
+  { seconds: 604800, label: "7 days" },
+  { seconds: 7776000, label: "90 days" },
+] as const;
+
+export function disappearLabel(seconds: number | null | undefined): string | null {
+  return DISAPPEAR_OPTIONS.find((o) => o.seconds === seconds)?.label ?? null;
+}
+
+export const POLL_MAX_OPTIONS = 12;
+
+export interface PollVote {
+  message_id: string;
+  user_id: string;
+  option_index: number;
+}
+
+/** Votes per option and who cast them, plus how many different people voted. */
+export function tallyPoll(optionCount: number, votes: readonly PollVote[]): { counts: number[]; voters: string[][]; total: number } {
+  const counts = Array.from({ length: optionCount }, () => 0);
+  const voters: string[][] = Array.from({ length: optionCount }, () => []);
+  for (const v of votes) {
+    if (v.option_index < 0 || v.option_index >= optionCount) continue;
+    counts[v.option_index]++;
+    voters[v.option_index].push(v.user_id);
+  }
+  return { counts, voters, total: new Set(votes.map((v) => v.user_id)).size };
+}

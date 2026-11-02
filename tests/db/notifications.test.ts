@@ -110,7 +110,8 @@ describe("messages", () => {
     expect(await recipients("chat.message")).toEqual(sorted([ADMIN, PASTOR, BOB, CAROL]));
     await send(ALICE, GENERAL);
     const bob = await rows(`select count, title, body from notifications where user_id = $1 and type = 'chat.message'`, [BOB]);
-    expect(bob).toEqual([{ count: 2, title: "General", body: "2 new messages" }]);
+    // WhatsApp-style (chat_notifications_v2.sql): the latest message, with who sent it.
+    expect(bob).toEqual([{ count: 2, title: "General", body: "Alice: hi" }]);
   });
 
   test("muted chats and blocked senders create nothing", async () => {
@@ -137,7 +138,7 @@ describe("messages", () => {
     await db.exec(`delete from notifications`);
     await send(ALICE, DM);
     expect(await recipients("chat.message")).toEqual([BOB]);
-    expect(await latestFor(BOB, "chat.message")).toMatchObject({ title: "Alice", body: "Sent you a message", link: `/dashboard/chat/${DM}` });
+    expect(await latestFor(BOB, "chat.message")).toMatchObject({ title: "Alice", body: "hi", link: `/dashboard/chat/${DM}` });
   });
 
   test("a members-only channel reaches its members plus pastors and admins", async () => {
@@ -147,11 +148,31 @@ describe("messages", () => {
     expect(await recipients("chat.message")).toEqual(sorted([ADMIN, PASTOR]));
   });
 
-  test("bell text never contains the message itself", async () => {
+  test("someone who turns message text off never gets it — only the people the message reached see it at all", async () => {
     await db.exec(`delete from notifications`);
+    await db.exec(`insert into notification_preferences (user_id, show_previews) values ('${ADMIN}', false) on conflict (user_id) do update set show_previews = false`);
     await send(BOB, GENERAL, "my secret prayer request");
-    const leaked = await rows(`select id from notifications where title ilike '%secret%' or body ilike '%secret%'`);
-    expect(leaked).toEqual([]);
+    const withText = await rows(`select user_id from notifications where body ilike '%secret%' order by user_id`);
+    // Everyone the message reached, except the admin who turned text off (and never Bob, the sender).
+    expect(withText.map((r) => r.user_id)).toEqual(sorted([PASTOR, ALICE, CAROL]));
+    expect((await latestFor(ADMIN, "chat.message")).body).toBe("New message from Bob");
+    // Notifications are private: Alice can't read the pastor's.
+    expect(await asUser(db, ALICE, () => rows(`select user_id from notifications where body ilike '%secret%'`))).toEqual([{ user_id: ALICE }]);
+  });
+
+  test("voice notes and photos are described, long messages are shortened", async () => {
+    await db.exec(`delete from notifications`);
+    await send(ALICE, DM, "x".repeat(300));
+    expect((await latestFor(BOB, "chat.message")).body).toBe(`${"x".repeat(139)}…`);
+    expect(await rows(`select app_private.chat_preview('voice', '') as v, app_private.chat_preview('image', 'p') as i`)).toEqual([{ v: "🎤 Voice message", i: "📷 Photo" }]);
+  });
+
+  test("a message deleted before it's read leaves no trace of its text in notifications", async () => {
+    await db.exec(`delete from notifications`);
+    const [{ id }] = await rows(`insert into chat_messages (channel_id, sender_id, content) values ($1, $2, 'oops wrong chat') returning id`, [DM, ALICE]);
+    expect((await latestFor(BOB, "chat.message")).body).toBe("oops wrong chat");
+    await db.exec(`update chat_messages set deleted_at = now(), content = '' where id = '${id}'`);
+    expect((await latestFor(BOB, "chat.message")).body).toBe("🚫 This message was deleted");
   });
 });
 

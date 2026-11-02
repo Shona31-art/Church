@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { FormField } from "@/components/ui/FormField";
 import { showToast } from "@/components/ui/Toaster";
 import { requestSermonAudioUpload } from "./actions";
+import { mediaEmbed, playableFileUrl } from "@/lib/media";
 
 const MAX_BYTES = 50 * 1024 * 1024;
 
@@ -52,9 +53,11 @@ export function AudioField({ initial, error }: { initial: string; error?: string
   }
 
   const isUpload = url.includes("/storage/v1/object/public/sermon-audio/");
+  const embed = mediaEmbed(url);
+  const file = embed ? null : playableFileUrl(url);
 
   return (
-    <FormField label="Audio" htmlFor="audio_url" optional error={problem ?? error} hint="Upload a recording from your phone (MP3, M4A, WAV, AAC or OGG, up to 50 MB), or paste a link.">
+    <FormField label="Audio" htmlFor="audio_url" optional error={problem ?? error} hint="Upload a recording from your phone (MP3, M4A, WAV, AAC or OGG, up to 50 MB), or paste a link from SoundCloud, Spotify, YouTube, Google Drive or Dropbox.">
       <div className="space-y-2">
         <div className="flex flex-wrap gap-2">
           <button type="button" className="btn-secondary" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
@@ -68,13 +71,14 @@ export function AudioField({ initial, error }: { initial: string; error?: string
         </div>
         <input ref={fileRef} type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.opus" className="sr-only" onChange={onPick} aria-label="Choose a recording" />
         {busy && <p className="text-sm text-ink/70">{busy}</p>}
-        {url && (isUpload || /\.(mp3|m4a|aac|wav|ogg|opus|webm)(\?|$)/i.test(url)) && <audio controls preload="metadata" src={url} className="w-full" />}
+        {file && !busy && <audio controls preload="metadata" src={file} className="w-full" />}
+        {embed && !busy && <p className="text-xs text-success">{embed.service} link — it will play right on the sermon page.</p>}
         <input
           id="audio_url"
           name="audio_url"
           type="url"
           inputMode="url"
-          placeholder="…or paste a link: https://…/sermon.mp3"
+          placeholder="…or paste a link: SoundCloud, Spotify, Google Drive…"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           className={`input ${isUpload ? "text-xs text-ink/60" : ""}`}

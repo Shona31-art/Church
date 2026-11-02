@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Ban, BellOff, Bell, EllipsisVertical, Eraser, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
-import { MUTE_OPTIONS, muteLabel, type MuteOption } from "@/lib/chat";
+import { Archive, ArchiveRestore, Ban, BellOff, Bell, EllipsisVertical, Eraser, Pencil, Pin, PinOff, Search, Timer, Trash2 } from "lucide-react";
+import { DISAPPEAR_OPTIONS, MUTE_OPTIONS, disappearLabel, muteLabel, type MuteOption } from "@/lib/chat";
 import { showToast } from "@/components/ui/Toaster";
-import { blockMember, clearMyChatHistory, deleteChannel, deleteDirectMessageForBoth, hideChatForMe, setChatMute, setChatPinned, unblockMember } from "../actions";
+import { blockMember, clearMyChatHistory, deleteChannel, deleteDirectMessageForBoth, hideChatForMe, setChatArchived, setChatDisappearing, setChatMute, setChatPinned, unblockMember } from "../actions";
 
 type Confirming = "clear" | "block" | "hide" | "deleteBoth" | "deleteChannel" | null;
 
@@ -22,6 +22,10 @@ export function ChatMenu({
   canEdit = false,
   canDelete = false,
   channelName,
+  v4 = false,
+  archived = false,
+  disappearAfter = null,
+  canSetDisappearing = false,
 }: {
   channelId: string;
   /** Pastors/admins on a channel created in the app. */
@@ -34,6 +38,12 @@ export function ChatMenu({
   pinned: boolean;
   /** Set in a DM: the other person, and whether I've blocked them. */
   dmWith: { id: string; name: string; blockedByMe: boolean } | null;
+  /** chat_v4.sql features: archive, search in chat, disappearing messages. */
+  v4?: boolean;
+  archived?: boolean;
+  disappearAfter?: number | null;
+  /** DMs: either person. Groups: pastors and church admins. */
+  canSetDisappearing?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -162,6 +172,35 @@ export function ChatMenu({
                 </button>
               ))}
             </div>
+          )}
+
+          {v4 && (
+            <>
+              <Link href={`/dashboard/chat/search?chat=${channelId}`} role="menuitem" className={item} onClick={() => setOpen(false)}>
+                <Search aria-hidden className="h-4 w-4 text-ink/60" /> Search in this chat
+              </Link>
+              <button type="button" role="menuitem" className={item} onClick={() => run(() => setChatArchived(channelId, !archived), archived ? "Chat moved back to your list." : "Chat archived. Find it under Archived at the bottom of your chats.", !archived)}>
+                {archived ? <ArchiveRestore aria-hidden className="h-4 w-4 text-ink/60" /> : <Archive aria-hidden className="h-4 w-4 text-ink/60" />}
+                {archived ? "Unarchive chat" : "Archive chat"}
+              </button>
+              {canSetDisappearing && (
+                <div role="group" aria-label="Disappearing messages" className="border-y border-line py-1">
+                  <p className="flex items-center gap-2.5 px-3 py-1 text-xs font-semibold text-ink/60">
+                    <Timer aria-hidden className="h-3.5 w-3.5" /> Disappearing messages{disappearAfter ? `: ${disappearLabel(disappearAfter)}` : ": off"}
+                  </p>
+                  {DISAPPEAR_OPTIONS.filter((o) => o.seconds !== disappearAfter).map((o) => (
+                    <button key={o.seconds} type="button" role="menuitem" className={`${item} pl-9`} onClick={() => run(() => setChatDisappearing(channelId, o.seconds), `New messages will disappear after ${o.label}.`)}>
+                      {o.label}
+                    </button>
+                  ))}
+                  {disappearAfter && (
+                    <button type="button" role="menuitem" className={`${item} pl-9`} onClick={() => run(() => setChatDisappearing(channelId, null), "Disappearing messages are off.")}>
+                      Turn off
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
           )}
 
           <button type="button" role="menuitem" className={item} onClick={() => (setOpen(false), setConfirming("clear"))}>

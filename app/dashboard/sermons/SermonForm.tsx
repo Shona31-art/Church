@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { useFormState } from "react-dom";
 import { saveSermon } from "./actions";
 import { AudioField } from "./AudioField";
+import { VideoField } from "./VideoField";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { Alert } from "@/components/ui/Alert";
 import { FormActions, FormField, RequiredNote } from "@/components/ui/FormField";
@@ -54,10 +55,9 @@ export function SermonForm({ sermon, aiAvailable, today }: { sermon?: SermonValu
             <input id="sermon_date" name="sermon_date" type="date" required defaultValue={v("sermon_date", sermon?.sermon_date ?? today)} className="input" aria-invalid={Boolean(fe.sermon_date)} />
           </FormField>
         </div>
-        <FormField label="Video link" htmlFor="video_url" optional error={fe.video_url} hint="YouTube links play right on the sermon page.">
-          <input id="video_url" name="video_url" type="url" inputMode="url" placeholder="https://www.youtube.com/watch?v=…" defaultValue={v("video_url", sermon?.video_url)} className="input" aria-invalid={Boolean(fe.video_url)} />
-        </FormField>
+        <VideoField initial={v("video_url", sermon?.video_url)} error={fe.video_url} />
         <AudioField initial={v("audio_url", sermon?.audio_url)} error={fe.audio_url} />
+        <MediaHostingTips />
       </fieldset>
 
       {/* Opens and closes; open already when there are notes or a problem to fix. */}
@@ -114,3 +114,36 @@ export function SermonForm({ sermon, aiAvailable, today }: { sermon?: SermonValu
     </form>
   );
 }
+
+/**
+ * Big recordings don't have to use the church's own storage: free services
+ * host them, and pasting the link here plays them on the sermon page.
+ */
+function MediaHostingTips() {
+  return (
+    <details className="rounded-xl border border-line p-4 text-sm [&_summary::-webkit-details-marker]:hidden">
+      <summary className="cursor-pointer list-none font-semibold">
+        Big files? Keep them on a free service and paste the link <span className="font-normal text-ink/60">· how</span>
+      </summary>
+      <div className="mt-3 space-y-3 text-ink/80">
+        <p>Videos and long recordings take a lot of space. These free services keep them for you, and the link plays right on the sermon page:</p>
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li>
+            <strong>Video — YouTube</strong> (best): upload, set it to <em>Public</em> or <em>Unlisted</em>, then copy the link from <em>Share</em>. It plays smoothly even on slow phones. If you stream on <strong>Facebook</strong>, paste the video&apos;s link (it must be public). <strong>Vimeo</strong> works too.
+          </li>
+          <li>
+            <strong>Audio — SoundCloud</strong> or <strong>Spotify</strong> (if your church has a podcast): copy the episode or track link from <em>Share</em>.
+          </li>
+          <li>
+            <strong>Google Drive</strong> (video or audio): upload, choose <em>Share → General access → Anyone with the link</em>, then <em>Copy link</em>.
+          </li>
+          <li>
+            <strong>Dropbox</strong> (video or audio): <em>Share → Copy link</em>. MP4 and MP3 files play best.
+          </li>
+        </ul>
+        <p className="text-ink/60">Uploading straight here still works too — it just uses your church&apos;s own storage.</p>
+      </div>
+    </details>
+  );
+}
+

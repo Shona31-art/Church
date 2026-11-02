@@ -83,6 +83,8 @@ const NOUNS: Record<string, string> = {
 };
 
 const SPECIFIC: Record<string, string> = {
+  "video_call.started": "Started a video call",
+  "video_call.ended": "Ended a video call for everyone",
   "auth.signed_in": "Signed in",
   "auth.signed_out": "Signed out",
   "member.role_changed": "Changed a member's role",

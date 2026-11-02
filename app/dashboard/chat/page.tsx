@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ChatSwipeRow } from "./ChatSwipeRow";
-import { BellOff, Hash, Lock, Pin, Plus, Users } from "lucide-react";
+import { Archive, BellOff, Hash, Lock, Pin, Plus, Search, Star, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
@@ -20,9 +20,10 @@ interface ChatRow {
   membersOnly: boolean;
   otherId: string | null;
   pinnedAt: string | null;
+  archived: boolean;
   muted: boolean;
   unread: number;
-  last: { content: string; kind: "text" | "voice" | "image"; deleted_at: string | null; created_at: string } | null;
+  last: { content: string; kind: "text" | "voice" | "image" | "poll"; deleted_at: string | null; created_at: string } | null;
 }
 
 export default async function ChatsPage() {
@@ -53,7 +54,7 @@ export default async function ChatsPage() {
     ? await supabase.from("chat_channel_members").select("channel_id, user_id, app_users(name)").in("channel_id", dmIds).neq("user_id", me.id)
     : { data: [] };
 
-  const base: Omit<ChatRow, "unread" | "last" | "pinnedAt" | "muted">[] = [
+  const base: Omit<ChatRow, "unread" | "last" | "pinnedAt" | "muted" | "archived">[] = [
     ...(channels ?? []).map((c: any) => ({
       channelId: c.id,
       name: c.name,
@@ -78,7 +79,7 @@ export default async function ChatsPage() {
       let unreadQuery = supabase.from("chat_messages").select("id", { count: "exact", head: true }).eq("channel_id", row.channelId).neq("sender_id", me.id).is("deleted_at", null);
       if (since) unreadQuery = unreadQuery.gt("created_at", since);
       const [{ data: last }, { count }] = await Promise.all([latestQuery.order("created_at", { ascending: false }).limit(1).maybeSingle(), settingsRows ? unreadQuery : Promise.resolve({ count: 0 })]);
-      return { ...row, pinnedAt: s?.pinned_at ?? null, muted: isMuted(s?.muted_until), unread: count ?? 0, last: (last as ChatRow["last"]) ?? null };
+      return { ...row, pinnedAt: s?.pinned_at ?? null, archived: Boolean((s as any)?.archived_at), muted: isMuted(s?.muted_until), unread: count ?? 0, last: (last as ChatRow["last"]) ?? null };
     })
   );
 
@@ -90,9 +91,13 @@ export default async function ChatsPage() {
     const hiddenAt = (settings.get(r.channelId) as any)?.hidden_at as string | undefined;
     return !hiddenAt || (r.last && r.last.created_at > hiddenAt);
   });
-  const groupChats = visible.filter((r) => r.kind !== "dm").sort(order);
-  const dmChats = visible.filter((r) => r.kind === "dm").sort(order);
-  const photos = await getAvatarUrls(dmChats.map((t) => t.otherId).filter((id): id is string => Boolean(id)));
+  // Archived chats (chat_v4.sql) sit in their own section at the bottom, like WhatsApp.
+  const archived = visible.filter((r) => r.archived).sort(order);
+  const active = visible.filter((r) => !r.archived);
+  const groupChats = active.filter((r) => r.kind !== "dm").sort(order);
+  const dmChats = active.filter((r) => r.kind === "dm").sort(order);
+  const photos = await getAvatarUrls(visible.map((t) => t.otherId).filter((id): id is string => Boolean(id)));
+  const archivedUnread = archived.reduce((n, r) => n + (r.muted ? 0 : r.unread), 0);
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -116,6 +121,21 @@ export default async function ChatsPage() {
 
       {error && <Alert tone="error">Couldn&apos;t load your chats — refresh the page to try again.</Alert>}
 
+      <div className="flex flex-wrap items-center gap-2">
+        <form action="/dashboard/chat/search" role="search" className="flex min-w-0 flex-1 gap-2">
+          <label htmlFor="chat-list-search" className="sr-only">
+            Search messages
+          </label>
+          <input id="chat-list-search" name="q" type="search" placeholder="Search messages" className="input min-w-0 flex-1" minLength={2} maxLength={100} />
+          <button type="submit" className="btn-secondary btn-icon" aria-label="Search">
+            <Search aria-hidden className="h-4 w-4" />
+          </button>
+        </form>
+        <Link href="/dashboard/chat/starred" className="btn-ghost">
+          <Star aria-hidden className="h-4 w-4" /> Starred
+        </Link>
+      </div>
+
       <Section title="Channels">
         {!groupChats.length ? (
           <p className="text-sm text-ink/60">No channels yet. A church-wide channel is created with your church, and each department gets its own.</p>
@@ -127,6 +147,18 @@ export default async function ChatsPage() {
       <Section title="Direct messages">
         {!dmChats.length ? <p className="text-sm text-ink/60">No direct messages yet. Use “New message” to start one.</p> : <ChatList rows={dmChats} photos={photos} />}
       </Section>
+
+      {archived.length > 0 && (
+        <details className="card-elevated rounded-2xl p-4 [&_summary::-webkit-details-marker]:hidden">
+          <summary className="flex cursor-pointer list-none items-center gap-2 font-semibold">
+            <Archive aria-hidden className="h-4 w-4 text-ink/60" /> Archived ({archived.length})
+            {archivedUnread > 0 && <span className="tabular rounded-full bg-ember px-1.5 py-0.5 text-eyebrow text-on-ember">{archivedUnread}</span>}
+          </summary>
+          <div className="mt-3">
+            <ChatList rows={archived} photos={photos} />
+          </div>
+        </details>
+      )}
     </div>
   );
 }
@@ -139,7 +171,7 @@ function ChatList({ rows, photos }: { rows: ChatRow[]; photos: Map<string, strin
         const showCount = r.unread > 0 && !r.muted;
         return (
           <li key={r.channelId}>
-            <ChatSwipeRow channelId={r.channelId} unread={r.unread} muted={r.muted} dmName={r.kind === "dm" ? r.name : undefined}>
+            <ChatSwipeRow channelId={r.channelId} unread={r.unread} muted={r.muted} archived={r.archived} dmName={r.kind === "dm" ? r.name : undefined}>
             <Link href={`/dashboard/chat/${r.channelId}`} className="flex items-center gap-3 rounded-xl px-2 py-3 hover:bg-ink/[0.03]">
               {r.kind === "dm" ? (
                 <Avatar name={r.name} src={r.otherId ? photos.get(r.otherId) : null} size="md" />

@@ -12,6 +12,7 @@ import { ScrambleBoard } from "./boards/ScrambleBoard";
 import { BooksBoard } from "./boards/BooksBoard";
 import { MazeBoard } from "./boards/MazeBoard";
 import { JigsawBoard } from "./jigsaw/JigsawBoard";
+import { DifferenceBoard } from "./spot-the-difference/DifferenceBoard";
 
 // Each game's board and one-line rules. The shell around them (levels, timer,
 // results) is shared — see GameShell.
@@ -31,6 +32,7 @@ const SCREENS: Record<GameKey, { rules: string; Board: (props: BoardProps<any>) 
   verse_fill: { rules: "Find the missing words. Easier levels give you choices; on Hard, type them in order.", Board: (p) => <SetBoard {...p} promptStyle="verse" /> },
   who_said: { rules: "Who said it? Pick the person behind each saying.", Board: (p) => <SetBoard {...p} promptStyle="quote" /> },
   books_order: { rules: "Put the books of the Bible in the right order. Each book in the right place scores.", Board: BooksBoard },
+  differences: { rules: "Two copies of a Bible picture, with a few changes. Tap each difference on either picture. Too many wrong taps ends the game.", Board: DifferenceBoard },
   jigsaw: { rules: "Put the Bible picture back together. Each piece in its right place scores.", Board: JigsawBoard },
   maze: { rules: "Find your way from the start (top left) to the goal (bottom right). Use the arrow keys, the arrows below the maze, or swipe.", Board: MazeBoard },
 };

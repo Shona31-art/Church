@@ -14,18 +14,19 @@ export function QuizBoard({ sessionId, view, finish, finishing }: BoardProps<Qui
   const [score, setScore] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [correctIndex, setCorrectIndex] = useState<number | null>(null);
-  const [checking, setChecking] = useState(false);
+  const [checking, setChecking] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const question = view.questions[index];
   const last = index === view.questions.length - 1;
 
   async function choose(choice: number) {
-    if (picked !== null || checking) return;
-    setChecking(true);
+    if (picked !== null || checking !== null) return;
+    // Show the tap straight away while the server checks it.
+    setChecking(choice);
     setError(null);
     const result = await callAction(() => revealQuizAnswer(sessionId, index, choice), { error: CONNECTION_FAILED });
-    setChecking(false);
+    setChecking(null);
     if (result.error || result.correctIndex === undefined) return setError(result.error ?? "Couldn't check that answer.");
     setPicked(result.chosen ?? choice);
     setCorrectIndex(result.correctIndex);
@@ -73,12 +74,13 @@ export function QuizBoard({ sessionId, view, finish, finishing }: BoardProps<Qui
               key={i}
               type="button"
               onClick={() => choose(i)}
-              disabled={picked !== null || checking}
+              disabled={picked !== null || checking !== null}
               className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left text-sm transition-colors ${
-                isAnswer ? "border-success-line bg-success-tint text-success" : isWrongPick ? "border-danger-line bg-danger-tint text-danger" : "border-line bg-surface hover:border-line-strong"
+                isAnswer ? "border-success-line bg-success-tint text-success" : isWrongPick ? "border-danger-line bg-danger-tint text-danger" : checking === i ? "border-gold bg-gold/10" : "border-line bg-surface hover:border-line-strong"
               }`}
             >
               <span>{choice}</span>
+              {checking === i && <span className="text-xs text-ink/60 motion-safe:animate-pulse">Checking…</span>}
               {isAnswer && (
                 <span className="flex items-center gap-1 text-xs font-semibold">
                   <CheckCircle2 aria-hidden className="h-4 w-4" /> Correct answer

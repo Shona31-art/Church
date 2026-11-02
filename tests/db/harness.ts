@@ -57,6 +57,11 @@ export const MIGRATION_ORDER = [
   "activity_log.sql",
   "pastor_alerts.sql",
   "member_children.sql",
+  "games_differences.sql",
+  "sermon_video.sql",
+  "video_calls.sql",
+  "chat_notifications_v2.sql",
+  "chat_v4.sql",
 ];
 
 const SUPABASE_STUBS = `

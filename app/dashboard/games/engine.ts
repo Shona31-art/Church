@@ -6,7 +6,7 @@ import type { GameKey, Level } from "@/lib/games/catalog";
 import { createRng, shuffle } from "@/lib/games/random";
 import { QUIZ_LENGTH, checkQuiz, type QuizKey, type QuizProgress } from "@/lib/games/quiz";
 import { buildWordSearch, checkWordSearch, type WordSearchPuzzle } from "@/lib/games/word-search";
-import { buildCrossword, checkCrossword, entryCells, type CrosswordPuzzle, type Direction } from "@/lib/games/crossword";
+import { buildCrossword, buildStageCrossword, checkCrossword, entryCells, type CrosswordPuzzle, type Direction } from "@/lib/games/crossword";
 import { countSolvedVerses, pickRoundForLevel, scrambleOrder, tokenize, type PuzzleVerse, type VerseProgress } from "@/lib/verse-puzzle";
 import { CROSSWORD_CLUES } from "@/lib/games/content/crossword-clues";
 import {
@@ -23,6 +23,7 @@ import {
   type SetQuestion,
 } from "@/lib/games/word-games";
 import { MAZE_POINTS, MAZE_THEMES, buildMaze, checkMaze, type Maze } from "@/lib/games/maze";
+import { buildDifferences, checkDifferences, differenceScene, markTaps, type Background, type DifferencePuzzle, type PictureObject } from "@/lib/games/differences";
 import { JIGSAW_BUCKET, JIGSAW_SCENES, buildJigsaw, checkJigsaw, type JigsawPuzzle, type JigsawSceneKey } from "@/lib/games/jigsaw";
 
 // One entry per game: how to build a puzzle (the full answer key, kept in
@@ -49,7 +50,7 @@ export interface ReviewItem {
 
 interface GameEngine {
   /** `kids`: Kids mode — simpler content only (the level is always Easy). */
-  build(level: Level, seed: number, ctx: { supabase: SupabaseClient; churchId: string; kids: boolean }): Promise<BuiltGame | { error: string }>;
+  build(level: Level, seed: number, ctx: { supabase: SupabaseClient; churchId: string; kids: boolean; stage?: number | null }): Promise<BuiltGame | { error: string }>;
   answers: z.ZodTypeAny;
   check(puzzle: any, progress: any, answers: any): number;
   /** Optional: answers to show once the game is over. */
@@ -148,8 +149,11 @@ export interface CrosswordView {
 }
 
 const crossword: GameEngine = {
-  async build(level, seed, { kids }) {
-    const puzzle = buildCrossword(level, seed, kids ? CROSSWORD_CLUES.filter((c) => c.kids) : undefined);
+  async build(level, seed, { kids, stage }) {
+    // Numbered levels each get their own clues (never repeated in another level).
+    const puzzle = stage
+      ? buildStageCrossword(stage)
+      : buildCrossword(level, seed, kids ? CROSSWORD_CLUES.filter((c) => c.kids) : undefined);
     const shape = Array.from({ length: puzzle.height }, () => Array<string>(puzzle.width).fill("#"));
     for (const e of puzzle.entries) for (const [r, c] of entryCells(e, e.answer.length)) shape[r][c] = ".";
     const view: CrosswordView = {
@@ -284,7 +288,46 @@ const jigsaw: GameEngine = {
   check: (puzzle: JigsawPuzzle, _progress, arrangement) => checkJigsaw(puzzle, arrangement),
 };
 
+// --- Spot the difference ---------------------------------------------------------
+
+export interface DifferenceView {
+  title: string;
+  reference: string;
+  background: Background;
+  left: PictureObject[];
+  right: PictureObject[];
+  count: number;
+  mistakes: number;
+}
+
+const tap = z.tuple([z.number().min(0).max(200), z.number().min(0).max(150)]);
+
+const differences: GameEngine = {
+  async build(level, seed) {
+    const puzzle = buildDifferences(level, createRng(seed));
+    const scene = differenceScene(puzzle.scene)!;
+    const view: DifferenceView = {
+      title: scene.title,
+      reference: scene.reference,
+      background: scene.background,
+      left: puzzle.left,
+      right: puzzle.right,
+      count: puzzle.spots.length,
+      mistakes: puzzle.mistakes,
+    };
+    return { puzzle, view, maxCorrect: puzzle.spots.length };
+  },
+  // Every tap, in order (x, y in the picture's 200 × 150 space).
+  answers: z.array(tap).max(200),
+  check: (puzzle: DifferencePuzzle, _progress, taps) => checkDifferences(puzzle, taps),
+  review: (puzzle: DifferencePuzzle, _progress, taps: [number, number][]) => {
+    const found = new Set(markTaps(puzzle.spots, taps ?? [], puzzle.mistakes).found);
+    return puzzle.spots.map((s, i) => ({ label: `${i + 1}`, prompt: "Difference", answer: s.label, correct: found.has(i) }));
+  },
+};
+
 export const ENGINES: Record<GameKey, GameEngine> = {
+  differences,
   jigsaw,
   quiz,
   crossword,

@@ -13,6 +13,8 @@ import { AlertChannels } from "@/components/notifications/AlertChannels";
 import { makeConfigured } from "@/lib/alert-delivery";
 import { InstallApp } from "@/components/install/InstallApp";
 import { EmailChangeForm } from "./EmailChangeForm";
+import { PreviewSetting } from "@/components/notifications/PreviewSetting";
+import { LastSeenSetting } from "@/components/chat/LastSeenSetting";
 import { ChildrenList } from "@/components/members/ChildrenList";
 import { loadChildren } from "@/lib/children";
 
@@ -49,6 +51,11 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
     alerts: prefsRes.data?.push_alerts ?? true,
   };
 
+  // Last seen (chat_v4.sql); no row yet = shared (the default).
+  const presenceRes = await supabase.from("user_presence").select("show_last_seen").eq("user_id", me.id).maybeSingle();
+  // Message previews (chat_notifications_v2.sql); hidden until that's run.
+  const previewRes = await supabase.from("notification_preferences").select("show_previews").eq("user_id", me.id).maybeSingle();
+
   // WhatsApp alerts are for the people who get pastor & admin alerts, and only
   // show once the platform has them switched on (MAKE_WEBHOOK_URL).
   const getsAlerts = (me.role === "pastor" || me.role === "church_admin") && makeConfigured();
@@ -83,6 +90,7 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
             shareReadReceipts={chatProfile.data?.share_read_receipts ?? true}
             blocked={blocked}
           />
+          {!presenceRes.error && <LastSeenSetting initial={presenceRes.data?.show_last_seen ?? true} />}
         </Section>
       )}
 
@@ -102,6 +110,7 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
         <div id="notifications" className="scroll-mt-24">
           <Section title="Notifications" description="Get a pop-up on your phone or computer when something happens, even when the app is closed.">
             <PushSettings initialPreferences={pushPrefs} />
+            {!previewRes.error && <PreviewSetting initial={previewRes.data?.show_previews ?? true} />}
             {channelRes && !channelRes.error && (
               <AlertChannels
                 initial={channelRes.data?.whatsapp_alerts ?? true}

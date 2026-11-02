@@ -1,6 +1,6 @@
 // The games, their levels and how they score (pure — unit-tested).
 
-export const GAME_KEYS = ["quiz", "crossword", "word_search", "emoji", "scramble", "verse_puzzle", "verse_fill", "who_said", "books_order", "maze", "jigsaw"] as const;
+export const GAME_KEYS = ["quiz", "crossword", "word_search", "emoji", "scramble", "verse_puzzle", "verse_fill", "who_said", "books_order", "maze", "jigsaw", "differences"] as const;
 export type GameKey = (typeof GAME_KEYS)[number];
 
 export const LEVELS = ["easy", "medium", "hard"] as const;
@@ -109,6 +109,14 @@ export const GAMES: Record<GameKey, GameInfo> = {
     path: "jigsaw",
     levels: { easy: "9 pieces", medium: "16 pieces", hard: "25 pieces" },
     parSeconds: { easy: 90, medium: 180, hard: 300 },
+  },
+  differences: {
+    key: "differences",
+    title: "Spot the difference",
+    summary: "Two Bible pictures, a few changes. Can you find them all?",
+    path: "spot-the-difference",
+    levels: { easy: "3 differences, 5 wrong taps allowed", medium: "5 differences, 4 wrong taps allowed", hard: "7 smaller differences, 3 wrong taps allowed" },
+    parSeconds: { easy: 45, medium: 90, hard: 150 },
   },
 };
 

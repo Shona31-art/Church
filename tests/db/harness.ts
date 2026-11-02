@@ -62,6 +62,7 @@ export const MIGRATION_ORDER = [
   "video_calls.sql",
   "chat_notifications_v2.sql",
   "chat_v4.sql",
+  "calls_v2.sql",
 ];
 
 const SUPABASE_STUBS = `
@@ -81,6 +82,15 @@ const SUPABASE_STUBS = `
   $$;
   alter table storage.objects enable row level security;
 
+  -- Supabase Realtime's authorization table (private channels). The topic of
+  -- the channel being joined comes from a session setting we control.
+  create schema if not exists realtime;
+  create table realtime.messages (id bigserial primary key, topic text not null, extension text not null default 'broadcast', payload jsonb);
+  create or replace function realtime.topic() returns text language sql stable as $$
+    select current_setting('test.topic', true)
+  $$;
+  alter table realtime.messages enable row level security;
+
   do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$;
   do $$ begin create role anon nologin; exception when duplicate_object then null; end $$;
 `;
@@ -92,6 +102,10 @@ const GRANTS = `
   grant execute on all functions in schema public to authenticated;
   grant execute on all functions in schema auth to authenticated;
   grant all on storage.objects to authenticated;
+  grant usage on schema realtime to authenticated;
+  grant all on realtime.messages to authenticated;
+  grant all on sequence realtime.messages_id_seq to authenticated;
+  grant execute on function realtime.topic() to authenticated;
 `;
 
 export async function createTestDb() {

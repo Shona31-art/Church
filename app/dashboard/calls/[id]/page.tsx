@@ -5,13 +5,12 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
 import { can } from "@/lib/permissions";
-import { createMeetingToken, isVideoConfigured } from "@/lib/daily";
-import { isCallOpen } from "@/lib/video-call-rules";
+import { callCapacity, iceServersFrom, isCallOpen } from "@/lib/video-call-rules";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { CallRoom } from "./CallRoom";
 
-/** A video call. Only people who can see its chat or appointment can open it (RLS). */
+/** A voice or video call. Only people who can see its chat or appointment can open it (RLS). */
 export default async function CallPage({ params }: { params: { id: string } }) {
   const gate = await moduleGate("video_calls");
   if (gate) return gate;
@@ -27,7 +26,7 @@ export default async function CallPage({ params }: { params: { id: string } }) {
 
   const back = call.channel_id ? { href: `/dashboard/chat/${call.channel_id}`, label: "Back to the chat" } : { href: `/dashboard/booking/${call.booking_id}`, label: "Back to the appointment" };
 
-  if (!isCallOpen(call) || !isVideoConfigured()) {
+  if (!isCallOpen(call)) {
     return (
       <div className="max-w-xl space-y-4">
         <PageHeader back={{ href: back.href, label: "Back" }} title="Video call" />
@@ -41,35 +40,16 @@ export default async function CallPage({ params }: { params: { id: string } }) {
     );
   }
 
-  // A pass into this room for this person, valid until the call ends.
-  let token: string | null = null;
-  try {
-    token = await createMeetingToken({
-      roomName: call.room_name,
-      userId: me.id,
-      userName: me.name,
-      expiresAt: new Date(call.expires_at),
-      isOwner: call.started_by === me.id,
-    });
-  } catch (error) {
-    console.error("[calls] meeting token failed:", (error as Error).message);
-  }
-  if (!token) {
-    return (
-      <div className="max-w-xl space-y-4">
-        <PageHeader back={{ href: back.href, label: "Back" }} title="Video call" />
-        <Alert tone="error">The video service didn&apos;t respond. Wait a moment, then refresh this page.</Alert>
-      </div>
-    );
-  }
-
   return (
     <CallRoom
       callId={call.id}
-      src={`${call.room_url}?t=${encodeURIComponent(token)}`}
+      me={{ id: me.id, name: me.name }}
+      capacity={callCapacity(call.room_url)}
+      iceServers={iceServersFrom({ TURN_URLS: process.env.TURN_URLS, TURN_USERNAME: process.env.TURN_USERNAME, TURN_CREDENTIAL: process.env.TURN_CREDENTIAL })}
       back={back}
       canEndForAll={call.started_by === me.id || can(me.role, "manageBookings")}
       audioOnly={Boolean((call as { audio_only?: boolean }).audio_only)}
+      expiresAt={call.expires_at}
     />
   );
 }

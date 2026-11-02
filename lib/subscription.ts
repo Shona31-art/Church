@@ -25,7 +25,7 @@ export const MODULE_KEYS = [
   "ai_assist", // AI helper buttons inside announcements, prayers, quiz questions
   "chat_voice", // voice notes in chat (Storage)
   "chat_photos", // photo sharing in chat (Storage) — in no plan by default
-  "video_calls", // video calls in chats and for pastor appointments (Daily.co, billed per minute)
+  "video_calls", // voice and video calls in chats and for pastor appointments (built in)
 ] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 

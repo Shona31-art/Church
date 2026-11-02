@@ -111,3 +111,33 @@ describe("voice calls", () => {
   });
 });
 
+describe("call channels (calls_v2.sql): only the call's people can join its Realtime channel", () => {
+  const joinAs = async (who: string, callRoom: string) => {
+    const [{ id }] = await rows(`select id from video_calls where room_name = $1`, [callRoom]);
+    await db.exec(`set test.topic = 'call:${id}'`);
+    try {
+      return await asUser(db, who, () => rows(`insert into realtime.messages (topic, extension) values (realtime.topic(), 'presence') returning id`));
+    } finally {
+      await db.exec(`set test.topic = ''`);
+    }
+  };
+
+  test("the two people in a private chat can; others in the church can't", async () => {
+    await db.exec(`update video_calls set ended_at = null where room_name = 'voice-call'`);
+    expect(await joinAs(BOB, "voice-call")).toHaveLength(1);
+    await expect(joinAs(CAROL, "voice-call")).rejects.toThrow(/row-level security/);
+    await expect(joinAs(OUTSIDER, "voice-call")).rejects.toThrow(/row-level security/);
+  });
+
+  test("an appointment's call: the member and pastors", async () => {
+    expect(await joinAs(CAROL, "booking-call")).toHaveLength(1);
+    expect(await joinAs(PASTOR, "booking-call")).toHaveLength(1);
+    await expect(joinAs(ALICE, "booking-call")).rejects.toThrow(/row-level security/);
+  });
+
+  test("once a call has ended, nobody can join its channel", async () => {
+    await db.exec(`update video_calls set ended_at = now() where room_name = 'voice-call'`);
+    await expect(joinAs(BOB, "voice-call")).rejects.toThrow(/row-level security/);
+  });
+});
+

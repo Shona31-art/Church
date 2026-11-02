@@ -3,18 +3,17 @@
 -- ============================================================================
 -- In plain language:
 --   * People can start a video call — or a voice call (cameras off) — from a private chat, a group chat, or an
---     approved pastor appointment. Calls run on Daily.co (a paid calling
---     service, billed per minute after its free allowance), so they're a plan
---     feature: on the free trial, Premium, Unlimited and Sponsored — not Basic,
---     which only has features with no running cost.
+--     approved pastor appointment. Calls are built into the app (phones
+--     connect directly — calls_v2.sql), and are a plan feature: on the free
+--     trial, Premium, Unlimited and Sponsored — not Basic.
 --   * video_calls records each call: which chat or appointment it belongs to,
 --     who started it, and when it ends (calls end on their own after 3 hours).
 --   * Who can see a call (and so join it): exactly the people who can see that
 --     chat, or that appointment (the member who booked it and the church's
 --     pastors and admins). Nobody can create or change calls from the browser:
 --     the server does that after checking who's asking.
---   * Daily rooms are private: a call can only be joined with a one-time pass
---     the server hands to people allowed in.
+--   * Only people who can see the call can join it (calls_v2.sql locks its
+--     connection channel to them).
 --   * Ringing: a call in a private chat rings the other person; an
 --     appointment's call rings the other side (the member, or the pastor it was
 --     booked with — all pastors and admins if it was booked with "any pastor").
@@ -27,7 +26,7 @@
 -- ============================================================================
 
 insert into modules (key, name, description) values
-  ('video_calls', 'Video calls', 'Video calls in chats and for pastor appointments (uses a paid calling service)')
+  ('video_calls', 'Video calls', 'Voice and video calls in chats and for pastor appointments')
 on conflict (key) do nothing;
 
 insert into plan_modules (plan_key, module_key) values

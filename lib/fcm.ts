@@ -22,16 +22,35 @@ interface ServiceAccount {
   project_id: string;
 }
 
+/** Text pasted from a phone: smart quotes, invisible characters and stray wrapping are undone. */
+function tidy(raw: string): string {
+  return raw
+    .replace(/^\uFEFF/, "")
+    .replace(/[\u201C\u201D\u201E\u201F\u2033]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u00A0\u200B]/g, " ")
+    .trim()
+    .replace(/^['"`]+|['"`]+$/g, "");
+}
+
+/** A "key": "value" pair from JSON-ish text, even when the whole thing won't parse. */
+function field(text: string, key: string): string | undefined {
+  const m = new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`).exec(text);
+  return m?.[1];
+}
+
 function serviceAccount(): ServiceAccount | null {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!raw) return null;
+  const text = tidy(raw);
+  let parsed: Partial<ServiceAccount> = {};
   try {
-    const parsed = JSON.parse(raw) as Partial<ServiceAccount>;
-    if (!parsed.client_email || !parsed.private_key || !parsed.project_id) return null;
-    return { client_email: parsed.client_email, private_key: parsed.private_key.replace(/\\n/g, "\n"), project_id: parsed.project_id };
+    parsed = JSON.parse(text);
   } catch {
-    return null;
+    parsed = { client_email: field(text, "client_email"), private_key: field(text, "private_key"), project_id: field(text, "project_id") };
   }
+  if (!parsed.client_email || !parsed.private_key || !parsed.project_id) return null;
+  return { client_email: parsed.client_email, private_key: parsed.private_key.replace(/\\n/g, "\n"), project_id: parsed.project_id };
 }
 
 export function fcmConfigured(): boolean {
@@ -42,19 +61,36 @@ export function fcmConfigured(): boolean {
 export function androidAppConfig(): { appId: string; apiKey: string; projectId: string; senderId: string } | null {
   const raw = process.env.FIREBASE_ANDROID_APP;
   if (!raw) return null;
+  const text = tidy(raw);
+  let found: Record<string, unknown> = {};
   try {
-    const json = JSON.parse(raw);
+    const json = JSON.parse(text);
     const clients = (json.client ?? []) as any[];
     const client = clients.find((c) => c?.client_info?.android_client_info?.package_name === ANDROID_PACKAGE) ?? clients[0];
-    const appId = client?.client_info?.mobilesdk_app_id;
-    const apiKey = client?.api_key?.[0]?.current_key;
-    const projectId = json.project_info?.project_id;
-    const senderId = json.project_info?.project_number;
-    if (![appId, apiKey, projectId, senderId].every((v) => typeof v === "string" && v)) return null;
-    return { appId, apiKey, projectId, senderId };
+    found = { appId: client?.client_info?.mobilesdk_app_id, apiKey: client?.api_key?.[0]?.current_key, projectId: json.project_info?.project_id, senderId: json.project_info?.project_number };
   } catch {
-    return null;
+    // Cut short or changed by copying: pick the four values out of the text.
+    found = { appId: field(text, "mobilesdk_app_id"), apiKey: field(text, "current_key"), projectId: field(text, "project_id"), senderId: field(text, "project_number") };
   }
+  const { appId, apiKey, projectId, senderId } = found;
+  if (![appId, apiKey, projectId, senderId].every((v) => typeof v === "string" && v)) return null;
+  return { appId, apiKey, projectId, senderId } as { appId: string; apiKey: string; projectId: string; senderId: string };
+}
+
+/** Why FIREBASE_ANDROID_APP can't be used, as specifically as possible. */
+function androidAppProblem(): string {
+  const text = tidy(process.env.FIREBASE_ANDROID_APP ?? "");
+  if (/private_key|service_account/.test(text)) return "FIREBASE_ANDROID_APP holds the private key file. Swap them: the private key goes in FIREBASE_SERVICE_ACCOUNT, and google-services.json in FIREBASE_ANDROID_APP.";
+  if (/com\.google\.gms|implementation\(|plugins\s*\{/.test(text)) return "FIREBASE_ANDROID_APP holds the Gradle code from Firebase's set-up page, not the file. Paste the contents of google-services.json instead.";
+  const missing = [
+    ["mobilesdk_app_id", "the app id"],
+    ["current_key", "the API key"],
+    ["project_id", "the project id"],
+    ["project_number", "the project number"],
+  ]
+    .filter(([key]) => !field(text, key))
+    .map(([, label]) => label);
+  return `FIREBASE_ANDROID_APP isn't a complete google-services.json (missing ${missing.join(", ") || "parts"}; it's ${text.length} characters long — the real file is usually 600–900). Paste the whole file again, from the first { to the last }.`;
 }
 
 let cachedToken: { value: string; expires: number } | null = null;
@@ -100,9 +136,14 @@ export type AndroidPush = Record<string, string>;
 /** What's missing on the server for the Android app, in plain words; null when ready. */
 export function fcmSetupProblem(): string | null {
   if (!process.env.FIREBASE_ANDROID_APP) return "FIREBASE_ANDROID_APP isn't set in Vercel (or Vercel wasn't redeployed after adding it).";
-  if (!androidAppConfig()) return "FIREBASE_ANDROID_APP isn't a valid google-services.json — paste the whole file again.";
+  if (!androidAppConfig()) return androidAppProblem();
   if (!process.env.FIREBASE_SERVICE_ACCOUNT) return "FIREBASE_SERVICE_ACCOUNT isn't set in Vercel (or Vercel wasn't redeployed after adding it).";
-  if (!serviceAccount()) return "FIREBASE_SERVICE_ACCOUNT isn't a valid key file — paste the whole private key file (it starts with {).";
+  if (!serviceAccount()) {
+    const text = tidy(process.env.FIREBASE_SERVICE_ACCOUNT ?? "");
+    return /mobilesdk_app_id|project_info/.test(text)
+      ? "FIREBASE_SERVICE_ACCOUNT holds google-services.json. Swap them: google-services.json goes in FIREBASE_ANDROID_APP, the private key file in FIREBASE_SERVICE_ACCOUNT."
+      : `FIREBASE_SERVICE_ACCOUNT isn't a complete private key file (${text.length} characters — the real one is about 2,300). Paste the whole file again, from the first { to the last }.`;
+  }
   return null;
 }
 

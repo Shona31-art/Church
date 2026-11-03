@@ -67,3 +67,20 @@ describe("Firebase settings", () => {
     expect(fcmConfigured()).toBe(true);
   });
 });
+
+describe("Firebase settings pasted from a phone", () => {
+  afterEach(() => {
+    delete process.env.FIREBASE_ANDROID_APP;
+  });
+  test("smart quotes and a cut-off end still work", () => {
+    process.env.FIREBASE_ANDROID_APP = `{ “project_info”: { “project_number”: “123”, “project_id”: “grace-app” }, “client”: [ { “client_info”: { “mobilesdk_app_id”: “1:123:android:abc” }, “api_key”: [ { “current_key”: “AIzaKey” } ] `;
+    expect(androidAppConfig()).toEqual({ appId: "1:123:android:abc", apiKey: "AIzaKey", projectId: "grace-app", senderId: "123" });
+  });
+  test("says when the wrong thing was pasted", async () => {
+    const { fcmSetupProblem } = await import("@/lib/fcm");
+    process.env.FIREBASE_ANDROID_APP = 'plugins { id("com.google.gms.google-services") }';
+    expect(fcmSetupProblem()).toMatch(/Gradle code/);
+    process.env.FIREBASE_ANDROID_APP = '{"type":"service_account","private_key":"x"}';
+    expect(fcmSetupProblem()).toMatch(/Swap them/);
+  });
+});

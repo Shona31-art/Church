@@ -2,12 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Lock, Mic, MicOff, Phone, PhoneOff, SwitchCamera, Video, VideoOff } from "lucide-react";
+import { Lock, Mic, MicOff, Phone, PhoneOff, SwitchCamera, Video, VideoOff, Volume2 } from "lucide-react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { showToast } from "@/components/ui/Toaster";
+import { graceAndroid } from "@/lib/android";
 import { Avatar } from "@/components/ui/Avatar";
 import { shouldInitiate } from "@/lib/video-call-rules";
 import { startRingback } from "@/lib/call-sounds";
@@ -95,6 +96,9 @@ export function CallRoom({
   const [phase, setPhase] = useState<Phase>({ kind: autoJoin ? "joining" : "lobby" });
   const [remotes, setRemotes] = useState<Record<string, Remote>>({});
   const [muted, setMuted] = useState(false);
+  // Grace's Android app: voice calls start on the earpiece, video on the loudspeaker.
+  const [android, setAndroid] = useState(false);
+  const [speaker, setSpeaker] = useState(!audioOnly);
   const [cameraOff, setCameraOff] = useState(false);
   const [facing, setFacing] = useState<"user" | "environment">("user");
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
@@ -316,6 +320,24 @@ export function CallRoom({
       lock?.release().catch(() => undefined);
     };
   }, [phase.kind]);
+
+  // Android app: earpiece/loudspeaker, screen off at your ear, and the call
+  // keeps going if you switch apps. Back to normal when the call ends.
+  const inCall = phase.kind === "in-call" || phase.kind === "joining";
+  useEffect(() => {
+    const app = graceAndroid();
+    setAndroid(Boolean(app));
+    if (!app || !inCall) return;
+    app.inCall(audioOnly ? "voice" : "video");
+    setSpeaker(!audioOnly);
+    return () => app.inCall("none");
+  }, [inCall, audioOnly]);
+
+  function toggleSpeaker() {
+    const on = !speaker;
+    graceAndroid()?.setSpeaker(on);
+    setSpeaker(on);
+  }
 
   // Show my own camera.
   useEffect(() => {
@@ -604,6 +626,11 @@ export function CallRoom({
             {audioOnly ? (
               // Voice call: a rounded panel of labelled buttons, like WhatsApp.
               <div className="mx-auto flex max-w-sm items-start justify-around rounded-[2rem] bg-white/10 px-4 pb-4 pt-5 backdrop-blur" role="group" aria-label="Call controls">
+                {android && (
+                  <RoundButton label="Speaker" tone={speaker ? "light" : "glass"} pressed={speaker} onClick={toggleSpeaker}>
+                    <Volume2 aria-hidden className="h-6 w-6" />
+                  </RoundButton>
+                )}
                 <RoundButton label={muted ? "Unmute" : "Mute"} tone={muted ? "light" : "glass"} pressed={muted} onClick={toggleMute}>
                   {muted ? <MicOff aria-hidden className="h-6 w-6" /> : <Mic aria-hidden className="h-6 w-6" />}
                 </RoundButton>

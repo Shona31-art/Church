@@ -87,6 +87,7 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 50 | `calls_v2.sql` | Built-in calls (no outside call service): phones connect directly (WebRTC) after meeting on a private Supabase Realtime channel per call; this locks that channel to the call's people while it's open. Optional free TURN relay for strict mobile networks: `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL` |
 | 51 | `calls_v3.sql` | WhatsApp-style calls: `video_calls.connected_at` (call length) and `end_reason` (ended / declined / no_answer), written by the server; private chats get "📞 Voice call · 2:34" or "📞 Missed voice call" |
 | 52 | `chat_v5.sql` | Delete messages "for me", like WhatsApp: long-press (or ⌄ → Select messages) to choose several, then Delete for me (hidden from your own view, search and starred; everyone else still sees them) or Delete for everyone (your own messages). `chat_hidden_messages`, one small row per hidden message |
+| 53 | `android_devices.sql` | Android app: each phone's push address (Firebase token) against the person signed in on it; server-only (no policies). Lets calls ring the phone full screen when Grace is closed |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so
@@ -131,6 +132,7 @@ shared prayer and care note. It refuses to run without `SEED_CONFIRM=yes` —
 | `CRON_SECRET` | yes in production | Lets Vercel Cron call `/api/cron/expire-chat-media` (deletes voice notes after 90 days). Blank = the job refuses to run |
 | `MAKE_WEBHOOK_URL`, `MAKE_WEBHOOK_SECRET` | no | Pastor & admin alerts on WhatsApp, through a Make.com scenario. See "WhatsApp alerts" |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | no | Phone/computer pop-ups for the notification bell (Web Push). Blank = bell only. See below |
+| `FIREBASE_SERVICE_ACCOUNT`, `FIREBASE_ANDROID_APP` | no | Android app: calls ring full screen and messages pop up when the app is closed (Firebase, free). See "Android app" |
 | `NOTIFICATIONS_WEBHOOK_SECRET` | with pop-ups | Secret the Supabase Database Webhook sends to `/api/notifications/push` |
 | `PEXELS_API_KEY` | no | Free stock photo search in the poster editor (free key from pexels.com/api). Blank = uploads only |
 
@@ -275,6 +277,42 @@ Built mobile-first. On phones:
   not as a cold permission popup.
 - **Welcome tour** on a person's first visit (per device), skippable.
 - **Loading placeholders** shaped like each main page.
+
+## Android app
+
+`android/` is a small native app (Kotlin) that shows Grace full screen and
+adds what a web page can't do on Android: calls ring like a phone call
+(full screen over the lock screen, the phone's ringtone at ringer volume,
+Decline/Answer) even when the app is closed, a "call in progress"
+notification so calls survive switching apps, earpiece/loudspeaker and
+screen-off-at-your-ear for voice calls, and the unread number on the app icon
+(including Huawei/Honor). Everything else is the website, so it updates
+without reinstalling. Not in the Play Store: members install it from
+**/android**, which links to the newest GitHub release.
+
+**Building.** `.github/workflows/android.yml` builds it on GitHub (free) when
+`android/` changes, or from Actions → Android app → Run workflow, and
+publishes `grace.apk` as a release. Updates install over the old version only
+if signed with the same key: `android/grace-release.p12`, unlocked by the
+repository secret `ANDROID_KEYSTORE_PASSWORD`. Without the secret the build
+still runs (as a check) but nothing is published. Never lose that password.
+
+**Calls when the app is closed (Firebase, free).**
+1. console.firebase.google.com → Add project (Analytics off).
+2. Add app → Android → package name `stream.gracebound.grace` → Register app
+   → download `google-services.json` (skip the remaining steps).
+3. Project settings → Service accounts → Generate new private key.
+4. Vercel → Environment Variables: `FIREBASE_ANDROID_APP` = the whole
+   `google-services.json`; `FIREBASE_SERVICE_ACCOUNT` = the whole key file
+   (secret). Redeploy.
+5. Run `android_devices.sql` (#53). Phones register when the app is opened.
+
+How it fits: `lib/fcm.ts` sends data-only messages (HTTP v1, a signed JWT,
+no SDK); `lib/push.ts` sends every pop-up to both Web Push and the app;
+ending a call sends `call_end` so the other phone stops ringing. The app's
+side: `android/app/src/main/java/stream/gracebound/grace/` (`PushService`,
+`Notifier`, `IncomingCallActivity`, `Bridge` = `window.GraceAndroid`,
+see `lib/android.ts`).
 
 ## Checks & tests
 

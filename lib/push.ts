@@ -2,6 +2,7 @@ import "server-only";
 import webpush from "web-push";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { safeNotificationLink, type NotificationCategory } from "@/lib/notifications";
+import { fcmConfigured, sendToAndroid } from "@/lib/fcm";
 
 // Phone pop-ups (Web Push) for the notification bell. Sends straight to each
 // browser's push service (Google, Apple, Mozilla) with our own VAPID keys —
@@ -30,6 +31,11 @@ export function pushConfigured(): boolean {
   return configured;
 }
 
+/** Web Push or the Android app (Firebase) is set up: phones can get pop-ups. */
+export function anyPushConfigured(): boolean {
+  return pushConfigured() || fcmConfigured();
+}
+
 export interface PushMessage {
   title: string;
   body: string | null;
@@ -51,7 +57,7 @@ export interface PushMessage {
  * Returns how many devices accepted it.
  */
 export async function sendPushToUser(userId: string, category: NotificationCategory | null, message: PushMessage): Promise<number> {
-  if (!pushConfigured()) return 0;
+  if (!anyPushConfigured()) return 0;
   const admin = createAdminClient(); // server only: reads one person's devices and preferences
 
   if (category) {
@@ -61,6 +67,28 @@ export async function sendPushToUser(userId: string, category: NotificationCateg
     if (prefs && (prefs as Record<string, unknown>)[PREFERENCE_COLUMN[category]] === false) return 0;
   }
 
+  const [web, android] = await Promise.all([pushConfigured() ? sendWebPush(admin, userId, message) : Promise.resolve(0), sendToAndroid(userId, androidPayload(message), message.call ? { urgent: true, ttlSeconds: 60 } : { urgent: true })]);
+  return web + android;
+}
+
+/** The same pop-up for Grace's Android app (android/…/PushService.kt). */
+export function androidPayload(message: PushMessage): Record<string, string> {
+  const url = safeNotificationLink(message.link);
+  const callId = message.call ? /^\/dashboard\/calls\/([0-9a-f-]{36})/i.exec(url)?.[1] : undefined;
+  const badge: Record<string, string> = typeof message.badge === "number" ? { badge: String(message.badge) } : {};
+  if (callId) return { type: "call", callId, title: message.title, video: /video/i.test(message.body ?? "") ? "1" : "0", url: `/dashboard/calls/${callId}`, ...badge };
+  return {
+    type: "notice",
+    kind: message.messageId ? "message" : "other",
+    title: message.title,
+    body: message.body ?? "",
+    url,
+    ...(message.tag ? ({ tag: message.tag } as Record<string, string>) : {}),
+    ...badge,
+  };
+}
+
+async function sendWebPush(admin: ReturnType<typeof createAdminClient>, userId: string, message: PushMessage): Promise<number> {
   const { data: devices, error } = await admin.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq("user_id", userId);
   if (error) {
     console.error("[push] device lookup failed:", error.message);

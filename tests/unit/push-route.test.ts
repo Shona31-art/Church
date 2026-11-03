@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 // POST /api/notifications/push — the Supabase Database Webhook target.
 // lib/push is mocked: these tests cover the route's checks, not Web Push itself.
 const sendPushToUser = vi.fn(async () => 1);
-vi.mock("@/lib/push", () => ({ pushConfigured: () => true, sendPushToUser, unreadCountFor: vi.fn(async () => 2) }));
+vi.mock("@/lib/push", () => ({ pushConfigured: () => true, anyPushConfigured: () => true, sendPushToUser, unreadCountFor: vi.fn(async () => 2) }));
 vi.mock("@/lib/alert-delivery", () => ({ deliverAlert: vi.fn(async () => ({ sent: false })), makeConfigured: () => false }));
 const { POST } = await import("@/app/api/notifications/push/route");
 

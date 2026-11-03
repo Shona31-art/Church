@@ -133,12 +133,16 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         visible = true
+        web.onResume()
         tellWebsite("grace-android-resume")
     }
 
     override fun onPause() {
         visible = false
         CookieManager.getInstance().flush()
+        // The page learns it's hidden (so it doesn't ring alongside the phone);
+        // during a call it keeps running as if on screen.
+        if (!call.active) web.onPause()
         super.onPause()
     }
 

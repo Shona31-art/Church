@@ -8,7 +8,8 @@ import { checkModuleAccess } from "@/lib/paywall";
 import { can } from "@/lib/permissions";
 import { todayInAppZone } from "@/lib/format";
 import { logAudit } from "@/lib/audit";
-import { pushConfigured, sendPushToUser } from "@/lib/push";
+import { anyPushConfigured, sendPushToUser } from "@/lib/push";
+import { sendCallEnded } from "@/lib/fcm";
 import { CALL_HOURS, MAX_PARTICIPANTS, bookingCallWindow, isLiveCall, newRoomName } from "@/lib/video-call-rules";
 
 // Starting, joining and ending calls (supabase/video_calls.sql). Calls are
@@ -196,6 +197,8 @@ export async function endCall(callId: string, reason: EndReason = "ended"): Prom
 
   // The ring has stopped mattering: clear it from people's bells.
   await admin.from("notifications").update({ read_at: now.toISOString() }).eq("link", `/dashboard/calls/${call.id}`).eq("type", "video_call").is("read_at", null);
+  // …and stop it ringing on Android phones.
+  await sendCallEnded((call.ring_user_ids ?? []) as string[], call.id).catch(() => undefined);
 
   // Call history in a private chat, from the caller (also tells the other
   // person about a missed call, through the usual message notification).
@@ -235,7 +238,7 @@ export async function ringAgain(callId: string): Promise<void> {
   const { data: call } = await createClient().from("video_calls").select("*").eq("id", callId).maybeSingle();
   if (!call || call.started_by !== me.id || call.connected_at || !isLiveCall(call, true)) return;
   const targets = ((call.ring_user_ids ?? []) as string[]).filter((id) => id !== me.id);
-  if (!targets.length || !pushConfigured()) return;
+  if (!targets.length || !anyPushConfigured()) return;
   const link = `/dashboard/calls/${call.id}`;
   await Promise.all(
     targets.map((id) =>

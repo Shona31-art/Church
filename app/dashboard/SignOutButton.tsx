@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { clearOfflinePages } from "@/lib/bible/offline";
 import { showToast } from "@/components/ui/Toaster";
 import { recordSignOut } from "@/app/login/actions";
+import { forgetAndroidPhone } from "@/lib/android";
 
 export function SignOutButton({ className }: { className?: string }) {
   const router = useRouter();
@@ -21,6 +22,7 @@ export function SignOutButton({ className }: { className?: string }) {
     // session — so say so instead of showing the login page while the person
     // is in fact still signed in.
     await recordSignOut().catch(() => undefined);
+    await forgetAndroidPhone();
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error("[sign-out]", error.message);

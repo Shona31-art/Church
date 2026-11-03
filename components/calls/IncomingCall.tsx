@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Phone, PhoneOff, Video } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { startRinging } from "@/lib/call-sounds";
+import { graceAndroid } from "@/lib/android";
 import { Avatar } from "@/components/ui/Avatar";
 import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
 import { endCall } from "@/app/dashboard/calls/actions";
@@ -111,13 +112,25 @@ function RingingCard({ incoming, onAnswer, onDecline, onDismiss }: { incoming: I
   dismissRef.current = onDismiss;
 
   // Ring and vibrate until answered, declined, ended, or timed out.
+  // In the Android app with Grace in the background, the phone itself rings
+  // (full screen), so the page stays quiet until Grace is back on screen.
   useEffect(() => {
     if (ended) return;
-    const stopRing = startRinging();
+    let stopRing: (() => void) | null = null;
+    const update = () => {
+      const quiet = graceAndroid() !== null && document.visibilityState === "hidden";
+      if (quiet && stopRing) {
+        stopRing();
+        stopRing = null;
+      } else if (!quiet && !stopRing) stopRing = startRinging();
+    };
+    update();
+    document.addEventListener("visibilitychange", update);
     const timeout = setTimeout(() => dismissRef.current(false), RING_SECONDS * 1000);
     answerRef.current?.focus();
     return () => {
-      stopRing();
+      document.removeEventListener("visibilitychange", update);
+      stopRing?.();
       clearTimeout(timeout);
     };
   }, [ended]);

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { graceAndroid } from "@/lib/android";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell } from "lucide-react";
@@ -46,6 +47,8 @@ export function NotificationsProvider({ userId, initialUnread, children }: { use
   // The number on the app icon (installed app), kept in step with the bell —
   // like WhatsApp's unread badge. Phones without support just ignore it.
   useEffect(() => {
+    // Grace's Android app sets the number itself (and clears read pop-ups at 0).
+    graceAndroid()?.setBadge(unread);
     const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
     if (!nav.setAppBadge) return;
     (unread > 0 ? nav.setAppBadge(unread) : nav.clearAppBadge?.())?.catch(() => undefined);

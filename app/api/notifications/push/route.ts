@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { pushConfigured, sendPushToUser, unreadCountFor } from "@/lib/push";
+import { anyPushConfigured, sendPushToUser, unreadCountFor } from "@/lib/push";
 import { CATEGORIES } from "@/lib/notifications";
 import { deliverAlert, makeConfigured } from "@/lib/alert-delivery";
 
@@ -51,7 +51,7 @@ function authorized(request: Request): boolean {
 export async function POST(request: Request) {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   const external = makeConfigured();
-  if (!pushConfigured() && !external) return NextResponse.json({ error: "Push isn't configured on this server." }, { status: 503 });
+  if (!anyPushConfigured() && !external) return NextResponse.json({ error: "Push isn't configured on this server." }, { status: 503 });
 
   const parsed = Payload.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Expected a notifications INSERT or UPDATE payload." }, { status: 400 });
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   const isCall = record.type === "video_call";
   const isMessage = record.type === "chat.message";
   const [sent, delivered] = await Promise.all([
-    pushConfigured()
+    anyPushConfigured()
       ? unreadCountFor(record.user_id).then((badge) =>
           sendPushToUser(record.user_id, record.category, {
           // "Alice (3 messages)", like WhatsApp, once more than one is waiting.

@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
-import { sendPushToUser, pushConfigured } from "@/lib/push";
+import { sendPushToUser, anyPushConfigured } from "@/lib/push";
 import { CATEGORIES, type NotificationCategory } from "@/lib/notifications";
 
 // My Account → Notifications: phone pop-ups on this device, and which kinds
@@ -88,7 +88,7 @@ export async function setShowMessagePreviews(enabled: boolean): Promise<Result> 
 export async function sendTestPush(): Promise<{ ok: true; sent: number } | { ok: false; error: string }> {
   const me = await getCurrentAppUser();
   if (!me) return SIGNED_OUT as { ok: false; error: string };
-  if (!pushConfigured()) return { ok: false, error: "Pop-ups aren't set up on this server yet (missing VAPID keys)." };
+  if (!anyPushConfigured()) return { ok: false, error: "Pop-ups aren't set up on this server yet (missing VAPID keys or Firebase)." };
   const sent = await sendPushToUser(me.id, null, {
     title: "Pop-ups are working",
     body: "You'll get notifications like this one on this device.",

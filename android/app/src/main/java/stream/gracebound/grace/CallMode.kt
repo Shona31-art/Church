@@ -14,6 +14,7 @@ import android.view.WindowManager
  */
 class CallMode(private val activity: MainActivity) {
     private var mode = "none"
+    val active get() = mode != "none"
     private var proximity: PowerManager.WakeLock? = null
     private val audio get() = activity.getSystemService(AudioManager::class.java)
 

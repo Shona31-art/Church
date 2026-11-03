@@ -71,6 +71,9 @@
       .primary { background: rgb(var(--ember)); color: rgb(var(--on-ember)); border: 0; }
       .secondary { background: rgb(var(--surface)); color: rgb(var(--ink)); border: 1px solid rgb(var(--line)); }
       .btn:focus-visible { outline: 2px solid rgb(var(--gold)); outline-offset: 2px; }
+      .saved { list-style: none; margin: 4px 0 8px; padding: 0; display: grid; gap: 6px; }
+      .saved a { display: block; padding: 10px 12px; border: 1px solid rgb(var(--line)); border-radius: 8px; color: rgb(var(--ink)); text-decoration: none; font-size: 14px; }
+      .saved a:hover { background: rgb(var(--ink) / 0.04); }
     </style>
   </head>
   <body>
@@ -80,12 +83,43 @@
         <h1>You're offline</h1>
         <div class="rule" aria-hidden="true"></div>
         <p>This page needs an internet connection. Nothing you saved earlier has been lost.</p>
-        <p>Bible versions you've downloaded still open without a connection.</p>
+        <p>Bible versions you've downloaded still open without a connection — even signed out — and so do pages you opened recently:</p>
+        <ul id="saved" class="saved" hidden></ul>
         <div class="actions">
           <button type="button" class="btn primary" onclick="location.reload()">Try again</button>
-          <a class="btn secondary" href="/dashboard/bible/read">Open the Bible</a>
+          <a class="btn secondary" id="bible" href="/bible">Open the Bible</a>
         </div>
       </div>
     </main>
+    <script>
+      // Pages saved for offline reading (public/sw.js: Home, Announcements,
+      // Calendar, Songs, Sermons), newest first, named by their own titles.
+      (async function () {
+        try {
+          if (!("caches" in window)) return;
+          // Signed in on this phone: the member's reader (with its menu). Otherwise the public one.
+          if (await caches.match("/dashboard/bible/read", { cacheName: "bible-shell-v1" })) document.getElementById("bible").href = "/dashboard/bible/read";
+          var cache = await caches.open("app-pages-v1");
+          var keys = (await cache.keys()).reverse().slice(0, 12);
+          var list = document.getElementById("saved");
+          for (var i = 0; i < keys.length; i++) {
+            var url = new URL(keys[i].url);
+            var res = await cache.match(keys[i]);
+            var html = res ? await res.text() : "";
+            var m = /<title>([^<]*)<\/title>/i.exec(html);
+            var title = (m ? m[1] : url.pathname).replace(/ · Grace$| \| Grace$/, "").replace(/&amp;/g, "&").replace(/&#x27;|&#39;/g, "'");
+            var li = document.createElement("li");
+            var a = document.createElement("a");
+            a.href = url.pathname + url.search;
+            a.textContent = url.pathname === "/dashboard" ? "Home" : title;
+            li.appendChild(a);
+            list.appendChild(li);
+          }
+          if (keys.length) list.hidden = false;
+        } catch (e) {
+          // Nothing saved, or storage blocked.
+        }
+      })();
+    </script>
   </body>
 </html>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { OfflineSignInNotice } from "@/components/OfflineSignInNotice";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -66,6 +67,7 @@ export function LoginForm({ expired, nextPath, reason }: { expired: boolean; nex
   return (
     <AuthShell>
       <form onSubmit={handleLogin} className="w-full max-w-[400px] space-y-5">
+        <OfflineSignInNotice />
         <AuthHeading eyebrow="Welcome back" title="Sign in to your church" />
 
         {expired && (

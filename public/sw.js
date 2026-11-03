@@ -11,8 +11,17 @@
 //   3. /_next/static/*  the immutable, content-hashed scripts/styles/fonts those
 //      pages need. Cache-first, trimmed so it can't grow without limit.
 //   4. /offline.html  a static, data-free page saved once at install. Shown
-//      only when opening a page fails outright (no connection) — never
-//      instead of a slow page, and no other page is ever cached.
+//      when opening a page fails outright (no connection) and there's no
+//      saved copy of it.
+//   5. /bible (the reader without signing in) and /login: no personal data,
+//      network-first, kept even after sign-out, so a downloaded Bible can
+//      be read signed out and offline. Also kept after sign-out: the app's
+//      content-hashed scripts and styles (app-static-v1).
+//   6. A few read-only church pages — Home, Announcements, Calendar, Songs,
+//      Sermons — network-first, keeping the last copy of each one opened
+//      (at most MAX_SAVED_PAGES), so they can be read offline. Nothing
+//      private (chats, prayers, journal, members, giving, account…) is ever
+//      saved. Saved copies are deleted on sign-out, like the Bible pages.
 // Everything else (other pages, server actions, Supabase, POSTs) goes straight
 // to the network, untouched.
 //
@@ -29,10 +38,23 @@
 const TEXT_CACHE = "bible-text-v1"; // must match lib/bible/offline.ts
 const SHELL_CACHE = "bible-shell-v1";
 const OFFLINE_CACHE = "app-offline-v1";
+const PAGES_CACHE = "app-pages-v1"; // must match lib/bible/offline.ts and public/offline.html
+// Not personal, so kept after sign-out: the public /bible reader page and the
+// app's content-hashed scripts and styles (which every saved page needs).
+const PUBLIC_CACHE = "app-public-v1"; // must match lib/bible/offline.ts
+const STATIC_CACHE = "app-static-v1"; // must match lib/bible/offline.ts
 const OFFLINE_URL = "/offline.html";
-const KEEP = [TEXT_CACHE, SHELL_CACHE, OFFLINE_CACHE];
+const KEEP = [TEXT_CACHE, SHELL_CACHE, OFFLINE_CACHE, PAGES_CACHE, PUBLIC_CACHE, STATIC_CACHE];
+// Read-only church pages kept for offline reading once opened (and the pages under them, e.g. one song).
+const SAVED_PAGES = ["/dashboard/announcements", "/dashboard/calendar", "/dashboard/songs", "/dashboard/sermons"];
+const MAX_SAVED_PAGES = 40;
+
+function isSavedPage(pathname) {
+  if (/\/(new|edit)(\/|$)/.test(pathname)) return false; // forms need a connection anyway
+  return pathname === "/dashboard" || SAVED_PAGES.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
 const OFFLINE_PAGES = ["/dashboard/bible/read", "/dashboard/bible/search"];
-const MAX_STATIC_ENTRIES = 200;
+const MAX_STATIC_ENTRIES = 400;
 const NETWORK_TIMEOUT_MS = 6000;
 
 self.addEventListener("install", (event) => {
@@ -72,7 +94,7 @@ self.addEventListener("fetch", (event) => {
   // Signing out: forget the saved reader pages (they show the member's name in
   // the header). The Bible text itself isn't personal and stays.
   if (url.pathname.startsWith("/auth/signout")) {
-    event.waitUntil(caches.delete(SHELL_CACHE));
+    event.waitUntil(Promise.all([caches.delete(SHELL_CACHE), caches.delete(PAGES_CACHE)]));
     return;
   }
 
@@ -82,12 +104,25 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (url.pathname.startsWith("/_next/static/")) {
-    event.respondWith(cacheFirst(request, SHELL_CACHE, true));
+    event.respondWith(staticFile(request));
+    return;
+  }
+
+  // The public Bible reader and the sign-in page: no personal data, so they
+  // work signed out and offline (sign-in says it needs a connection and
+  // points to the Bible).
+  if (request.mode === "navigate" && (url.pathname === "/bible" || url.pathname === "/login")) {
+    event.respondWith(networkFirstPage(request, url.pathname, PUBLIC_CACHE));
     return;
   }
 
   if (request.mode === "navigate" && OFFLINE_PAGES.includes(url.pathname)) {
     event.respondWith(networkFirstPage(request, url.pathname));
+    return;
+  }
+
+  if (request.mode === "navigate" && isSavedPage(url.pathname)) {
+    event.respondWith(networkFirstSaved(request, url.pathname + url.search));
     return;
   }
 
@@ -115,9 +150,15 @@ async function cacheFirst(request, cacheName, trim = false) {
   return response;
 }
 
+/** Scripts and styles: from the kept copy (older workers kept them with the reader pages). */
+async function staticFile(request) {
+  const old = await caches.match(request, { cacheName: SHELL_CACHE, ignoreSearch: true });
+  return old || cacheFirst(request, STATIC_CACHE, true);
+}
+
 /** The live page when online; the saved copy when offline or the network hangs. */
-async function networkFirstPage(request, pathname) {
-  const cache = await caches.open(SHELL_CACHE);
+async function networkFirstPage(request, pathname, cacheName = SHELL_CACHE) {
+  const cache = await caches.open(cacheName);
   try {
     const response = await Promise.race([
       fetch(request),
@@ -133,6 +174,28 @@ async function networkFirstPage(request, pathname) {
     if (saved) return saved;
     // Never opened online on this device: the offline page explains.
     return offlinePage();
+  }
+}
+
+/**
+ * A read-only church page: live when online (keeping a copy), the last copy
+ * when offline. Unlike the Bible reader there's no time limit — a slow
+ * connection still gets the live page, never an old copy.
+ */
+async function networkFirstSaved(request, key) {
+  try {
+    const response = await fetch(request);
+    if (response.ok && !response.redirected) {
+      const cache = await caches.open(PAGES_CACHE);
+      await cache.delete(key);
+      await cache.put(key, response.clone());
+      const keys = await cache.keys();
+      for (const old of keys.slice(0, Math.max(0, keys.length - MAX_SAVED_PAGES))) await cache.delete(old);
+    }
+    return response;
+  } catch (error) {
+    const saved = await caches.match(key, { cacheName: PAGES_CACHE });
+    return saved || offlinePage();
   }
 }
 

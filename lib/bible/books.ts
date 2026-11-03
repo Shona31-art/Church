@@ -58,14 +58,15 @@ export function readerHref({
   chapter,
   verse,
   verseEnd,
-}: ChapterRef & { versionId?: string; verse?: number; verseEnd?: number }): string {
+  base = "/dashboard/bible/read",
+}: ChapterRef & { versionId?: string; verse?: number; verseEnd?: number; base?: string }): string {
   const params = new URLSearchParams();
   if (versionId) params.set("v", versionId);
   params.set("book", BOOKS[bookIndex].name);
   params.set("chapter", String(chapter));
   if (verse) params.set("verse", String(verse));
   if (verse && verseEnd && verseEnd > verse) params.set("to", String(verseEnd));
-  return `/dashboard/bible/read?${params}`;
+  return `${base}?${params}`;
 }
 
 /** Contents of one book's text file. Verse N is chapters[c-1][N-1]; "" = not in this version. */

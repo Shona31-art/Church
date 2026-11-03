@@ -21,6 +21,7 @@ import { NotificationBell, NotificationsProvider } from "@/components/notificati
 import { IncomingCall } from "@/components/calls/IncomingCall";
 import { MessageBanner } from "@/components/notifications/MessageBanner";
 import { AndroidBridge } from "@/components/android/AndroidBridge";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { PresenceHeartbeat } from "@/components/chat/PresenceHeartbeat";
 // Imported for its side effect: starts listening for the browser's one-time install prompt as early as possible.
 import "@/components/install/install-store";
@@ -92,6 +93,7 @@ export function DashboardChrome({
       <IncomingCall userId={userId} />
       <MessageBanner userId={userId} />
       <AndroidBridge userId={userId} />
+      <OfflineBanner />
       <PresenceHeartbeat />
       <div className="min-h-screen min-h-dvh md:flex">
         <a

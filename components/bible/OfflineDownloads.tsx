@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, CircleCheck, Download } from "lucide-react";
 import { showToast } from "@/components/ui/Toaster";
 import { VERSIONS } from "@/lib/bible/versions";
-import { downloadStatus, downloadVersion, offlineSupported, removeVersion, type DownloadStatus } from "@/lib/bible/offline";
+import { downloadStatus, downloadVersion, offlineSupported, removeVersion, saveReaderPages, type DownloadStatus } from "@/lib/bible/offline";
 
 type Row = { status: DownloadStatus | null; downloading: boolean; failed: boolean; confirmRemove: boolean };
 
@@ -25,6 +25,10 @@ export function OfflineDownloads() {
   useEffect(() => {
     if (!offlineSupported()) return setSupported(false);
     VERSIONS.forEach((v) => downloadStatus(v.id).then((status) => update(v.id, { status })));
+    // A Bible downloaded before the reader pages were saved with it: save them now.
+    Promise.all(VERSIONS.map((v) => downloadStatus(v.id))).then((all) => {
+      if (navigator.onLine && all.some((st) => st.saved === st.total)) void saveReaderPages();
+    });
     // iPhone/iPad Safari clears website storage after weeks unused unless the app is on the Home Screen.
     const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;

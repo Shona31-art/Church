@@ -127,3 +127,26 @@ reader page only.
 2. [ ] Verify verse counts per version against a known total (≈31,102 verses)
 3. [ ] Service worker + web app manifest, scoped to the Bible reader
 4. [ ] Switch the daily verse and AI study tool off bible-api.com
+
+## Addendum (2026-11-03): more pages offline, and a fix for first-time downloads
+
+- **Fix:** "Download for offline" saved only the Bible text. The reader page
+  itself was saved by the service worker only when opened while the worker
+  was already running, which isn't the case on a first visit or just after
+  installing the app, so a fresh download could still show "You're offline".
+  Downloading now also saves the reader and search pages and every script
+  and style they use (`saveReaderPages()` in `lib/bible/offline.ts`); the
+  Downloads panel does it once for Bibles downloaded before this fix.
+- **More pages offline:** Home, Announcements, Calendar, Songs and Sermons
+  (and the pages under them, except forms) are now network-first with the
+  last copy kept (`app-pages-v1`, at most 40 pages), so they can be read
+  offline. Nothing private is saved — chats, prayers, journal, members,
+  giving and account stay online-only — and saved copies are deleted on
+  sign-out, like the reader. A slow connection always gets the live page.
+- The offline page lists the saved pages; a bar in the app says when it's
+  showing saved copies (`components/OfflineBanner.tsx`).
+- **Signed out or offline:** signing in needs the server, so `/bible`
+  (`app/bible/page.tsx`) is the reader without an account — no highlights or
+  notes, nothing personal — and it, the sign-in page and the app's scripts
+  (`app-public-v1`, `app-static-v1`) are kept even after sign-out. The sign-in
+  page and the offline page point to it when there's no connection.

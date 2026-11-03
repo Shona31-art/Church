@@ -37,8 +37,11 @@ type NoteEditor = { noteId?: string; verse: number | null; initialText: string }
  * Tapping verses selects them and shows the action bar (highlight, bookmark,
  * note, copy, share). Highlights, bookmarks and notes are the member's own,
  * loaded per chapter through server actions (useChapterAnnotations).
+ *
+ * `guest`: the public reader at /bible, for reading a downloaded Bible when
+ * signed out or offline — no highlights or notes, nothing personal.
  */
-export function BibleReader() {
+export function BibleReader({ guest = false }: { guest?: boolean } = {}) {
   const params = useSearchParams();
   const version = versionById(params.get("v"));
   const requestedBook = bookIndexByName(params.get("book"));
@@ -58,7 +61,7 @@ export function BibleReader() {
   // (reading localStorage during render would mismatch the server HTML).
   const [settings, setSettings] = useState<ReaderSettings>(DEFAULT_SETTINGS);
   const [compareLoad, setCompareLoad] = useState<{ key: string; book: BookText | null; failed: boolean } | null>(null);
-  const annotations = useChapterAnnotations(bookName, chapter, true);
+  const annotations = useChapterAnnotations(bookName, chapter, !guest);
 
   useEffect(() => setSettings(readSettings()), []);
   function updateSettings(next: ReaderSettings) {
@@ -84,6 +87,7 @@ export function BibleReader() {
   const go = useCallback(
     (to: Partial<Reference> & { versionId?: string }, { replace = false } = {}) => {
       const href = readerHref({
+        base: guest ? "/bible" : undefined,
         versionId: to.versionId ?? version.id,
         bookIndex: to.bookIndex ?? bookIndex,
         chapter: to.chapter ?? chapter,
@@ -93,7 +97,7 @@ export function BibleReader() {
       window.history[replace ? "replaceState" : "pushState"](null, "", href);
       if (!to.verse) window.scrollTo({ top: 0 });
     },
-    [version.id, bookIndex, chapter],
+    [version.id, bookIndex, chapter, guest],
   );
 
   // Opening the reader with no passage in the URL (e.g. from the menu): carry
@@ -221,11 +225,17 @@ export function BibleReader() {
   return (
     <div className={`mx-auto max-w-2xl ${selected.length ? "pb-56 md:pb-40" : ""}`}>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <BackLink href="/dashboard/bible" label="Bible" className="" />
-        <Link href={`/dashboard/bible/search?v=${version.id}`} className="btn-ghost btn-sm">
-          <Search aria-hidden className="h-4 w-4" />
-          Search
-        </Link>
+        {guest ? (
+          <BackLink href="/login" label="Sign in" className="" />
+        ) : (
+          <>
+            <BackLink href="/dashboard/bible" label="Bible" className="" />
+            <Link href={`/dashboard/bible/search?v=${version.id}`} className="btn-ghost btn-sm">
+              <Search aria-hidden className="h-4 w-4" />
+              Search
+            </Link>
+          </>
+        )}
       </div>
       {/* Toolbar: sticks under the phone header (57px) or to the top on desktop. */}
       <div className="card-elevated sticky top-[65px] z-10 mb-8 flex items-center gap-1 rounded-2xl bg-surface/95 p-1.5 backdrop-blur md:top-4">
@@ -363,7 +373,7 @@ export function BibleReader() {
         <VerseActionBar
           label={selectionLabel}
           annotationsReady={Boolean(a)}
-          unavailableReason={annotations.state.status === "error" ? annotations.state.message : "Loading your highlights…"}
+          unavailableReason={guest ? "Sign in to highlight and make notes." : annotations.state.status === "error" ? annotations.state.message : "Loading your highlights…"}
           activeColor={activeColor}
           anyHighlighted={selected.some((n) => a?.highlights[n])}
           allBookmarked={allBookmarked}

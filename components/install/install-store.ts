@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { detectPlatform, installMode, isInAppBrowser, type InstallMode, type InstallPlatform } from "@/lib/install";
+import { graceAndroid } from "@/lib/android";
 
 // Browser side of "install the app". The browser fires `beforeinstallprompt`
 // once, early, and only if it would let this site install — so we start
@@ -111,7 +112,10 @@ export function useInstall(): InstallState {
     hasPrompt: deferredPrompt !== null,
     platform,
     inAppBrowser: isInAppBrowser(navigator.userAgent),
+    nativeApp: graceAndroid() !== null,
   });
   // A fresh install prompt means the browser knows it isn't installed (any more).
-  return { mode, platform, justInstalled: installedThisVisit, installedOnDevice: installedOnDevice && deferredPrompt === null, promptInstall };
+  // "Installed on this device" refers to the older home-screen version; Android
+  // phones are still offered the Android app.
+  return { mode, platform, justInstalled: installedThisVisit, installedOnDevice: mode !== "android-app" && installedOnDevice && deferredPrompt === null, promptInstall };
 }

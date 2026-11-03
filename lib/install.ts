@@ -11,8 +11,11 @@ export type InstallPlatform = "ios" | "android" | "desktop";
  *   ios       — iPhone/iPad: Share → Add to Home Screen, done by hand
  *   in-app    — inside WhatsApp/Facebook/Instagram etc., which can't install: open in a real browser first
  *   manual    — no prompt available: use the browser's own menu
+ *   android-app — Android phone: download Grace's Android app (/android), which
+ *                 rings for calls like a phone. Also offered to people using the
+ *                 older home-screen (browser) version, so they switch over.
  */
-export type InstallMode = "installed" | "prompt" | "ios" | "in-app" | "manual";
+export type InstallMode = "installed" | "prompt" | "ios" | "in-app" | "manual" | "android-app";
 
 export function detectPlatform(userAgent: string, maxTouchPoints = 0): InstallPlatform {
   if (/iPhone|iPad|iPod/i.test(userAgent)) return "ios";
@@ -27,7 +30,9 @@ export function isInAppBrowser(userAgent: string): boolean {
   return /FBAN|FBAV|FB_IAB|Instagram|WhatsApp|Line\/|Snapchat|TikTok|musical_ly|; wv\)/i.test(userAgent);
 }
 
-export function installMode(input: { standalone: boolean; hasPrompt: boolean; platform: InstallPlatform; inAppBrowser: boolean }): InstallMode {
+export function installMode(input: { standalone: boolean; hasPrompt: boolean; platform: InstallPlatform; inAppBrowser: boolean; nativeApp?: boolean }): InstallMode {
+  if (input.nativeApp) return "installed";
+  if (input.platform === "android" && !input.inAppBrowser) return "android-app";
   if (input.standalone) return "installed";
   if (input.inAppBrowser) return "in-app";
   if (input.hasPrompt) return "prompt";

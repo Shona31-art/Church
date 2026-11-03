@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Download, Smartphone, X } from "lucide-react";
+import Link from "next/link";
 import { useInstall } from "./install-store";
 import { InstallApp } from "./InstallApp";
 
@@ -65,10 +66,16 @@ export function InstallBanner() {
         <Smartphone className="h-5 w-5" strokeWidth={1.75} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold">Install Grace on your phone</p>
-        <p className="mt-0.5 text-xs text-ink/60">Opens from your home screen, full screen, like any other app.</p>
+        <p className="text-sm font-semibold">{mode === "android-app" ? "Get the Grace Android app" : "Install Grace on your phone"}</p>
+        <p className="mt-0.5 text-xs text-ink/60">
+          {mode === "android-app" ? "Calls ring like a phone call, even when Grace is closed." : "Opens from your home screen, full screen, like any other app."}
+        </p>
         <div className="mt-3 flex flex-wrap gap-2">
-          {mode === "prompt" ? (
+          {mode === "android-app" ? (
+            <Link href="/android" className="btn-primary btn-sm">
+              <Download aria-hidden className="h-3.5 w-3.5" /> Get the app
+            </Link>
+          ) : mode === "prompt" ? (
             <button type="button" onClick={install} className="btn-primary btn-sm">
               <Download aria-hidden className="h-3.5 w-3.5" /> Install
             </button>

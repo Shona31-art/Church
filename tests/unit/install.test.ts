@@ -30,9 +30,15 @@ describe("isInAppBrowser", () => {
 });
 
 describe("installMode", () => {
-  const base = { standalone: false, hasPrompt: false, platform: "android" as const, inAppBrowser: false };
+  const base = { standalone: false, hasPrompt: false, platform: "desktop" as "desktop" | "android" | "ios", inAppBrowser: false };
   test("already installed wins over everything", () => {
     expect(installMode({ ...base, standalone: true, hasPrompt: true })).toBe("installed");
+    expect(installMode({ ...base, platform: "android", nativeApp: true })).toBe("installed");
+  });
+  test("Android phones get the Android app, even from the older home-screen version", () => {
+    expect(installMode({ ...base, platform: "android", hasPrompt: true })).toBe("android-app");
+    expect(installMode({ ...base, platform: "android", standalone: true })).toBe("android-app");
+    expect(installMode({ ...base, platform: "android", inAppBrowser: true })).toBe("in-app");
   });
   test("in-app browsers are told to open a real browser, even if a prompt exists", () => {
     expect(installMode({ ...base, inAppBrowser: true, hasPrompt: true })).toBe("in-app");

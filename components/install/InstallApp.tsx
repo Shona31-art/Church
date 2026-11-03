@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { CircleCheck, Download, LoaderCircle } from "lucide-react";
+import Link from "next/link";
 import { useInstall } from "./install-store";
+import { ANDROID_APK_URL } from "@/lib/android";
 import { InAppBrowserSteps, IosSteps, ManualSteps } from "./InstallSteps";
 
 /**
@@ -50,6 +52,24 @@ export function InstallApp() {
         <LoaderCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0 motion-safe:animate-spin" />
         Installing — Grace should appear on your home screen or app list in a moment.
       </p>
+    );
+  }
+
+  if (mode === "android-app") {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-ink/70">Get Grace&apos;s Android app: calls ring like a phone call — even when Grace is closed or your phone is locked — and the app icon shows your unread count.</p>
+        <a href={ANDROID_APK_URL} className="btn-primary" download>
+          <Download aria-hidden className="h-4 w-4" /> Download the Android app
+        </a>
+        <p className="hint">
+          Open <strong>grace.apk</strong> when it has downloaded and tap <strong>Install</strong> (allow installs from Chrome if asked).{" "}
+          <Link href="/android" className="link">
+            Step-by-step help
+          </Link>
+          . Already have Grace on your home screen from the browser? Uninstall that one first, so notifications don&apos;t come twice.
+        </p>
+      </div>
     );
   }
 

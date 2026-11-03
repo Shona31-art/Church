@@ -25,7 +25,14 @@ export default async function CallPage({ params, searchParams }: { params: { id:
     .maybeSingle();
   if (!call) notFound();
 
-  const back = call.channel_id ? { href: `/dashboard/chat/${call.channel_id}`, label: "Back to the chat" } : { href: `/dashboard/booking/${call.booking_id}`, label: "Back to the appointment" };
+  // calls_v4.sql: people added to the call (they can't open its chat or appointment).
+  const invited = ((call as { invited_user_ids?: string[] }).invited_user_ids ?? []) as string[];
+  const iWasAdded = invited.includes(me.id);
+  const back = iWasAdded
+    ? { href: "/dashboard/chat", label: "Back to chats" }
+    : call.channel_id
+    ? { href: `/dashboard/chat/${call.channel_id}`, label: "Back to the chat" }
+    : { href: `/dashboard/booking/${call.booking_id}`, label: "Back to the appointment" };
 
   if (!isCallOpen(call)) {
     return (
@@ -63,6 +70,15 @@ export default async function CallPage({ params, searchParams }: { params: { id:
       .maybeSingle();
     const b = booking as any;
     other = b?.requested_by === me.id ? { id: b?.pastor_id ?? null, name: b?.pastor?.name ?? "Your pastor" } : { id: b?.requested_by ?? null, name: b?.requester?.name ?? "Member" };
+  }
+  // People were added: it's a group call now, named after who's in it.
+  if (invited.length) {
+    const ids = [...new Set([call.started_by, ...((call.ring_user_ids ?? []) as string[]), ...invited, other?.id].filter((id): id is string => Boolean(id) && id !== me.id))];
+    const { data: people } = await supabase.from("app_users").select("id, name").in("id", ids);
+    const names = ((people ?? []) as { name: string }[]).map((p) => p.name.split(" ")[0]);
+    if (oneToOne || iWasAdded) title = names.length > 1 ? `${names.slice(0, -1).join(", ")} & ${names[names.length - 1]}` : names[0] ?? "Group call";
+    oneToOne = false;
+    other = null;
   }
   const photo = other?.id ? (await getAvatarUrls([other.id])).get(other.id) ?? null : null;
 

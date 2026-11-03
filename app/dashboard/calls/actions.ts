@@ -177,15 +177,25 @@ export async function endCall(callId: string, reason: EndReason = "ended"): Prom
   if (!call) return { error: "That call couldn't be found." };
   if (call.ended_at) return { ok: true };
 
-  const { data: channel } = call.channel_id ? await supabase.from("chat_channels").select("is_dm").eq("id", call.channel_id).maybeSingle() : { data: null };
+  // Server lookup: someone added to the call can't see the private chat itself.
+  const admin = createAdminClient();
+  const { data: channel } = call.channel_id ? await admin.from("chat_channels").select("is_dm").eq("id", call.channel_id).maybeSingle() : { data: null };
   const oneToOne = Boolean(call.booking_id) || Boolean(channel?.is_dm);
+  const invited = ((call.invited_user_ids ?? []) as string[]);
+
+  // Someone added to the call said no: stop their phone ringing; the call goes on.
+  if (reason === "declined" && invited.includes(me.id)) {
+    await admin.from("notifications").update({ read_at: new Date().toISOString() }).eq("user_id", me.id).eq("link", `/dashboard/calls/${call.id}`).eq("type", "video_call").is("read_at", null);
+    await sendCallEnded([me.id], call.id).catch(() => undefined);
+    return { ok: true };
+  }
+
   if (!oneToOne && call.started_by !== me.id && !can(me.role, "manageBookings")) {
     return { error: "Only the person who started the call, or a pastor, can end it for everyone." };
   }
   if (reason === "declined" && !((call.ring_user_ids ?? []) as string[]).includes(me.id)) reason = "ended";
   if (reason === "no_answer" && call.started_by !== me.id) reason = "ended";
 
-  const admin = createAdminClient();
   const now = new Date();
   let { data: closed, error } = await admin.from("video_calls").update({ ended_at: now.toISOString(), end_reason: reason }).eq("id", call.id).is("ended_at", null).select("id");
   if (error?.code === "42703") ({ data: closed, error } = await admin.from("video_calls").update({ ended_at: now.toISOString() }).eq("id", call.id).is("ended_at", null).select("id"));
@@ -198,7 +208,7 @@ export async function endCall(callId: string, reason: EndReason = "ended"): Prom
   // The ring has stopped mattering: clear it from people's bells.
   await admin.from("notifications").update({ read_at: now.toISOString() }).eq("link", `/dashboard/calls/${call.id}`).eq("type", "video_call").is("read_at", null);
   // …and stop it ringing on Android phones.
-  await sendCallEnded((call.ring_user_ids ?? []) as string[], call.id).catch(() => undefined);
+  await sendCallEnded([...((call.ring_user_ids ?? []) as string[]), ...invited], call.id).catch(() => undefined);
 
   // Call history in a private chat, from the caller (also tells the other
   // person about a missed call, through the usual message notification).
@@ -251,4 +261,84 @@ export async function ringAgain(callId: string): Promise<void> {
       }).catch(() => 0)
     )
   );
+}
+
+// ---------------------------------------------------------------------------
+// Adding people to a call (calls_v4.sql)
+// ---------------------------------------------------------------------------
+
+/** A private chat or appointment call can grow to this many people. */
+const ADDED_CALL_SIZE = MAX_PARTICIPANTS.group;
+
+type CallPerson = { id: string; name: string };
+
+/** The call, if I can see it and it's still open — plus who's already part of it. */
+async function openCallForInvites(callId: string) {
+  const me = await requireCaller();
+  if ("error" in me) return me;
+  if (!z.string().uuid().safeParse(callId).success) return { error: "That call couldn't be found." };
+  // RLS: only a call I'm part of.
+  const { data: call } = await createClient().from("video_calls").select("*").eq("id", callId).maybeSingle();
+  if (!call || call.ended_at || new Date(call.expires_at).getTime() <= Date.now()) return { error: "This call has ended." };
+  if (!("invited_user_ids" in call)) return { error: "Adding people to calls needs a database update first: run supabase/calls_v4.sql." };
+  const admin = createAdminClient();
+  // Everyone the call already includes (its chat's members, the appointment's two people, those added).
+  const already = new Set<string>([call.started_by, ...((call.ring_user_ids ?? []) as string[]), ...((call.invited_user_ids ?? []) as string[]), me.id].filter(Boolean));
+  if (call.channel_id) {
+    const { data: members } = await admin.from("chat_channel_members").select("user_id").eq("channel_id", call.channel_id);
+    for (const m of members ?? []) already.add(m.user_id);
+  }
+  // Blocked either way: never offered, never rung.
+  const { data: blocks } = await admin.from("chat_blocks").select("blocker_id, blocked_id").or(`blocker_id.eq.${me.id},blocked_id.eq.${me.id}`);
+  const blocked = new Set((blocks ?? []).map((b: { blocker_id: string; blocked_id: string }) => (b.blocker_id === me.id ? b.blocked_id : b.blocker_id)));
+  return { me, call, admin, already, blocked };
+}
+
+/** People from my church I can add to this call (not already in it, not blocked). */
+export async function callInviteCandidates(callId: string): Promise<{ people?: CallPerson[]; error?: string }> {
+  const ctx = await openCallForInvites(callId);
+  if ("error" in ctx) return { error: ctx.error };
+  const { data, error } = await ctx.admin
+    .from("app_users")
+    .select("id, name")
+    .eq("church_id", ctx.me.church_id!)
+    .eq("status", "active")
+    .order("name")
+    .limit(500);
+  if (error) {
+    console.error("[calls] invite list failed:", error.message);
+    return { error: "Couldn't load the church's members — try again." };
+  }
+  return { people: ((data ?? []) as CallPerson[]).filter((p) => !ctx.already.has(p.id) && !ctx.blocked.has(p.id)) };
+}
+
+/** Rings these people into the call (calls_v4.sql's trigger notifies them). */
+export async function inviteToCall(callId: string, userIds: string[]): Promise<{ ok?: true; added?: number; error?: string }> {
+  const ids = z.array(z.string().uuid()).min(1).max(ADDED_CALL_SIZE).safeParse([...new Set(userIds)]);
+  if (!ids.success) return { error: "Choose who to add." };
+  const ctx = await openCallForInvites(callId);
+  if ("error" in ctx) return { error: ctx.error };
+  const { me, call, admin, already, blocked } = ctx;
+
+  // Only active members of my church, not already in the call, not blocked.
+  const { data: valid } = await admin.from("app_users").select("id").in("id", ids.data).eq("church_id", me.church_id!).eq("status", "active");
+  const adding = ((valid ?? []) as { id: string }[]).map((u) => u.id).filter((id) => !already.has(id) && !blocked.has(id));
+  if (!adding.length) return { error: "They're already in this call, or can't be added." };
+
+  const invited = [...((call.invited_user_ids ?? []) as string[]), ...adding];
+  // A private chat or appointment call has two people; added people make it a group call.
+  const groupCall = Boolean(call.channel_id) && !(await admin.from("chat_channels").select("is_dm").eq("id", call.channel_id).maybeSingle()).data?.is_dm;
+  if (!groupCall && 2 + invited.length > ADDED_CALL_SIZE) return { error: `A call can have up to ${ADDED_CALL_SIZE} people.` };
+
+  const { error } = await admin
+    .from("video_calls")
+    .update({ invited_user_ids: invited, invited_by: me.id, room_url: `builtin:${ADDED_CALL_SIZE}` })
+    .eq("id", call.id)
+    .is("ended_at", null);
+  if (error) {
+    console.error("[calls] adding people failed:", error.message);
+    return { error: error.code === "42703" ? "Adding people to calls needs a database update first: run supabase/calls_v4.sql." : "Couldn't add them — try again." };
+  }
+  await logAudit({ churchId: me.church_id!, actorId: me.id, action: "video_call.people_added", targetTable: "video_calls", targetId: call.id, metadata: { added: adding.length } });
+  return { ok: true, added: adding.length };
 }

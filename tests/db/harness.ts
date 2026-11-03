@@ -66,6 +66,7 @@ export const MIGRATION_ORDER = [
   "calls_v3.sql",
   "chat_v5.sql",
   "android_devices.sql",
+  "calls_v4.sql",
 ];
 
 const SUPABASE_STUBS = `

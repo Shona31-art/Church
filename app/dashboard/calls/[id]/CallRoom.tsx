@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Lock, Mic, MicOff, Phone, PhoneOff, SwitchCamera, Video, VideoOff, Volume2 } from "lucide-react";
+import { Lock, Mic, MicOff, Phone, PhoneOff, SwitchCamera, UserPlus, Video, VideoOff, Volume2, X } from "lucide-react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
@@ -12,7 +12,7 @@ import { graceAndroid } from "@/lib/android";
 import { Avatar } from "@/components/ui/Avatar";
 import { shouldInitiate } from "@/lib/video-call-rules";
 import { startRingback } from "@/lib/call-sounds";
-import { endCall, markCallConnected, ringAgain, type EndReason } from "../actions";
+import { callInviteCandidates, endCall, inviteToCall, markCallConnected, ringAgain, type EndReason } from "../actions";
 
 /**
  * A built-in voice or video call that behaves like WhatsApp.
@@ -66,10 +66,10 @@ export function CallRoom({
   canEndForAll,
   audioOnly = false,
   expiresAt,
-  oneToOne = false,
+  oneToOne: startsOneToOne = false,
   isCaller = false,
   other = null,
-  title = "Call",
+  title: startTitle = "Call",
   autoJoin = false,
 }: {
   callId: string;
@@ -94,6 +94,11 @@ export function CallRoom({
   const [supabase] = useState(() => createClient());
   const peerId = useMemo(() => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()).slice(2)), []);
   const [phase, setPhase] = useState<Phase>({ kind: autoJoin ? "joining" : "lobby" });
+  // A two-person call becomes a group call when someone adds people (calls_v4.sql).
+  const [oneToOne, setOneToOne] = useState(startsOneToOne);
+  const oneToOneRef = useRef(startsOneToOne);
+  const [title, setTitle] = useState(startTitle);
+  const [adding, setAdding] = useState(false);
   const [remotes, setRemotes] = useState<Record<string, Remote>>({});
   const [muted, setMuted] = useState(false);
   // Grace's Android app: voice calls start on the earpiece, video on the loudspeaker.
@@ -275,7 +280,12 @@ export function CallRoom({
     const status = supabase
       .channel(`call-ended:${callId}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "video_calls", filter: `id=eq.${callId}` }, ({ new: row }) => {
-        const r = row as { ended_at: string | null; end_reason?: EndReason | null };
+        const r = row as { ended_at: string | null; end_reason?: EndReason | null; invited_user_ids?: string[] };
+        if (r.invited_user_ids?.length && oneToOneRef.current) {
+          oneToOneRef.current = false;
+          setOneToOne(false);
+          setTitle("Group call");
+        }
         if (r.ended_at && !endingRef.current) {
           endingRef.current = true;
           finish(END_TEXT[r.end_reason ?? "ended"] ?? "Call ended");
@@ -410,10 +420,10 @@ export function CallRoom({
       // The other person hung up or declined.
       .on("broadcast", { event: "bye" }, ({ payload }) => {
         const p = payload as { from: string; reason: EndReason };
-        if (oneToOne && !endingRef.current) {
+        if (oneToOneRef.current && !endingRef.current) {
           endingRef.current = true;
           finish(END_TEXT[p.reason] ?? "Call ended");
-        } else if (!oneToOne) {
+        } else if (!oneToOneRef.current) {
           closePeer(p.from);
         }
       })
@@ -564,7 +574,8 @@ export function CallRoom({
 
   /** The red button: two-person calls end for both; in a group you just leave. */
   function hangUpButton() {
-    if (oneToOne) return endWith("ended");
+    // Two-person call, or the last one left in a group call: end it.
+    if (oneToOne || !someoneHere) return endWith("ended");
     hangUp();
     router.push(back.href);
   }
@@ -687,6 +698,9 @@ export function CallRoom({
                     <Volume2 aria-hidden className="h-6 w-6" />
                   </RoundButton>
                 )}
+                <RoundButton label="Add" tone="glass" onClick={() => setAdding(true)}>
+                  <UserPlus aria-hidden className="h-6 w-6" />
+                </RoundButton>
                 <RoundButton label="Video" tone="glass" onClick={() => void turnOnVideo()}>
                   <Video aria-hidden className="h-6 w-6" />
                 </RoundButton>
@@ -702,6 +716,9 @@ export function CallRoom({
               <div className="mx-auto flex max-w-sm items-center justify-between gap-3 rounded-full bg-black/60 px-3 py-2.5 backdrop-blur" role="group" aria-label="Call controls">
                 <RoundButton label={cameraOff ? "Turn camera on" : "Turn camera off"} tone={cameraOff ? "glass" : "light"} pressed={cameraOff} onClick={toggleCamera} hideLabel>
                   {cameraOff ? <VideoOff aria-hidden className="h-6 w-6" /> : <Video aria-hidden className="h-6 w-6" />}
+                </RoundButton>
+                <RoundButton label="Add people" tone="glass" onClick={() => setAdding(true)} hideLabel>
+                  <UserPlus aria-hidden className="h-6 w-6" />
                 </RoundButton>
                 <RoundButton label={muted ? "Unmute" : "Mute"} tone={muted ? "light" : "glass"} pressed={muted} onClick={toggleMute} hideLabel>
                   {muted ? <MicOff aria-hidden className="h-6 w-6" /> : <Mic aria-hidden className="h-6 w-6" />}
@@ -722,6 +739,99 @@ export function CallRoom({
         )}
       </footer>
       {confirmDialog}
+      {adding && <AddPeople callId={callId} onClose={() => setAdding(false)} />}
+    </div>
+  );
+}
+
+/** "Add": ring more people from the church into this call, like WhatsApp. */
+function AddPeople({ callId, onClose }: { callId: string; onClose: () => void }) {
+  const [people, setPeople] = useState<{ id: string; name: string }[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    callAction(() => callInviteCandidates(callId), { error: CONNECTION_FAILED }).then((r) => (r.error ? setError(r.error) : setPeople(r.people ?? [])));
+  }, [callId]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  async function add() {
+    setBusy(true);
+    const r = await callAction(() => inviteToCall(callId, [...chosen]), { error: CONNECTION_FAILED });
+    setBusy(false);
+    if (r.error) return setError(r.error);
+    const names = (people ?? []).filter((p) => chosen.has(p.id)).map((p) => p.name.split(" ")[0]);
+    showToast(`Calling ${names.join(", ")}…`, "success");
+    onClose();
+  }
+
+  const q = query.trim().toLowerCase();
+  const shown = (people ?? []).filter((p) => !q || p.name.toLowerCase().includes(q));
+
+  return (
+    <div className="fixed inset-0 z-[85] flex items-end justify-center bg-black/60 sm:items-center" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-label="Add people to the call"
+        className="flex max-h-[80dvh] w-full max-w-md flex-col rounded-t-3xl bg-[#13332c] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white shadow-2xl sm:rounded-3xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold">Add people</h2>
+          <button type="button" onClick={onClose} aria-label="Close" className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10">
+            <X aria-hidden className="h-5 w-5" />
+          </button>
+        </div>
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search names"
+          aria-label="Search names"
+          autoFocus
+          className="mt-2 w-full rounded-full border border-white/15 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-white/40"
+        />
+        <ul className="mt-3 flex-1 overflow-y-auto" aria-label="Church members">
+          {people === null && !error && <li className="py-6 text-center text-sm text-white/70">Loading…</li>}
+          {people && !shown.length && <li className="py-6 text-center text-sm text-white/70">{q ? "Nobody by that name." : "Everyone's already in this call."}</li>}
+          {shown.map((p) => (
+            <li key={p.id}>
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2 hover:bg-white/10">
+                <Avatar name={p.name} src={null} size="sm" />
+                <span className="flex-1 truncate text-sm">{p.name}</span>
+                <input
+                  type="checkbox"
+                  checked={chosen.has(p.id)}
+                  onChange={() =>
+                    setChosen((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(p.id)) next.delete(p.id);
+                      else next.add(p.id);
+                      return next;
+                    })
+                  }
+                  className="h-5 w-5 accent-green-500"
+                />
+              </label>
+            </li>
+          ))}
+        </ul>
+        {error && (
+          <p role="alert" className="mt-2 text-sm text-red-200">
+            {error}
+          </p>
+        )}
+        <button type="button" onClick={add} disabled={!chosen.size || busy} className="mt-3 flex h-12 items-center justify-center gap-2 rounded-full bg-green-600 font-semibold disabled:opacity-50">
+          <UserPlus aria-hidden className="h-5 w-5" /> {busy ? "Adding…" : chosen.size ? `Call ${chosen.size === 1 ? "1 person" : `${chosen.size} people`}` : "Choose who to add"}
+        </button>
+      </div>
     </div>
   );
 }

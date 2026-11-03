@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Award, BookOpenText, CalendarCheck, Flame, Grid3x3, Library, ListOrdered, Medal, MessageSquareQuote, Route, Shuffle, Smile, SmilePlus, SquarePen, TextCursorInput, type LucideIcon, Puzzle, ScanSearch, ChevronDown, ChevronRight } from "lucide-react";
+import { Award, BookOpenText, CalendarCheck, Flame, Grid3x3, Library, ListOrdered, Medal, MessageSquareQuote, Route, Shuffle, Smile, SmilePlus, SquarePen, TextCursorInput, type LucideIcon, Puzzle, ScanSearch, ChevronDown, ChevronRight, Swords } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
@@ -57,6 +57,14 @@ export default async function GamesHubPage({ searchParams }: { searchParams: { k
   ]);
   if (error) console.error("[games] scoreboard failed:", error.message);
   const rows = (attempts as any[]) ?? [];
+  // Bible duels waiting for my answer or my turn (game_duels.sql; nothing before it's run).
+  const { count: duelsForMe } = await supabase
+    .from("game_duels")
+    .select("id", { count: "exact", head: true })
+    .eq("opponent_id", me.id)
+    .in("status", ["pending", "active"])
+    .is("opponent_finished_at", null)
+    .gt("expires_at", new Date().toISOString());
 
   // Church scoreboard (Kids mode games don't count).
   const totals = new Map<string, { name: string; points: number; games: number }>();
@@ -173,6 +181,21 @@ export default async function GamesHubPage({ searchParams }: { searchParams: { k
           </div>
         </section>
       </div>
+
+      {/* Bible duels: play someone from church */}
+      <Link href="/dashboard/games/duel" className="card-elevated group flex items-center gap-4 rounded-2xl p-5 sm:p-6 hover:border-gold/60">
+        <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gold/15 text-gold">
+          <Swords className="h-7 w-7" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2 font-display text-xl font-semibold">
+            Bible duels
+            {(duelsForMe ?? 0) > 0 && <span className="rounded-full bg-danger px-2 py-0.5 text-xs font-semibold text-white">{duelsForMe} for you</span>}
+          </span>
+          <span className="block text-sm text-ink/60">Challenge someone from church to the same quiz, against the clock. Who knows their Bible best?</span>
+        </span>
+        <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-ink/40 group-hover:text-ink" />
+      </Link>
 
       {/* All games */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

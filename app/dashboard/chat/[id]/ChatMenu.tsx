@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Archive, ArchiveRestore, Ban, BellOff, Bell, EllipsisVertical, Eraser, Pencil, Pin, PinOff, Search, Timer, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Ban, BellOff, Bell, EllipsisVertical, Eraser, Pencil, Pin, PinOff, Search, Swords, Timer, Trash2 } from "lucide-react";
 import { DISAPPEAR_OPTIONS, MUTE_OPTIONS, disappearLabel, muteLabel, type MuteOption } from "@/lib/chat";
 import { showToast } from "@/components/ui/Toaster";
 import { blockMember, clearMyChatHistory, deleteChannel, deleteDirectMessageForBoth, hideChatForMe, setChatArchived, setChatDisappearing, setChatMute, setChatPinned, unblockMember } from "../actions";
@@ -211,6 +211,12 @@ export function ChatMenu({
           <button type="button" role="menuitem" className={item} onClick={() => (setOpen(false), setConfirming("clear"))}>
             <Eraser aria-hidden className="h-4 w-4 text-ink/60" /> Clear my chat history
           </button>
+
+          {dmWith && !dmWith.blockedByMe && (
+            <Link href={`/dashboard/games/duel/new?with=${dmWith.id}`} role="menuitem" className={item} onClick={() => setOpen(false)}>
+              <Swords aria-hidden className="h-4 w-4 text-ink/60" /> Challenge to a Bible duel
+            </Link>
+          )}
 
           {dmWith &&
             (dmWith.blockedByMe ? (

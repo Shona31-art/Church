@@ -90,6 +90,7 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 53 | `android_devices.sql` | Android app: each phone's push address (Firebase token) against the person signed in on it; server-only (no policies). Lets calls ring the phone full screen when Grace is closed |
 | 54 | `calls_v4.sql` | Add people to a call, like WhatsApp: "Add" rings more church members into a call; they get into that call only (not its private chat or appointment); a two-person call becomes a group call (up to 6). `video_calls.invited_user_ids`, `invited_by`; rings the people added |
 | 55 | `calls_v5.sql` | Group calls end when everyone has left: phones in a call check in every 20 s (`video_calls.presence`); the last one out — or everyone going quiet — ends the call, so "Join" disappears. `call_presence_write()` is server-only |
+| 56 | `game_duels.sql` | Bible quiz duels: challenge someone from church to the same 10/20/30 questions against a 20 s clock; most right answers wins, a tie goes to the quicker player. Answers and the answer key are server-only (`game_duel_keys`, `game_duel_answers`); only the two players see a duel; live progress; notifications for the challenge, accept/decline and result |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so

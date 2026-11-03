@@ -68,6 +68,7 @@ export const MIGRATION_ORDER = [
   "android_devices.sql",
   "calls_v4.sql",
   "calls_v5.sql",
+  "game_duels.sql",
 ];
 
 const SUPABASE_STUBS = `

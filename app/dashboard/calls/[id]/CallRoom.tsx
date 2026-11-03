@@ -99,7 +99,9 @@ export function CallRoom({
   // Grace's Android app: voice calls start on the earpiece, video on the loudspeaker.
   const [android, setAndroid] = useState(false);
   const [speaker, setSpeaker] = useState(!audioOnly);
-  const [cameraOff, setCameraOff] = useState(false);
+  // A voice call starts with the camera off; "Video" turns it on mid-call.
+  const [cameraOff, setCameraOff] = useState(audioOnly);
+  const [myVideo, setMyVideo] = useState(!audioOnly);
   const [facing, setFacing] = useState<"user" | "environment">("user");
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
   const [, tick] = useState(0);
@@ -110,7 +112,9 @@ export function CallRoom({
   const channelRef = useRef<RealtimeChannel | null>(null);
   const peersRef = useRef(new Map<string, RTCPeerConnection>());
   const pendingRef = useRef(new Map<string, RTCIceCandidateInit[]>());
-  const metaRef = useRef<PresenceMeta>({ userId: me.id, name: me.name, muted: false, cameraOff: false });
+  const metaRef = useRef<PresenceMeta>({ userId: me.id, name: me.name, muted: false, cameraOff: audioOnly });
+  // Each person's incoming sound and video, gathered into one stream.
+  const remoteStreamsRef = useRef(new Map<string, MediaStream>());
   const everConnectedRef = useRef(false);
   const endingRef = useRef(false);
   const joinStartedRef = useRef(false);
@@ -127,6 +131,7 @@ export function CallRoom({
     peersRef.current.get(id)?.close();
     peersRef.current.delete(id);
     pendingRef.current.delete(id);
+    remoteStreamsRef.current.delete(id);
     setRemotes((all) => {
       const { [id]: _gone, ...rest } = all;
       return rest;
@@ -189,11 +194,18 @@ export function CallRoom({
       peersRef.current.set(theirId, pc);
       setRemotes((all) => ({ ...all, [theirId]: { peerId: theirId, userId: meta.userId, name: meta.name, stream: null, muted: Boolean(meta.muted), cameraOff: Boolean(meta.cameraOff), state: "new" } }));
       localRef.current.getTracks().forEach((track) => pc.addTrack(track, localRef.current!));
+      // Voice call: an empty video lane from the start, so either person can
+      // turn their camera on later without reconnecting.
+      if (initiator && !localRef.current.getVideoTracks().length) pc.addTransceiver("video", { direction: "sendrecv", streams: [localRef.current] });
       pc.onicecandidate = (e) => {
         if (e.candidate) send({ type: "candidate", from: peerId, to: theirId, candidate: e.candidate.toJSON() });
       };
       pc.ontrack = (e) => {
-        updateRemote(theirId, { stream: e.streams[0] ?? new MediaStream([e.track]) });
+        const gathered = remoteStreamsRef.current.get(theirId) ?? new MediaStream();
+        if (!gathered.getTracks().includes(e.track)) gathered.addTrack(e.track);
+        remoteStreamsRef.current.set(theirId, gathered);
+        // A new object each time, so the page re-attaches it.
+        updateRemote(theirId, { stream: new MediaStream(gathered.getTracks()) });
         if (!everConnectedRef.current) {
           everConnectedRef.current = true;
           setConnectedAt(Date.now());
@@ -234,6 +246,8 @@ export function CallRoom({
         if (signal.type === "description") {
           await pc.setRemoteDescription(signal.description);
           if (signal.description.type === "offer") {
+            // Answer the voice call's empty video lane as two-way, so my camera can join it later.
+            for (const t of pc.getTransceivers()) if (t.receiver.track?.kind === "video" && t.direction === "recvonly") t.direction = "sendrecv";
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
             send({ type: "description", from: peerId, to: signal.from, description: pc.localDescription!.toJSON() });
@@ -321,6 +335,9 @@ export function CallRoom({
     };
   }, [phase.kind]);
 
+  // Video on screen: a video call, or a voice call where someone turned their camera on.
+  const videoLayout = !audioOnly || (myVideo && !cameraOff) || people.some((p) => !p.cameraOff);
+
   // Android app: earpiece/loudspeaker, screen off at your ear, and the call
   // keeps going if you switch apps. Back to normal when the call ends.
   const inCall = phase.kind === "in-call" || phase.kind === "joining";
@@ -328,10 +345,10 @@ export function CallRoom({
     const app = graceAndroid();
     setAndroid(Boolean(app));
     if (!app || !inCall) return;
-    app.inCall(audioOnly ? "voice" : "video");
-    setSpeaker(!audioOnly);
+    app.inCall(videoLayout ? "video" : "voice");
+    setSpeaker(videoLayout);
     return () => app.inCall("none");
-  }, [inCall, audioOnly]);
+  }, [inCall, videoLayout]);
 
   function toggleSpeaker() {
     const on = !speaker;
@@ -342,7 +359,7 @@ export function CallRoom({
   // Show my own camera.
   useEffect(() => {
     if (localVideoRef.current && localRef.current) localVideoRef.current.srcObject = localRef.current;
-  }, [phase.kind, facing, someoneHere]);
+  }, [phase.kind, facing, someoneHere, myVideo, videoLayout]);
 
   async function join() {
     if (joinStartedRef.current) return;
@@ -430,7 +447,46 @@ export function CallRoom({
     share({ muted: next });
   }
 
+  /** Voice call → video: start my camera and send it on the lane already there. */
+  async function turnOnVideo() {
+    const local = localRef.current;
+    if (!local) return;
+    if (local.getVideoTracks().length) {
+      // Already have a camera, just paused: turn it back on.
+      if (cameraOff) toggleCamera();
+      return;
+    }
+    let track: MediaStreamTrack | undefined;
+    try {
+      track = (await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 640 }, height: { ideal: 480 } } })).getVideoTracks()[0];
+    } catch (error) {
+      const denied = (error as DOMException)?.name === "NotAllowedError";
+      return showToast(denied ? "Allow the camera for Grace (tap the lock or ⓘ next to the address, or your phone's app settings), then try again." : "Couldn't start the camera — close other apps using it and try again.", "error");
+    }
+    if (!track) return;
+    local.addTrack(track);
+    for (const [theirId, pc] of peersRef.current) {
+      const sender = pc.getTransceivers().find((t) => t.receiver.track?.kind === "video")?.sender;
+      if (sender) {
+        await sender.replaceTrack(track).catch(() => undefined);
+      } else {
+        // A connection made without a video lane: add one and renegotiate.
+        pc.addTrack(track, local);
+        try {
+          await pc.setLocalDescription(await pc.createOffer());
+          send({ type: "description", from: peerId, to: theirId, description: pc.localDescription!.toJSON() });
+        } catch {
+          // They'll still hear me.
+        }
+      }
+    }
+    setMyVideo(true);
+    setCameraOff(false);
+    share({ cameraOff: false });
+  }
+
   function toggleCamera() {
+    if (!localRef.current?.getVideoTracks().length) return void turnOnVideo();
     const next = !cameraOff;
     localRef.current?.getVideoTracks().forEach((t) => (t.enabled = !next));
     setCameraOff(next);
@@ -518,7 +574,7 @@ export function CallRoom({
     endWith("ended");
   }
 
-  const kindLabel = audioOnly ? "Voice call" : "Video call";
+  const kindLabel = videoLayout ? "Video call" : "Voice call";
   const elapsed = connectedAt ? Math.floor((Date.now() - connectedAt) / 1000) : 0;
   const timer = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`;
   const statusLine =
@@ -536,7 +592,7 @@ export function CallRoom({
       ? `Waiting for ${other?.name ?? "them"}…`
       : "Waiting for others to join…";
 
-  const remoteVideo = !audioOnly && oneToOne ? people.find((p) => p.stream && !p.cameraOff) : undefined;
+  const remoteVideo = videoLayout && oneToOne ? people.find((p) => p.stream && !p.cameraOff) : undefined;
 
   // ---------------------------------------------------------------------------
   // Screens
@@ -548,7 +604,7 @@ export function CallRoom({
 
       {/* Sound from everyone (and video tiles in group calls). */}
       {!remoteVideo &&
-        people.map((p) => (oneToOne || audioOnly ? <RemoteMedia key={p.peerId} person={p} audioOnly hidden /> : null))}
+        people.map((p) => (oneToOne || !videoLayout ? <RemoteMedia key={p.peerId} person={p} audioOnly hidden /> : null))}
 
       <header className="relative z-10 px-6 pt-[max(2.5rem,env(safe-area-inset-top))] text-center [text-shadow:0_1px_3px_rgb(0_0_0/0.6)]">
         <p className="flex items-center justify-center gap-1 text-xs text-white/70">
@@ -561,14 +617,14 @@ export function CallRoom({
       </header>
 
       <main className="relative z-10 flex flex-1 flex-col items-center justify-center gap-4 px-4">
-        {!remoteVideo && (oneToOne || audioOnly || !someoneHere) && phase.kind !== "error" && (
+        {!remoteVideo && (oneToOne || !videoLayout || !someoneHere) && phase.kind !== "error" && (
           <span className={!connected && phase.kind !== "ended" ? "motion-safe:animate-pulse" : ""}>
             <span className="block scale-[2.2]">
               <Avatar name={oneToOne ? other?.name ?? title : title} src={oneToOne ? other?.photoUrl ?? null : null} size="lg" />
             </span>
           </span>
         )}
-        {!oneToOne && !audioOnly && someoneHere && (
+        {!oneToOne && videoLayout && someoneHere && (
           <div className={`grid w-full max-w-3xl gap-2 ${people.length > 1 ? "grid-cols-2" : ""}`}>
             {people.map((p) => (
               <div key={p.peerId} className="relative aspect-video overflow-hidden rounded-2xl bg-black/40">
@@ -577,7 +633,7 @@ export function CallRoom({
             ))}
           </div>
         )}
-        {!oneToOne && audioOnly && someoneHere && (
+        {!oneToOne && !videoLayout && someoneHere && (
           <p className="text-sm text-white/80">{people.map((p) => p.name + (p.muted ? " (muted)" : "")).join(", ")}</p>
         )}
         {oneToOne && people.some((p) => p.muted) && <p className="flex items-center gap-1 text-sm text-white/80"><MicOff aria-hidden className="h-4 w-4" /> {other?.name ?? "They"} muted their microphone</p>}
@@ -585,13 +641,13 @@ export function CallRoom({
       </main>
 
       {/* My own camera, small, bottom right — with the flip-camera button on it, like WhatsApp. */}
-      {!audioOnly && (phase.kind === "in-call" || phase.kind === "joining") && (
+      {videoLayout && (phase.kind === "in-call" || phase.kind === "joining") && (
         <div className="absolute bottom-[max(7.5rem,calc(env(safe-area-inset-bottom)+6.5rem))] right-4 z-20 aspect-[3/4] w-28 overflow-hidden rounded-2xl border border-white/20 bg-black sm:w-36">
           <video ref={localVideoRef} autoPlay playsInline muted className={`h-full w-full object-cover ${facing === "user" ? "-scale-x-100" : ""} ${cameraOff ? "invisible" : ""}`} />
           {cameraOff && <span className="absolute inset-0 flex items-center justify-center text-[11px] text-white/70">Camera off</span>}
-          <button type="button" onClick={switchCamera} aria-label="Switch camera" className="absolute right-1.5 top-1.5 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white">
+          {myVideo && <button type="button" onClick={switchCamera} aria-label="Switch camera" className="absolute right-1.5 top-1.5 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white">
             <SwitchCamera aria-hidden className="h-4 w-4" />
-          </button>
+          </button>}
         </div>
       )}
 
@@ -623,7 +679,7 @@ export function CallRoom({
           </div>
         ) : (
           <>
-            {audioOnly ? (
+            {!videoLayout ? (
               // Voice call: a rounded panel of labelled buttons, like WhatsApp.
               <div className="mx-auto flex max-w-sm items-start justify-around rounded-[2rem] bg-white/10 px-4 pb-4 pt-5 backdrop-blur" role="group" aria-label="Call controls">
                 {android && (
@@ -631,6 +687,9 @@ export function CallRoom({
                     <Volume2 aria-hidden className="h-6 w-6" />
                   </RoundButton>
                 )}
+                <RoundButton label="Video" tone="glass" onClick={() => void turnOnVideo()}>
+                  <Video aria-hidden className="h-6 w-6" />
+                </RoundButton>
                 <RoundButton label={muted ? "Unmute" : "Mute"} tone={muted ? "light" : "glass"} pressed={muted} onClick={toggleMute}>
                   {muted ? <MicOff aria-hidden className="h-6 w-6" /> : <Mic aria-hidden className="h-6 w-6" />}
                 </RoundButton>

@@ -1,23 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Clock, RotateCcw, Swords, Trophy, XCircle } from "lucide-react";
+import { RotateCcw, Swords, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
-import { haptic } from "@/lib/haptics";
 import { showToast } from "@/components/ui/Toaster";
 import { Avatar } from "@/components/ui/Avatar";
 import { BackLink } from "@/components/ui/PageHeader";
+import { TimedQuiz } from "@/components/games/TimedQuiz";
 import { DUEL_SECONDS, duelClock, duelPhase, otherSide, sideOf, type DuelRow } from "@/lib/games/duel";
 import { answerDuel, cancelDuel, createDuel, startDuel, type DuelReviewItem } from "../actions";
 import { RespondButtons } from "../RespondButtons";
 
 type Person = { name: string; photoUrl: string | null };
-
-/** How long the right answer stays on screen before the next question. */
-const REVEAL_MS = 1200;
 
 export function DuelRoom({ initial, meId, me, them, review }: { initial: DuelRow; meId: string; me: Person; them: Person & { id: string }; review: DuelReviewItem[] | null }) {
   const router = useRouter();
@@ -98,7 +95,15 @@ export function DuelRoom({ initial, meId, me, them, review }: { initial: DuelRow
         </Card>
       )}
 
-      {phase === "playing" && <Questions duel={duel} side={side} onProgress={(patch) => setDuel((d) => ({ ...d, ...patch }))} theirLine={`${theirName} ${theirStatus}`} />}
+      {phase === "playing" && (
+        <TimedQuiz
+          questions={duel.questions}
+          startIndex={duel[`${side}_done`]}
+          answer={(i, c) => answerDuel(duel.id, i, c)}
+          onAnswered={(done, finished) => setDuel((d) => ({ ...d, [`${side}_done`]: done, ...(finished ? { [`${side}_finished_at`]: new Date().toISOString() } : {}) }))}
+          footer={`${theirName} ${theirStatus}`}
+        />
+      )}
 
       {phase === "waiting" && (
         <Card>
@@ -121,117 +126,6 @@ export function DuelRoom({ initial, meId, me, them, review }: { initial: DuelRow
         </Card>
       )}
     </div>
-  );
-}
-
-/** The questions, one at a time, against the clock. Resumes where I left off. */
-function Questions({ duel, side, onProgress, theirLine }: { duel: DuelRow; side: "challenger" | "opponent"; onProgress: (patch: Partial<DuelRow>) => void; theirLine: string }) {
-  const total = duel.questions.length;
-  const [index, setIndex] = useState(duel[`${side}_done`]);
-  const [picked, setPicked] = useState<number | null>(null);
-  const [correctIndex, setCorrectIndex] = useState<number | null>(null);
-  const [checking, setChecking] = useState(false);
-  const [left, setLeft] = useState(DUEL_SECONDS);
-  const [score, setScore] = useState(0);
-  const lockRef = useRef(false);
-  const question = duel.questions[index];
-
-  const choose = useCallback(
-    async (choice: number) => {
-      if (lockRef.current) return;
-      lockRef.current = true;
-      setChecking(true);
-      if (choice >= 0) setPicked(choice);
-      const r = await callAction(() => answerDuel(duel.id, index, choice), { error: CONNECTION_FAILED });
-      setChecking(false);
-      if (r.error || r.correctIndex === undefined) {
-        // Already answered (e.g. on another device): move on.
-        if (/already answered|in order/.test(r.error ?? "")) {
-          setIndex((i) => i + 1);
-          lockRef.current = false;
-          return;
-        }
-        lockRef.current = false;
-        setPicked(null);
-        return showToast(r.error ?? "Couldn't save your answer.", "error");
-      }
-      setCorrectIndex(r.correctIndex);
-      haptic(r.correct ? "success" : "error");
-      if (r.correct) setScore((s) => s + 1);
-      onProgress({ [`${side}_done`]: index + 1, ...(r.finished ? { [`${side}_finished_at`]: new Date().toISOString() } : {}) } as Partial<DuelRow>);
-      if (!r.finished) {
-        setTimeout(() => {
-          setIndex((i) => i + 1);
-          setPicked(null);
-          setCorrectIndex(null);
-          lockRef.current = false;
-        }, REVEAL_MS);
-      }
-    },
-    [duel.id, index, onProgress, side]
-  );
-
-  // The clock for this question; out of time counts as a wrong answer.
-  useEffect(() => {
-    setLeft(DUEL_SECONDS);
-    const started = Date.now();
-    const t = setInterval(() => {
-      const remaining = DUEL_SECONDS - Math.floor((Date.now() - started) / 1000);
-      setLeft(Math.max(0, remaining));
-      if (remaining <= 0) {
-        clearInterval(t);
-        void choose(-1);
-      }
-    }, 250);
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- restart only for a new question
-  }, [index]);
-
-  if (!question) return <Card>Saving your answers…</Card>;
-  const answered = correctIndex !== null;
-
-  return (
-    <Card>
-      <div className="mb-3 flex items-center justify-between text-xs text-ink/60">
-        <span className="tabular">
-          Question {index + 1} of {total} · ✓ {score}
-        </span>
-        <span className={`flex items-center gap-1 font-semibold tabular ${left <= 5 && !answered ? "text-danger motion-safe:animate-pulse" : ""}`} aria-live="off">
-          <Clock aria-hidden className="h-3.5 w-3.5" /> {answered ? "—" : `${left}s`}
-        </span>
-      </div>
-      <div className="mb-5 h-1.5 overflow-hidden rounded-full bg-ink/10" aria-hidden>
-        <div className={`h-full rounded-full transition-[width] duration-200 ${left <= 5 ? "bg-danger" : "bg-gold"}`} style={{ width: `${answered ? 0 : (left / DUEL_SECONDS) * 100}%` }} />
-      </div>
-      <p className="mb-5 font-display text-xl font-semibold" id="duel-question">
-        {question.question}
-      </p>
-      <div className="space-y-2" role="group" aria-labelledby="duel-question">
-        {question.choices.map((choice, i) => {
-          const isAnswer = correctIndex === i;
-          const wrongPick = picked === i && answered && correctIndex !== i;
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => choose(i)}
-              disabled={picked !== null || checking || answered}
-              className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left text-sm transition-colors ${
-                isAnswer ? "border-success-line bg-success-tint text-success" : wrongPick ? "border-danger-line bg-danger-tint text-danger" : picked === i ? "border-gold bg-gold/10" : "border-line bg-surface hover:border-line-strong"
-              }`}
-            >
-              <span>{choice}</span>
-              {isAnswer && <CheckCircle2 aria-label="Correct answer" className="h-4 w-4 shrink-0" />}
-              {wrongPick && <XCircle aria-label="Your answer" className="h-4 w-4 shrink-0" />}
-            </button>
-          );
-        })}
-      </div>
-      {answered && picked === null && <p className="mt-3 text-sm text-danger">Out of time!</p>}
-      <p className="mt-5 text-center text-xs text-ink/60" aria-live="polite">
-        {theirLine}
-      </p>
-    </Card>
   );
 }
 

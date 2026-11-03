@@ -7,6 +7,7 @@ let due: { id: string; media_path: string }[] = [];
 let removeError: { message: string } | null = null;
 let disappearedFiles: { media_path: string }[] = [];
 
+vi.mock("@/lib/games/challenge-server", () => ({ announceDueChallenges: async () => 0 }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => {
     const query = {
@@ -87,7 +88,7 @@ describe("expire-chat-media cron", () => {
   test("deletes due files, then marks those messages expired", async () => {
     const response = await call("Bearer s3cret");
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ expired: 2, notificationsDeleted: 3, subscriptionsEnded: 0, disappearedFiles: 1 });
+    expect(await response.json()).toEqual({ expired: 2, notificationsDeleted: 3, subscriptionsEnded: 0, disappearedFiles: 1, challengesAnnounced: 0 });
     // Disappeared messages' files first, then the 90-day media clean-up.
     expect(calls.removed).toEqual([["church/chan/user/gone.webp"], ["church/chan/user/a.m4a", "church/chan/user/b.webm"]]);
     expect(calls.updatedIds).toEqual([["m1", "m2"]]);

@@ -65,6 +65,15 @@ export default async function GamesHubPage({ searchParams }: { searchParams: { k
     .in("status", ["pending", "active"])
     .is("opponent_finished_at", null)
     .gt("expires_at", new Date().toISOString());
+  // A whole-church challenge running now (church_challenges.sql).
+  const { data: liveChallenge } = await supabase
+    .from("church_challenges")
+    .select("id, title, ends_at")
+    .lte("starts_at", new Date().toISOString())
+    .gt("ends_at", new Date().toISOString())
+    .order("ends_at")
+    .limit(1)
+    .maybeSingle();
 
   // Church scoreboard (Kids mode games don't count).
   const totals = new Map<string, { name: string; points: number; games: number }>();
@@ -182,8 +191,20 @@ export default async function GamesHubPage({ searchParams }: { searchParams: { k
         </section>
       </div>
 
-      {/* Bible duels: play someone from church */}
-      <Link href="/dashboard/games/duel" className="card-elevated group flex items-center gap-4 rounded-2xl p-5 sm:p-6 hover:border-gold/60">
+      {/* Play other people: the whole church, or one person */}
+      <div className="grid gap-4 md:grid-cols-2">
+      <Link href={liveChallenge ? `/dashboard/games/challenge/${liveChallenge.id}` : "/dashboard/games/challenge"} className={`card-elevated group flex items-center gap-4 rounded-2xl p-5 sm:p-6 hover:border-gold/60 ${liveChallenge ? "border-gold/60" : ""}`}>
+        <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gold/15 text-3xl">⛪</span>
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-2 font-display text-xl font-semibold">
+            Church challenge
+            {liveChallenge && <span className="rounded-full bg-green-600 px-2 py-0.5 text-xs font-semibold text-white">Running now</span>}
+          </span>
+          <span className="block text-sm text-ink/60">{liveChallenge ? `“${liveChallenge.title}” — everyone plays the same quiz. Top the leaderboard!` : "The whole church plays the same quiz, with a live leaderboard."}</span>
+        </span>
+        <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-ink/40 group-hover:text-ink" />
+      </Link>
+            <Link href="/dashboard/games/duel" className="card-elevated group flex items-center gap-4 rounded-2xl p-5 sm:p-6 hover:border-gold/60">
         <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gold/15 text-gold">
           <Swords className="h-7 w-7" />
         </span>
@@ -196,6 +217,7 @@ export default async function GamesHubPage({ searchParams }: { searchParams: { k
         </span>
         <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-ink/40 group-hover:text-ink" />
       </Link>
+      </div>
 
       {/* All games */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CHAT_MEDIA_BUCKET, mediaExpiryCutoff } from "@/lib/chat";
 import { endCancelledSubscriptions } from "@/lib/subscription-billing";
+import { announceDueChallenges } from "@/lib/games/challenge-server";
 
 /**
  * GET /api/cron/expire-chat-media — nightly clean-up, called by Vercel Cron
@@ -121,5 +122,13 @@ export async function GET(request: Request) {
     console.error("[cron] end cancelled subscriptions failed (retries tomorrow):", (error as Error).message);
   }
 
-  return NextResponse.json({ expired, notificationsDeleted, subscriptionsEnded, disappearedFiles: disappeared });
+  // Church challenges that closed without anyone opening them since: send the results.
+  let challengesAnnounced = 0;
+  try {
+    challengesAnnounced = await announceDueChallenges();
+  } catch (error) {
+    console.error("[cron] church challenge results failed (retries tomorrow):", (error as Error).message);
+  }
+
+  return NextResponse.json({ expired, notificationsDeleted, subscriptionsEnded, disappearedFiles: disappeared, challengesAnnounced });
 }

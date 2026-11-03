@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentAppUser, type AppUser } from "@/lib/current-user";
 import { checkModuleAccess } from "@/lib/paywall";
-import { createRng, newSeed, shuffle } from "@/lib/games/random";
+import { pickQuizQuestions } from "@/lib/games/pick-questions";
 import { DUEL_LENGTHS, DUEL_SECONDS, duelWinner, otherSide, sideOf, timeAnswer, type DuelRow, type DuelSide } from "@/lib/games/duel";
 
 // Bible Quiz Duels (supabase/game_duels.sql). Two people from the same
@@ -67,33 +67,20 @@ export async function createDuel(opponentId: string, level: string, length: numb
   if (!them || block?.length) return { error: "You can't challenge this person." };
   if ((open ?? 0) >= 10) return { error: "You have 10 challenges waiting for an answer — wait for some replies first." };
 
-  // The same questions for both: this level first, topped up from the others.
-  const { data: bank, error: bankError } = await createClient()
-    .from("bible_quiz_questions")
-    .select("id, question, choices, correct_index, difficulty")
-    .or(`church_id.is.null,church_id.eq.${me.church_id}`)
-    .order("id");
-  if (bankError || !bank?.length) return { error: "No quiz questions are available yet." };
-  const rng = createRng(newSeed());
-  const atLevel = shuffle(bank.filter((q) => q.difficulty === lvl.data), rng);
-  const others = shuffle(bank.filter((q) => q.difficulty !== lvl.data), rng);
-  const chosen = [...atLevel, ...others].slice(0, length);
-  const shuffled = chosen.map((q) => {
-    const choices = q.choices as string[];
-    const order = shuffle(choices.map((_, i) => i), rng);
-    return { question: q.question as string, choices: order.map((i) => choices[i]), correct: order.indexOf(q.correct_index as number) };
-  });
+  // The same questions for both.
+  const picked = await pickQuizQuestions(me.church_id!, lvl.data, length);
+  if ("error" in picked) return picked;
 
   const { data: duel, error } = await admin
     .from("game_duels")
-    .insert({ church_id: me.church_id, challenger_id: me.id, opponent_id: opponent.data, level: lvl.data, questions: shuffled.map(({ question, choices }) => ({ question, choices })) })
+    .insert({ church_id: me.church_id, challenger_id: me.id, opponent_id: opponent.data, level: lvl.data, questions: picked.questions })
     .select("id")
     .single();
   if (error || !duel) {
     console.error("[duel] create failed:", error?.message);
     return { error: error?.code === "42P01" ? MIGRATION_MISSING : "Couldn't send the challenge — try again." };
   }
-  const { error: keyError } = await admin.from("game_duel_keys").insert({ duel_id: duel.id, correct: shuffled.map((q) => q.correct) });
+  const { error: keyError } = await admin.from("game_duel_keys").insert({ duel_id: duel.id, correct: picked.correct });
   if (keyError) {
     await admin.from("game_duels").delete().eq("id", duel.id);
     return { error: "Couldn't send the challenge — try again." };

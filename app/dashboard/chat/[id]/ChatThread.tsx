@@ -33,6 +33,8 @@ import { MessageBubble } from "./MessageBubble";
 import { ForwardDialog } from "./ForwardDialog";
 import { PollDialog } from "./PollDialog";
 import { Composer } from "./Composer";
+import { CHAT_CLEARED_EVENT } from "./ChatMenu";
+import { Copy, Star, Trash2, X } from "lucide-react";
 import type { RecordedVoiceNote } from "./VoiceRecorder";
 import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
 
@@ -77,6 +79,7 @@ export function ChatThread({
   initialPolls = {},
   initialVotes = [],
   disappearAfter = null,
+  v5 = false,
 }: {
   channelId: string;
   churchId: string;
@@ -114,6 +117,8 @@ export function ChatThread({
   initialVotes?: PollVote[];
   /** Disappearing messages: seconds, or null when off. */
   disappearAfter?: number | null;
+  /** chat_v5.sql has been run: delete messages just for me. */
+  v5?: boolean;
 }) {
   // One client for the component's lifetime, so the realtime subscription
   // isn't torn down and rebuilt on every render.
@@ -125,7 +130,10 @@ export function ChatThread({
   const [sendError, setSendError] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [editing, setEditing] = useState<ChatMessage | null>(null);
-  const [deleting, setDeleting] = useState<ChatMessage | null>(null);
+  // The message(s) being deleted (the confirm dialog is open).
+  const [deleting, setDeleting] = useState<ChatMessage[] | null>(null);
+  // Choosing several messages (long press, or "Select messages"): their ids.
+  const [selected, setSelected] = useState<Set<string> | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [otherReadAt, setOtherReadAt] = useState<string | null>(initialOtherReadAt);
   const [typers, setTypers] = useState<Record<string, number>>({});
@@ -181,6 +189,69 @@ export function ChatThread({
     if (deleting) deleteDialogRef.current?.showModal();
     else deleteDialogRef.current?.close();
   }, [deleting]);
+
+  // "Clear my chat history" (⋮ menu): empty the open chat straight away.
+  useEffect(() => {
+    function onCleared(e: Event) {
+      const { channelId: cleared, clearedAt } = (e as CustomEvent<{ channelId: string; clearedAt: string }>).detail;
+      if (cleared !== channelId) return;
+      setMessages((prev) => prev.filter((m) => m.pending || m.created_at > clearedAt));
+      setSelected(null);
+      setReplyTo(null);
+    }
+    window.addEventListener(CHAT_CLEARED_EVENT, onCleared);
+    return () => window.removeEventListener(CHAT_CLEARED_EVENT, onCleared);
+  }, [channelId]);
+
+  // Long press on a message starts choosing several, like WhatsApp.
+  const pressRef = useRef<{ timer?: ReturnType<typeof setTimeout>; x: number; y: number; fired: boolean }>({ x: 0, y: 0, fired: false });
+  function pressStart(e: React.PointerEvent, m: ChatMessage) {
+    if (m.pending || (e.pointerType === "mouse" && e.button !== 0)) return;
+    clearTimeout(pressRef.current.timer);
+    pressRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      fired: false,
+      timer: setTimeout(() => {
+        pressRef.current.fired = true;
+        navigator.vibrate?.(25);
+        toggleSelected(m.id, true);
+      }, 450),
+    };
+  }
+  function pressMove(e: React.PointerEvent) {
+    if (Math.hypot(e.clientX - pressRef.current.x, e.clientY - pressRef.current.y) > 10) clearTimeout(pressRef.current.timer);
+  }
+  function pressEnd() {
+    clearTimeout(pressRef.current.timer);
+  }
+  /** While choosing, a tap ticks the message instead of doing anything else. */
+  function pressClick(e: React.MouseEvent, m: ChatMessage) {
+    if (pressRef.current.fired) {
+      pressRef.current.fired = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (!selected || m.pending) return;
+    e.preventDefault();
+    e.stopPropagation();
+    toggleSelected(m.id);
+  }
+  function toggleSelected(id: string, on?: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev ?? []);
+      if (on ?? !next.has(id)) next.add(id);
+      else next.delete(id);
+      return next.size ? next : null;
+    });
+  }
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !deleting && setSelected(null);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selected, deleting]);
 
   useEffect(() => {
     const toMessage = (row: any): ChatMessage => ({
@@ -506,17 +577,65 @@ export function ChatThread({
     router.refresh();
   }
 
-  async function confirmDelete() {
-    const target = deleting;
+  /** Delete for everyone: my own messages (or, for a moderator, one message). */
+  async function deleteForEveryone() {
+    const targets = deleting ?? [];
     setDeleting(null);
-    if (!target) return;
-    const result = await callAction(() => deleteChatMessage(target.id), { error: CONNECTION_FAILED });
-    if (result.error) return showToast(result.error, "error");
-    setMessages((prev) =>
-      prev.map((m) => (m.id === target.id ? { ...m, content: "", media_path: null, deleted_at: new Date().toISOString(), deleted_by: currentUserId } : m))
-    );
-    setReactions((prev) => prev.filter((r) => r.message_id !== target.id));
-    if (editing?.id === target.id || replyTo?.id === target.id) cancelMode();
+    setSelected(null);
+    let failed: string | null = null;
+    for (const target of targets) {
+      const result = await callAction(() => deleteChatMessage(target.id), { error: CONNECTION_FAILED });
+      if (result.error) {
+        failed = result.error;
+        continue;
+      }
+      setMessages((prev) => prev.map((m) => (m.id === target.id ? { ...m, content: "", media_path: null, deleted_at: new Date().toISOString(), deleted_by: currentUserId } : m)));
+      setReactions((prev) => prev.filter((r) => r.message_id !== target.id));
+      if (editing?.id === target.id || replyTo?.id === target.id) cancelMode();
+    }
+    if (failed) showToast(failed, "error");
+  }
+
+  /** Delete for me: gone from my view only; everyone else still sees them. */
+  async function deleteForMe() {
+    const ids = (deleting ?? []).map((m) => m.id);
+    setDeleting(null);
+    setSelected(null);
+    if (!ids.length) return;
+    const previous = messages;
+    setMessages((prev) => prev.filter((m) => !ids.includes(m.id)));
+    if (editing && ids.includes(editing.id)) cancelMode();
+    if (replyTo && ids.includes(replyTo.id)) cancelMode();
+    const { error } = await supabase
+      .from("chat_hidden_messages")
+      .upsert(ids.map((message_id) => ({ user_id: currentUserId, message_id, channel_id: channelId })), { onConflict: "user_id,message_id", ignoreDuplicates: true });
+    if (error) {
+      setMessages(previous);
+      showToast("Couldn't delete — check your connection and try again.", "error");
+    } else showToast(ids.length === 1 ? "Message deleted for you." : `${ids.length} messages deleted for you.`, "success");
+  }
+
+  async function copySelected() {
+    const text = messages
+      .filter((m) => selected?.has(m.id) && !m.deleted_at && m.content)
+      .map((m) => m.content)
+      .join("\n");
+    setSelected(null);
+    if (!text) return showToast("Nothing to copy — those messages have no text.", "info");
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("Copied.", "success");
+    } catch {
+      showToast("Couldn't copy on this device.", "error");
+    }
+  }
+
+  async function starSelected() {
+    const chosen = messages.filter((m) => selected?.has(m.id) && !m.deleted_at && !m.pending);
+    setSelected(null);
+    const allStarred = chosen.every((m) => starred.has(m.id));
+    for (const m of chosen) if (allStarred || !starred.has(m.id)) await toggleStar(m, true);
+    if (chosen.length) showToast(allStarred ? "Unstarred." : "Starred. Find them under Chats → Starred.", "success");
   }
 
   async function react(message: ChatMessage, emoji: Reaction) {
@@ -539,7 +658,7 @@ export function ChatThread({
     }
   }
 
-  async function toggleStar(message: ChatMessage) {
+  async function toggleStar(message: ChatMessage, quiet = false) {
     const on = !starred.has(message.id);
     setStarred((prev) => {
       const next = new Set(prev);
@@ -558,7 +677,7 @@ export function ChatThread({
         return next;
       });
       showToast("Couldn't save that — try again.", "error");
-    } else if (on) showToast("Starred. Find it under Chats → Starred.", "success");
+    } else if (on && !quiet) showToast("Starred. Find it under Chats → Starred.", "success");
   }
 
   async function vote(messageId: string, choices: number[]) {
@@ -601,7 +720,10 @@ export function ChatThread({
     el.animate?.([{ backgroundColor: "rgb(var(--gold) / 0.18)" }, { backgroundColor: "transparent" }], { duration: 1400 });
   }
 
-  const deletingOthers = deleting && deleting.sender_id !== currentUserId;
+  // What the delete dialog can offer for the chosen messages.
+  const deletingAllMine = Boolean(deleting?.length) && deleting!.every((m) => m.sender_id === currentUserId && canDeleteMessage(m, currentUserId, canModerate));
+  const deletingAsModerator = deleting?.length === 1 && deleting[0].sender_id !== currentUserId && canDeleteMessage(deleting[0], currentUserId, canModerate);
+  const selectedMessages = selected ? messages.filter((m) => selected.has(m.id)) : [];
   // Disappearing messages vanish on time, even while the chat is open.
   const shown = messages.filter((m) => !m.expires_at || new Date(m.expires_at).getTime() > now);
   const disappearText = disappearAfter ? { 86400: "24 hours", 604800: "7 days", 7776000: "90 days" }[disappearAfter] : null;
@@ -612,6 +734,27 @@ export function ChatThread({
       onFocus={onComposerFocus}
       className="chat-thread card-elevated flex min-h-[26rem] flex-col overflow-hidden rounded-2xl"
     >
+      {selected && (
+        <div role="toolbar" aria-label="Selected messages" className="flex items-center gap-1 border-b border-line bg-surface px-2 py-1.5">
+          <button type="button" className="btn-ghost btn-icon h-10 w-10 rounded-full" onClick={() => setSelected(null)} aria-label="Stop selecting">
+            <X aria-hidden className="h-5 w-5" />
+          </button>
+          <p className="flex-1 text-sm font-semibold" aria-live="polite">
+            {selected.size} selected
+          </p>
+          <button type="button" className="btn-ghost btn-icon h-10 w-10 rounded-full" onClick={copySelected} aria-label="Copy text">
+            <Copy aria-hidden className="h-5 w-5" />
+          </button>
+          {v4 && (
+            <button type="button" className="btn-ghost btn-icon h-10 w-10 rounded-full" onClick={starSelected} aria-label="Star">
+              <Star aria-hidden className="h-5 w-5" />
+            </button>
+          )}
+          <button type="button" className="btn-ghost btn-icon h-10 w-10 rounded-full text-danger" onClick={() => setDeleting(selectedMessages)} aria-label="Delete">
+            <Trash2 aria-hidden className="h-5 w-5" />
+          </button>
+        </div>
+      )}
       <div ref={logRef} className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5" role="log" aria-live="polite" aria-label="Messages">
         {truncated && <p className="mb-2 text-center text-xs text-ink/60">{aroundMessage ? "Showing the messages around the one you opened." : "Showing the most recent messages."}</p>}
         {disappearText && (
@@ -627,7 +770,21 @@ export function ChatThread({
           const myReaction = messageReactions.find((r) => r.user_id === currentUserId)?.emoji ?? null;
 
           return (
-            <div key={m.id}>
+            <div
+              key={m.id}
+              onPointerDown={(e) => pressStart(e, m)}
+              onPointerMove={pressMove}
+              onPointerUp={pressEnd}
+              onPointerCancel={pressEnd}
+              onPointerLeave={pressEnd}
+              onClickCapture={(e) => pressClick(e, m)}
+              onContextMenu={(e) => {
+                // Phones open their own menu on a long press; ours takes over.
+                if (selected || pressRef.current.fired || (e.nativeEvent as PointerEvent).pointerType === "touch") e.preventDefault();
+              }}
+              className={`relative [-webkit-touch-callout:none] ${selected ? "cursor-pointer select-none" : ""}`}
+            >
+              {selected?.has(m.id) && <div aria-hidden className="pointer-events-none absolute inset-x-[-0.75rem] bottom-0 top-0 rounded-lg bg-gold/15 sm:inset-x-[-1.25rem]" />}
               {newDay && (
                 <div className="my-4 flex justify-center" role="separator" aria-label={dayLabel(m.created_at)}>
                   <span className="rounded-full border border-line bg-parchment px-3 py-1 text-eyebrow font-medium text-ink/60">{dayLabel(m.created_at)}</span>
@@ -661,7 +818,8 @@ export function ChatThread({
                       }
                     : undefined
                 }
-                onDelete={canDeleteMessage(m, currentUserId, canModerate) ? () => setDeleting(m) : undefined}
+                onDelete={canDeleteMessage(m, currentUserId, canModerate) || (v5 && !m.pending) ? () => setDeleting([m]) : undefined}
+                onSelect={v2 && !m.pending ? () => toggleSelected(m.id, true) : undefined}
                 onJumpTo={jumpTo}
                 receipt={isDm && isMine ? receiptStatus(m, otherReadAt) : undefined}
                 starred={starred.has(m.id)}
@@ -752,21 +910,32 @@ export function ChatThread({
       >
         <div className="p-6">
           <h2 id="delete-message-title" className="text-xl font-semibold">
-            {deletingOthers ? "Remove this message?" : "Delete message?"}
+            {deletingAsModerator ? "Remove this message?" : deleting && deleting.length > 1 ? `Delete ${deleting.length} messages?` : "Delete message?"}
           </h2>
           <p className="mt-2 text-sm text-ink/70">
-            {deletingOthers
-              ? `It will show as "Removed by a moderator" for everyone. This is recorded in the activity log.`
-              : `It will show as "This message was deleted" for everyone in this chat.`}
+            {deletingAsModerator
+              ? `"Remove" shows it as "Removed by a moderator" for everyone and is recorded in the activity log.${v5 ? ' "Delete for me" just hides it from you.' : ""}`
+              : deletingAllMine
+              ? `"Delete for everyone" shows "This message was deleted" in everyone's chat.${v5 ? ' "Delete for me" hides it from you only.' : ""}`
+              : v5
+              ? "They'll disappear from your view of this chat. Everyone else still sees them."
+              : "Deleting messages just for you needs a database update (chat_v5.sql) — ask your church admin to run it. You can delete your own messages for everyone."}
           </p>
           <div className="mt-6 flex flex-wrap justify-end gap-2">
             {/* Cancel first, so a reflexive Enter is safe. */}
             <button type="button" autoFocus className="btn-secondary" onClick={() => setDeleting(null)}>
               Cancel
             </button>
-            <button type="button" className="btn-danger" onClick={confirmDelete}>
-              {deletingOthers ? "Remove" : "Delete for everyone"}
-            </button>
+            {v5 && (
+              <button type="button" className={deletingAllMine || deletingAsModerator ? "btn-secondary text-danger" : "btn-danger"} onClick={deleteForMe}>
+                Delete for me
+              </button>
+            )}
+            {(deletingAllMine || deletingAsModerator) && (
+              <button type="button" className="btn-danger" onClick={deleteForEveryone}>
+                {deletingAsModerator ? "Remove" : "Delete for everyone"}
+              </button>
+            )}
           </div>
         </div>
       </dialog>

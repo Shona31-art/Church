@@ -9,7 +9,7 @@ import { planIncludes } from "@/lib/features";
 import { isMuted, muteLabel, type ChatMessage, type ChatReaction, type PollVote } from "@/lib/chat";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ChatMenu } from "./ChatMenu";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { BackLink, PageHeader } from "@/components/ui/PageHeader";
 import { Avatar } from "@/components/ui/Avatar";
 import { ChatThread, type ChatPerson } from "./ChatThread";
 import { DmStatus } from "./DmStatus";
@@ -170,13 +170,18 @@ export default async function ChatChannelPage({ params, searchParams }: { params
   const noVoice = (myRestrictions ?? []).some((r: any) => r.kind === "no_voice");
   const mutedUntil = isMuted(settings?.muted_until) ? settings!.muted_until : null;
   // Video calls (video_calls.sql): not in a private chat with someone you've blocked.
+  // chat_v5.sql (delete for me) installed? A missing table answers with an error.
+  const v5 = v4 && !(await supabase.from("chat_hidden_messages").select("message_id").limit(1)).error;
   const call = myBlock ? { available: false, activeCallId: null, startedAt: null } : await videoCallState({ channelId: channel.id }, channel.is_dm);
 
   return (
-    <div className="relative max-w-3xl">
-      {/* The ⋮ menu sits top right, level with "‹ Chats", where people expect it. */}
-      {v2 && (
-        <div className="absolute right-0 top-0 z-20 flex items-center gap-1.5">
+    <div className="max-w-3xl">
+      {/* "‹ Chats" on the left; call buttons and ⋮ on the right of the same row,
+          in the page's own flow so they scroll under the phone's top bar. */}
+      <div className="mb-3 flex min-h-11 items-center justify-between gap-2">
+        <BackLink href="/dashboard/chat" label="Chats" className="" />
+        {v2 && (
+        <div className="flex shrink-0 items-center gap-1.5">
           {/* Call buttons beside the menu, like WhatsApp. */}
           {call.available && <StartCallButton compact oneToOne={channel.is_dm} place={{ channelId: channel.id }} activeCallId={call.activeCallId} startedAt={call.startedAt} />}
           <ChatMenu
@@ -193,9 +198,9 @@ export default async function ChatChannelPage({ params, searchParams }: { params
             canSetDisappearing={channel.is_dm || me.role === "pastor" || me.role === "church_admin"}
           />
         </div>
-      )}
+        )}
+      </div>
       <PageHeader
-        back={{ href: "/dashboard/chat", label: "Chats" }}
         title={
           channel.is_dm ? (
             <span className="flex items-center gap-3">
@@ -249,6 +254,7 @@ export default async function ChatChannelPage({ params, searchParams }: { params
         initialPolls={Object.fromEntries(((pollRows ?? []) as { message_id: string; options: string[]; allow_multiple: boolean }[]).map((p) => [p.message_id, { options: p.options, allowMultiple: p.allow_multiple }]))}
         initialVotes={(voteRows ?? []) as PollVote[]}
         disappearAfter={(channel as any).disappear_after_seconds ?? null}
+        v5={v5}
         currentUserId={me.id}
         canModerate={!channel.is_dm && can(me.role, "moderateChat")}
         directory={directory}

@@ -34,6 +34,7 @@ export function MessageBubble({
   mentionsMe = false,
   poll,
   onCallBack,
+  onSelect,
 }: {
   message: ChatMessage;
   isMine: boolean;
@@ -61,6 +62,8 @@ export function MessageBubble({
   /** For a poll message: its options, live votes and how to vote. */
   /** Call history bubbles: "Tap to call back". */
   onCallBack?: (kind: "voice" | "video") => void;
+  /** Start choosing several messages (like a long press). */
+  onSelect?: () => void;
   poll?: { options: string[]; allowMultiple: boolean; votes: PollVote[]; currentUserId: string; nameOf: (id: string) => string; onVote?: (choices: number[]) => void };
 }) {
   const deleted = Boolean(message.deleted_at);
@@ -68,7 +71,7 @@ export function MessageBubble({
   const removedByModerator = deleted && message.deleted_by && message.deleted_by !== message.sender_id;
   // Group chats show who's talking; in a DM the page header already does.
   const showAvatarColumn = !isMine && !isDm;
-  const hasMenu = !message.pending && !deleted && Boolean(onReact || onReply || onEdit || onDelete || onStar || onForward);
+  const hasMenu = !message.pending && !deleted && Boolean(onReact || onReply || onEdit || onDelete || onStar || onForward || onSelect);
 
   return (
     <div id={`msg-${message.id}`} className={`group flex gap-2 scroll-mt-24 ${isMine ? "justify-end" : "justify-start"} ${showHeader ? "mt-3" : "mt-0.5"}`}>
@@ -204,6 +207,7 @@ export function MessageBubble({
                 starred={starred}
                 onStar={onStar}
                 onForward={onForward}
+                onSelect={onSelect}
               />
             </div>
           )}

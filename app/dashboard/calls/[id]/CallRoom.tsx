@@ -7,6 +7,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { showToast } from "@/components/ui/Toaster";
 import { Avatar } from "@/components/ui/Avatar";
 import { shouldInitiate } from "@/lib/video-call-rules";
 import { startRingback } from "@/lib/call-sounds";
@@ -415,26 +416,72 @@ export function CallRoom({
   }
 
   /** Front ↔ back camera on phones: swap the video being sent without reconnecting. */
+  /**
+   * Front ⇄ back camera. Phones can't open both cameras at once, so the old
+   * camera is released first; "exact" makes the phone really change sides
+   * (a plain hint is often ignored), with fallbacks for phones that only
+   * list their cameras by id.
+   */
   async function switchCamera() {
+    const local = localRef.current;
+    if (!local) return;
     const nextFacing = facing === "user" ? "environment" : "user";
+    const oldTrack = local.getVideoTracks()[0];
+    const oldDeviceId = oldTrack?.getSettings().deviceId;
+    oldTrack?.stop();
+    const size = { width: { ideal: 640 }, height: { ideal: 480 } };
+    const attempts: MediaTrackConstraints[] = [{ facingMode: { exact: nextFacing }, ...size }];
     try {
-      const fresh = await navigator.mediaDevices.getUserMedia({ video: { facingMode: nextFacing, width: { ideal: 640 }, height: { ideal: 480 } } });
-      const track = fresh.getVideoTracks()[0];
-      track.enabled = !cameraOff;
-      for (const pc of peersRef.current.values()) {
-        const sender = pc.getSenders().find((s) => s.track?.kind === "video");
-        await sender?.replaceTrack(track);
-      }
-      const local = localRef.current!;
-      local.getVideoTracks().forEach((t) => {
-        local.removeTrack(t);
-        t.stop();
-      });
-      local.addTrack(track);
-      setFacing(nextFacing);
+      const cameras = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput" && d.deviceId && d.deviceId !== oldDeviceId);
+      const wanted = nextFacing === "environment" ? /back|rear|environment/i : /front|user|face/i;
+      const pick = cameras.find((d) => wanted.test(d.label)) ?? cameras[0];
+      if (pick) attempts.push({ deviceId: { exact: pick.deviceId }, ...size });
     } catch {
-      // No second camera: nothing to switch to.
+      // Can't list cameras; the facing-mode attempts below still run.
     }
+    attempts.push({ facingMode: nextFacing, ...size });
+
+    let track: MediaStreamTrack | null = null;
+    let usedFacing: "user" | "environment" = nextFacing;
+    for (const video of attempts) {
+      try {
+        track = (await navigator.mediaDevices.getUserMedia({ video })).getVideoTracks()[0] ?? null;
+        if (track) break;
+      } catch {
+        // Try the next way of asking.
+      }
+    }
+    if (!track) {
+      // Only one camera: bring the old one back.
+      usedFacing = facing;
+      try {
+        track = (await navigator.mediaDevices.getUserMedia({ video: oldDeviceId ? { deviceId: { exact: oldDeviceId }, ...size } : { facingMode: facing, ...size } })).getVideoTracks()[0] ?? null;
+      } catch {
+        track = null;
+      }
+      showToast("Couldn't switch to the other camera on this phone.", "error");
+    }
+    const reported = track?.getSettings().facingMode;
+    if (reported === "user" || reported === "environment") usedFacing = reported;
+
+    if (oldTrack) local.removeTrack(oldTrack);
+    if (track) {
+      track.enabled = !cameraOff;
+      local.addTrack(track);
+    }
+    for (const pc of peersRef.current.values()) {
+      // By transceiver, so it is found even after a failed switch left it empty.
+      const sender = pc.getTransceivers().find((t) => t.receiver.track?.kind === "video")?.sender;
+      await sender?.replaceTrack(track).catch(() => undefined);
+    }
+    // The preview keeps showing the stopped camera unless it is re-attached.
+    const preview = localVideoRef.current;
+    if (preview) {
+      preview.srcObject = null;
+      preview.srcObject = local;
+      preview.play().catch(() => undefined);
+    }
+    setFacing(usedFacing);
   }
 
   /** The red button: two-person calls end for both; in a group you just leave. */

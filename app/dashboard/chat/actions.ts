@@ -170,10 +170,13 @@ export async function setChatPinned(channelId: string, pinned: boolean): Promise
 }
 
 /** Input: channel id. Hides everything sent before now — for you only; nobody else's copy changes. */
-export async function clearMyChatHistory(channelId: string): Promise<ChatActionResult> {
-  const result = await saveMySettings(channelId, { cleared_at: new Date().toISOString() });
-  if (!result.error) revalidatePath(`/dashboard/chat/${channelId}`);
-  return result;
+/** Returns the cut-off, so the open chat can drop those messages at once. */
+export async function clearMyChatHistory(channelId: string): Promise<ChatActionResult & { clearedAt?: string }> {
+  const clearedAt = new Date().toISOString();
+  const result = await saveMySettings(channelId, { cleared_at: clearedAt });
+  if (result.error) return result;
+  revalidatePath(`/dashboard/chat/${channelId}`);
+  return { clearedAt };
 }
 
 // ---------------------------------------------------------------------------

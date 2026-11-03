@@ -8,6 +8,9 @@ import { DISAPPEAR_OPTIONS, MUTE_OPTIONS, disappearLabel, muteLabel, type MuteOp
 import { showToast } from "@/components/ui/Toaster";
 import { blockMember, clearMyChatHistory, deleteChannel, deleteDirectMessageForBoth, hideChatForMe, setChatArchived, setChatDisappearing, setChatMute, setChatPinned, unblockMember } from "../actions";
 
+/** Sent when "Clear my chat history" succeeds; ChatThread listens. */
+export const CHAT_CLEARED_EVENT = "grace:chat-cleared";
+
 type Confirming = "clear" | "block" | "hide" | "deleteBoth" | "deleteChannel" | null;
 
 /**
@@ -85,13 +88,15 @@ export function ChatMenu({
   }, [confirming]);
 
   /** `leave`: the chat is gone (deleted or hidden), so go back to the list. */
-  async function run(action: () => Promise<{ error?: string }>, done: string, leave = false) {
+  async function run(action: () => Promise<{ error?: string; clearedAt?: string }>, done: string, leave = false) {
     setOpen(false);
     setConfirming(null);
     setBusy(true);
     const result = await action();
     setBusy(false);
     if (result.error) return showToast(result.error, "error");
+    // Cleared: the open chat empties now, without waiting for a refresh.
+    if (result.clearedAt) window.dispatchEvent(new CustomEvent(CHAT_CLEARED_EVENT, { detail: { channelId, clearedAt: result.clearedAt } }));
     showToast(done);
     if (leave) router.push("/dashboard/chat");
     else router.refresh();

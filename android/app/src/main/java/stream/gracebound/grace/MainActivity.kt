@@ -111,7 +111,20 @@ class MainActivity : ComponentActivity() {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        // Push settings and this phone's token, then tell the website.
+        refreshPush()
+    }
+
+    private var lastPushRefresh = 0L
+
+    /**
+     * Push settings and this phone's token, then tell the website. Repeated
+     * each time Grace comes back on screen until push works, so setting up
+     * Firebase later takes effect without restarting the phone or the app.
+     */
+    private fun refreshPush() {
+        val now = System.currentTimeMillis()
+        if (now - lastPushRefresh < 20_000) return
+        lastPushRefresh = now
         Thread {
             Push.refresh(applicationContext) { runOnUiThread { tellWebsite("grace-android-token") } }
         }.start()
@@ -134,6 +147,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         visible = true
         web.onResume()
+        if (Push.token(this).isEmpty()) refreshPush()
         tellWebsite("grace-android-resume")
     }
 

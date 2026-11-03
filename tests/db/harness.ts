@@ -67,6 +67,7 @@ export const MIGRATION_ORDER = [
   "chat_v5.sql",
   "android_devices.sql",
   "calls_v4.sql",
+  "calls_v5.sql",
 ];
 
 const SUPABASE_STUBS = `
@@ -97,6 +98,7 @@ const SUPABASE_STUBS = `
 
   do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$;
   do $$ begin create role anon nologin; exception when duplicate_object then null; end $$;
+  do $$ begin create role service_role nologin; exception when duplicate_object then null; end $$;
 `;
 
 const GRANTS = `

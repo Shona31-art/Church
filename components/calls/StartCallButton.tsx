@@ -44,7 +44,7 @@ export function StartCallButton({
     const channel = supabase
       .channel(`video-calls:${column}:${value}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "video_calls", filter: `${column}=eq.${value}` }, ({ new: row }) => {
-        const call = row as { id?: string; ended_at: string | null; expires_at: string; started_at?: string; connected_at?: string | null };
+        const call = row as { id?: string; ended_at: string | null; expires_at: string; started_at?: string; connected_at?: string | null; presence?: Record<string, string> | null };
         if (!call?.id) return;
         const live = isLiveCall(call, oneToOne);
         setActive((current) => (live ? { id: call.id!, startedAt: oneToOne && !call.connected_at ? call.started_at ?? null : null } : current?.id === call.id ? null : current));
@@ -54,6 +54,19 @@ export function StartCallButton({
       supabase.removeChannel(channel);
     };
   }, [column, value, initialActive, initialStartedAt, oneToOne]);
+
+  // A call everyone has left (or whose phones all went quiet) stops showing
+  // "Join" even if nobody tapped Leave: recheck it every 30 s (calls_v5.sql).
+  const activeId = active?.id ?? null;
+  useEffect(() => {
+    if (!activeId) return;
+    const supabase = createClient();
+    const t = setInterval(async () => {
+      const { data } = await supabase.from("video_calls").select("*").eq("id", activeId).maybeSingle();
+      if (!data || !isLiveCall(data, oneToOne)) setActive((current) => (current?.id === activeId ? null : current));
+    }, 30_000);
+    return () => clearInterval(t);
+  }, [activeId, oneToOne]);
 
   // An unanswered two-person call lapses after a minute.
   useEffect(() => {

@@ -99,8 +99,10 @@ export async function startChatCall(channelId: string, audioOnly = false): Promi
   if (canPost === false) return { error: "You can't start a call in this chat right now." };
 
   // A private chat rings the other person (unless they've blocked you, as
-  // with messages). Group chats don't ring: the chat gets a message instead.
+  // with messages). A group rings its members too, like WhatsApp — unless it's
+  // a big one (e.g. General), where the chat message is the invitation.
   let ring: string[] = [];
+  if (!channel.is_dm) ring = await groupRingList(channelId, me);
   if (channel.is_dm) {
     const { data: other } = await supabase.from("chat_channel_members").select("user_id").eq("channel_id", channelId).neq("user_id", me.id).maybeSingle();
     if (other) {
@@ -118,6 +120,36 @@ export async function startChatCall(channelId: string, audioOnly = false): Promi
     if (error) console.error("[calls] chat notice failed:", error.message);
   }
   return { callId: result.callId };
+}
+
+/** Groups up to this size ring everyone when a call starts. */
+const GROUP_RING_LIMIT = 32;
+
+/**
+ * Who a group call rings: the people who get the group's message
+ * notifications (mirrors chat_notifications_v2.sql) — active members who can
+ * read it, haven't muted it and haven't blocked the caller. Nobody if the
+ * group is bigger than GROUP_RING_LIMIT.
+ */
+async function groupRingList(channelId: string, me: AppUser): Promise<string[]> {
+  const admin = createAdminClient(); // server only: who's in a group, to ring them
+  const { data: ch } = await admin.from("chat_channels").select("id, is_dm, members_only, department_id").eq("id", channelId).maybeSingle();
+  if (!ch || ch.is_dm) return [];
+  const [{ data: users }, { data: members }, { data: muted }, { data: blockers }] = await Promise.all([
+    admin.from("app_users").select("id, role, department_id").eq("church_id", me.church_id!).eq("status", "active").neq("id", me.id).limit(2000),
+    (ch as { members_only?: boolean }).members_only ? admin.from("chat_channel_members").select("user_id").eq("channel_id", channelId) : Promise.resolve({ data: [] }),
+    admin.from("chat_member_settings").select("user_id").eq("channel_id", channelId).gt("muted_until", new Date().toISOString()),
+    admin.from("chat_blocks").select("blocker_id").eq("blocked_id", me.id),
+  ]);
+  const memberIds = new Set(((members ?? []) as { user_id: string }[]).map((m) => m.user_id));
+  const skip = new Set([...((muted ?? []) as { user_id: string }[]).map((m) => m.user_id), ...((blockers ?? []) as { blocker_id: string }[]).map((b) => b.blocker_id)]);
+  const leaders = (role: string) => role === "pastor" || role === "church_admin";
+  const audience = ((users ?? []) as { id: string; role: string; department_id: string | null }[]).filter((u) => {
+    if (skip.has(u.id)) return false;
+    if ((ch as { members_only?: boolean }).members_only) return memberIds.has(u.id) || leaders(u.role);
+    return !ch.department_id || u.department_id === ch.department_id || leaders(u.role);
+  });
+  return audience.length <= GROUP_RING_LIMIT ? audience.map((u) => u.id) : [];
 }
 
 /** Start (or join) the video call for an approved appointment, on its day. */
@@ -183,8 +215,9 @@ export async function endCall(callId: string, reason: EndReason = "ended"): Prom
   const oneToOne = Boolean(call.booking_id) || Boolean(channel?.is_dm);
   const invited = ((call.invited_user_ids ?? []) as string[]);
 
-  // Someone added to the call said no: stop their phone ringing; the call goes on.
-  if (reason === "declined" && invited.includes(me.id)) {
+  // Someone rung into a group (or added to a call) said no: stop their phone
+  // ringing; the call goes on for everyone else.
+  if (reason === "declined" && (invited.includes(me.id) || (!oneToOne && ((call.ring_user_ids ?? []) as string[]).includes(me.id)))) {
     await admin.from("notifications").update({ read_at: new Date().toISOString() }).eq("user_id", me.id).eq("link", `/dashboard/calls/${call.id}`).eq("type", "video_call").is("read_at", null);
     await sendCallEnded([me.id], call.id).catch(() => undefined);
     return { ok: true };
@@ -341,4 +374,23 @@ export async function inviteToCall(callId: string, userIds: string[]): Promise<{
   }
   await logAudit({ churchId: me.church_id!, actorId: me.id, action: "video_call.people_added", targetTable: "video_calls", targetId: call.id, metadata: { added: adding.length } });
   return { ok: true, added: adding.length };
+}
+
+// ---------------------------------------------------------------------------
+// Who's still in a call (calls_v5.sql)
+// ---------------------------------------------------------------------------
+
+/**
+ * "I'm in this call" (every 20 s while in it) or "I left". When the last
+ * person leaves, the database ends the call. Quietly does nothing before
+ * calls_v5.sql has been run.
+ */
+export async function callPresence(callId: string, here: boolean): Promise<void> {
+  const me = await getCurrentAppUser();
+  if (!me?.church_id || !z.string().uuid().safeParse(callId).success) return;
+  // RLS: only a call this person can see.
+  const { data: call } = await createClient().from("video_calls").select("id").eq("id", callId).is("ended_at", null).maybeSingle();
+  if (!call) return;
+  const { error } = await createAdminClient().rpc("call_presence_write", { target: callId, who: me.id, here });
+  if (error && error.code !== "PGRST202") console.error("[calls] presence failed:", error.message);
 }

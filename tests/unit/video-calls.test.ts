@@ -61,6 +61,19 @@ describe("WhatsApp-style calls", () => {
     expect(isLiveCall({ ...base, started_at: "2026-11-02T09:30:00Z", connected_at: null }, false, now)).toBe(true);
   });
 
+  test("a group call nobody is in any more stops showing Join (calls_v5.sql)", async () => {
+    const { isLiveCall } = await import("@/lib/video-call-rules");
+    const now = new Date("2026-11-02T10:00:00Z");
+    const base = { ended_at: null, expires_at: "2026-11-02T12:00:00Z", connected_at: null };
+    // Just started: time to join.
+    expect(isLiveCall({ ...base, started_at: "2026-11-02T09:59:30Z", presence: {} }, false, now)).toBe(true);
+    // Someone's phone checked in 30 s ago.
+    expect(isLiveCall({ ...base, started_at: "2026-11-02T09:30:00Z", presence: { a: "2026-11-02T09:59:30Z" } }, false, now)).toBe(true);
+    // Everyone gone (or their phones stopped checking in).
+    expect(isLiveCall({ ...base, started_at: "2026-11-02T09:30:00Z", presence: {} }, false, now)).toBe(false);
+    expect(isLiveCall({ ...base, started_at: "2026-11-02T09:30:00Z", presence: { a: "2026-11-02T09:55:00Z" } }, false, now)).toBe(false);
+  });
+
   test("call history lines become call bubbles", async () => {
     const { parseCallLog, humanCallLength } = await import("@/lib/chat");
     expect(parseCallLog("📞 Voice call · 0:10")).toEqual({ kind: "voice", missed: false, length: "10 secs" });

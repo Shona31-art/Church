@@ -50,3 +50,20 @@ describe("adding people to a call", () => {
     expect((await rows(`select user_id from notifications where type = 'video_call' order by user_id`)).map((r) => r.user_id)).toEqual([CAROL, DAN]);
   });
 });
+
+describe("calls end when everyone has left (calls_v5.sql)", () => {
+  const G = "50000000-0000-0000-0000-0000000000c9";
+  test("the last one out ends the call; a member can't call it themselves", async () => {
+    await db.exec(`update video_calls set ended_at = now() where id = '${CALL}'`);
+    await db.exec(`insert into video_calls (id, church_id, channel_id, room_name, room_url, started_by, expires_at) values ('${G}', '${CHURCH}', '${DM}', 'g-call', 'builtin:6', '${ALICE}', now() + interval '3 hours')`);
+    await expect(sees(ALICE, `select call_presence_write('${G}', '${ALICE}', false)`)).rejects.toThrow(/Not allowed/);
+    expect(await rows(`select call_presence_write($1, $2, true) as n`, [G, ALICE])).toEqual([{ n: 1 }]);
+    expect(await rows(`select call_presence_write($1, $2, true) as n`, [G, BOB])).toEqual([{ n: 2 }]);
+    expect(await rows(`select call_presence_write($1, $2, false) as n`, [G, ALICE])).toEqual([{ n: 1 }]);
+    expect((await rows(`select ended_at from video_calls where id = $1`, [G]))[0].ended_at).toBeNull();
+    expect(await rows(`select call_presence_write($1, $2, false) as n`, [G, BOB])).toEqual([{ n: 0 }]);
+    const [call] = await rows(`select ended_at, end_reason from video_calls where id = $1`, [G]);
+    expect(call.ended_at).not.toBeNull();
+    expect(call.end_reason).toBe("ended");
+  });
+});

@@ -12,7 +12,7 @@ import { graceAndroid } from "@/lib/android";
 import { Avatar } from "@/components/ui/Avatar";
 import { shouldInitiate } from "@/lib/video-call-rules";
 import { startRingback } from "@/lib/call-sounds";
-import { callInviteCandidates, endCall, inviteToCall, markCallConnected, ringAgain, type EndReason } from "../actions";
+import { callInviteCandidates, callPresence, endCall, inviteToCall, markCallConnected, ringAgain, type EndReason } from "../actions";
 
 /**
  * A built-in voice or video call that behaves like WhatsApp.
@@ -143,8 +143,20 @@ export function CallRoom({
     });
   }, []);
 
+  /**
+   * Group calls: tell the server I've left (calls_v5.sql); the last one out
+   * ends the call. A beacon, so it still goes when the app is closing.
+   * Two-person calls end through endCall instead.
+   */
+  const sayLeft = useCallback(() => {
+    if (oneToOneRef.current || !channelRef.current) return;
+    const body = new Blob([JSON.stringify({ callId })], { type: "application/json" });
+    if (!navigator.sendBeacon?.("/api/calls/leave", body)) callPresence(callId, false).catch(() => undefined);
+  }, [callId]);
+
   /** Stops everything this phone is doing in the call. */
   const hangUp = useCallback(() => {
+    sayLeft();
     for (const id of [...peersRef.current.keys()]) closePeer(id);
     localRef.current?.getTracks().forEach((t) => t.stop());
     localRef.current = null;
@@ -153,7 +165,7 @@ export function CallRoom({
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
-  }, [closePeer, supabase]);
+  }, [closePeer, sayLeft, supabase]);
 
   /** Show how the call ended for a moment, then go back to the chat / appointment. */
   const finish = useCallback(
@@ -274,6 +286,20 @@ export function CallRoom({
 
   // Leaving the page (or closing the app) leaves the call.
   useEffect(() => hangUp, [hangUp]);
+  useEffect(() => {
+    window.addEventListener("pagehide", sayLeft);
+    return () => window.removeEventListener("pagehide", sayLeft);
+  }, [sayLeft]);
+
+  // While I'm in the call, check in every 20 s, so a call everyone has left
+  // (even by closing the app) ends and stops showing "Join".
+  useEffect(() => {
+    if (phase.kind !== "in-call") return;
+    const checkIn = () => callPresence(callId, true).catch(() => undefined);
+    checkIn();
+    const timer = setInterval(checkIn, 20_000);
+    return () => clearInterval(timer);
+  }, [phase.kind, callId]);
 
   // The other side ended it (hung up, declined), or it ran out.
   useEffect(() => {
@@ -613,6 +639,19 @@ export function CallRoom({
       {/* Two-person video: the other person fills the screen, like WhatsApp. */}
       {remoteVideo && <RemoteMedia person={remoteVideo} audioOnly={false} fill nameTag={false} />}
 
+      {/* Group video: everyone fills the screen in tall tiles, like WhatsApp. */}
+      {!oneToOne && videoLayout && someoneHere && (
+        <div className={`absolute inset-0 grid gap-1 p-1 pb-[max(7rem,calc(env(safe-area-inset-bottom)+6rem))] ${groupGrid(people.length)}`}>
+          {people.map((p, i) => (
+            <div key={p.peerId} className={`relative min-h-0 overflow-hidden rounded-xl bg-white/5 ${people.length % 2 === 1 && people.length > 1 && i === 0 ? "col-span-2" : ""}`}>
+              <RemoteMedia person={p} audioOnly={false} fill />
+            </div>
+          ))}
+          {/* Keeps the name and timer readable over the video. */}
+          <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-black/60 to-transparent" />
+        </div>
+      )}
+
       {/* Sound from everyone (and video tiles in group calls). */}
       {!remoteVideo &&
         people.map((p) => (oneToOne || !videoLayout ? <RemoteMedia key={p.peerId} person={p} audioOnly hidden /> : null))}
@@ -634,15 +673,6 @@ export function CallRoom({
               <Avatar name={oneToOne ? other?.name ?? title : title} src={oneToOne ? other?.photoUrl ?? null : null} size="lg" />
             </span>
           </span>
-        )}
-        {!oneToOne && videoLayout && someoneHere && (
-          <div className={`grid w-full max-w-3xl gap-2 ${people.length > 1 ? "grid-cols-2" : ""}`}>
-            {people.map((p) => (
-              <div key={p.peerId} className="relative aspect-video overflow-hidden rounded-2xl bg-black/40">
-                <RemoteMedia person={p} audioOnly={false} fill />
-              </div>
-            ))}
-          </div>
         )}
         {!oneToOne && !videoLayout && someoneHere && (
           <p className="text-sm text-white/80">{people.map((p) => p.name + (p.muted ? " (muted)" : "")).join(", ")}</p>
@@ -834,6 +864,14 @@ function AddPeople({ callId, onClose }: { callId: string; onClose: () => void })
       </div>
     </div>
   );
+}
+
+/** Tiles for the other people in a group video call: 1 full, 2 stacked, then two columns. */
+function groupGrid(n: number): string {
+  if (n <= 1) return "grid-cols-1 grid-rows-1";
+  if (n === 2) return "grid-cols-1 grid-rows-2";
+  if (n <= 4) return "grid-cols-2 grid-rows-2";
+  return "grid-cols-2 grid-rows-3";
 }
 
 function RoundButton({ label, tone, pressed, onClick, hideLabel = false, children }: { label: string; tone: "red" | "green" | "glass" | "light"; pressed?: boolean; onClick: () => void; hideLabel?: boolean; children: React.ReactNode }) {

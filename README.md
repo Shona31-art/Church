@@ -89,6 +89,7 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 52 | `chat_v5.sql` | Delete messages "for me", like WhatsApp: long-press (or ⌄ → Select messages) to choose several, then Delete for me (hidden from your own view, search and starred; everyone else still sees them) or Delete for everyone (your own messages). `chat_hidden_messages`, one small row per hidden message |
 | 53 | `android_devices.sql` | Android app: each phone's push address (Firebase token) against the person signed in on it; server-only (no policies). Lets calls ring the phone full screen when Grace is closed |
 | 54 | `calls_v4.sql` | Add people to a call, like WhatsApp: "Add" rings more church members into a call; they get into that call only (not its private chat or appointment); a two-person call becomes a group call (up to 6). `video_calls.invited_user_ids`, `invited_by`; rings the people added |
+| 55 | `calls_v5.sql` | Group calls end when everyone has left: phones in a call check in every 20 s (`video_calls.presence`); the last one out — or everyone going quiet — ends the call, so "Join" disappears. `call_presence_write()` is server-only |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so

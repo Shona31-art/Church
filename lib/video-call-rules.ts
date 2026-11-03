@@ -65,17 +65,27 @@ export function iceServersFrom(env: { TURN_URLS?: string; TURN_USERNAME?: string
 /** A two-person call nobody picked up within this long is over (like an unanswered phone call). */
 export const UNANSWERED_MS = 60_000;
 
+/** How recently a phone must have checked in to count as still in the call (calls_v5.sql: every 20 s). */
+export const PRESENCE_FRESH_MS = 75_000;
+
 /**
  * Is this call still worth joining? A two-person call that was never answered
  * stops counting after a minute, so the chat shows "Voice call / Video call"
- * again rather than "Join call" for a call nobody is in.
+ * again rather than "Join call" for a call nobody is in. With calls_v5.sql,
+ * a call whose phones have all stopped checking in (everyone left or closed
+ * the app) doesn't count either, after a short grace period for joining.
  */
 export function isLiveCall(
-  call: { ended_at: string | null; expires_at: string; started_at?: string | null; connected_at?: string | null },
+  call: { ended_at: string | null; expires_at: string; started_at?: string | null; connected_at?: string | null; presence?: Record<string, string> | null },
   oneToOne: boolean,
   now: Date = new Date()
 ): boolean {
   if (!isCallOpen(call, now)) return false;
-  if (!oneToOne || call.connected_at || !call.started_at) return true;
-  return now.getTime() - new Date(call.started_at).getTime() < UNANSWERED_MS;
+  const age = call.started_at ? now.getTime() - new Date(call.started_at).getTime() : 0;
+  if (oneToOne && !call.connected_at && call.started_at && age >= UNANSWERED_MS) return false;
+  const presence = call.presence;
+  if (presence && typeof presence === "object" && call.started_at && age >= PRESENCE_FRESH_MS && (!oneToOne || Object.keys(presence).length)) {
+    return Object.values(presence).some((seen) => now.getTime() - new Date(seen).getTime() < PRESENCE_FRESH_MS);
+  }
+  return true;
 }

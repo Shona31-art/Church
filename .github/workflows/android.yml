@@ -1,0 +1,75 @@
+# Builds Grace's Android app and publishes it as a GitHub release, so the
+# download link https://github.com/Shona31-art/Church/releases/latest/download/grace.apk
+# always gives the newest version. Runs when the android/ folder changes, or
+# by hand (Actions → Android app → Run workflow).
+#
+# Needs one repository secret: ANDROID_KEYSTORE_PASSWORD (Settings → Secrets
+# and variables → Actions). It unlocks android/grace-release.p12, the key that
+# lets each new version install over the old one.
+name: Android app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-app
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HAS_KEY: ${{ secrets.ANDROID_KEYSTORE_PASSWORD != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Check the signing password is set
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_PASSWORD" ]; then
+            echo "::warning::ANDROID_KEYSTORE_PASSWORD isn't set: building a test copy that won't be published."
+          fi
+
+      - name: Build the app
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: gradle --no-daemon assembleRelease -PgraceVersionCode=${{ github.run_number }}
+
+      - name: Name the file
+        run: cp android/app/build/outputs/apk/release/app-release.apk grace.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: grace-apk
+          path: grace.apk
+
+      - name: Publish the download
+        if: ${{ env.HAS_KEY == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="android-${{ github.run_number }}"
+          gh release create "$tag" grace.apk \
+            --title "Grace for Android (version 1.0.${{ github.run_number }})" \
+            --notes "Install on Android: download grace.apk and open it. Updates install over the old version; your sign-in stays." \
+            --latest

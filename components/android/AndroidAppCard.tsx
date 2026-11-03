@@ -15,6 +15,20 @@ type Status = { notifications: boolean; fullScreen: boolean; battery: boolean; p
 export function AndroidAppCard() {
   const [status, setStatus] = useState<Status | null>(null);
   const [androidBrowser, setAndroidBrowser] = useState(false);
+  const [test, setTest] = useState<{ state: "waiting" | "sent" | "problem"; text: string } | null>(null);
+
+  /** Rings this phone in 10 seconds (time to lock it), or says exactly what's not set up. */
+  async function testRing() {
+    setTest({ state: "waiting", text: "Now lock your phone or go to the home screen — Grace should ring in about 10 seconds." });
+    const res = await fetch("/api/android/test", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: graceAndroid()?.fcmToken() ?? "", delaySeconds: 10 }),
+    }).catch(() => null);
+    const json = (await res?.json().catch(() => null)) as { ok?: boolean; problem?: string; error?: string } | null;
+    if (json?.ok) setTest({ state: "sent", text: "Sent ✓ Firebase delivered the test call to this phone. If it didn't ring: turn on the settings above, then in the phone's Settings → Apps → Grace → Notifications → Calls, switch on Banners, Lock screen and Sound. On Honor/Huawei also: Settings → Battery → App launch → Grace → Manage manually, with all three switches on." });
+    else setTest({ state: "problem", text: json?.problem ?? json?.error ?? "Couldn't reach Grace — check your internet and try again." });
+  }
 
   useEffect(() => {
     const read = () => {
@@ -86,6 +100,17 @@ export function AndroidAppCard() {
           </button>
         </li>
       </ul>
+      <div className="mt-3">
+        <button type="button" className="btn-primary" onClick={testRing} disabled={test?.state === "waiting"}>
+          <PhoneCall aria-hidden className="h-4 w-4" /> {test?.state === "waiting" ? "Ringing soon…" : "Test ring"}
+        </button>
+        {test && (
+          <p role="status" className={`mt-2 text-sm ${test.state === "problem" ? "text-danger" : "text-ink/70"}`}>
+            {test.state === "problem" ? "Not working yet: " : ""}
+            {test.text}
+          </p>
+        )}
+      </div>
     </fieldset>
   );
 }

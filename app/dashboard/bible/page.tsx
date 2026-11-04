@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bookmark, Highlighter, Search, Sparkles, ArrowRight } from "lucide-react";
+import { Bookmark, BookMarked, Highlighter, Search, Sparkles, ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
@@ -44,6 +44,7 @@ export default async function BibleHomePage() {
   const [bookmarks, highlights] = await Promise.all([withText(bookmarksRes.data ?? []), withText((highlightsRes.data ?? []) as SavedVerse[])]);
   // The AI study tool is its own (paid) feature; Basic has the reader only.
   const studyAvailable = Boolean(access?.modules.has("bible_study_ai"));
+  const plansAvailable = Boolean(access?.modules.has("reading_plans"));
   const verseOfDay = parseReference(verseRef);
 
   return (
@@ -88,14 +89,27 @@ export default async function BibleHomePage() {
         </div>
       </section>
 
-      {studyAvailable && (
-        <Link href="/dashboard/bible/study" className="card-interactive mt-4 flex items-start gap-4 rounded-2xl p-5">
-          <Sparkles aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
-          <span>
-            <span className="block font-semibold">Bible study</span>
-            <span className="block text-sm text-ink/60">Explain a passage, get a devotional, cross-references or a 7-day reading plan.</span>
-          </span>
-        </Link>
+      {(plansAvailable || studyAvailable) && (
+        <div className={`mt-4 grid gap-4 ${plansAvailable && studyAvailable ? "md:grid-cols-2" : ""}`}>
+          {plansAvailable && (
+            <Link href="/dashboard/reading-plans" className="card-interactive flex items-start gap-4 rounded-2xl p-5">
+              <BookMarked aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
+              <span>
+                <span className="block font-semibold">Reading plans</span>
+                <span className="block text-sm text-ink/60">Read the Bible a little every day, on your own or with the whole church.</span>
+              </span>
+            </Link>
+          )}
+          {studyAvailable && (
+            <Link href="/dashboard/bible/study" className="card-interactive flex items-start gap-4 rounded-2xl p-5">
+              <Sparkles aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
+              <span>
+                <span className="block font-semibold">Bible study</span>
+                <span className="block text-sm text-ink/60">Explain a passage, get a devotional, cross-references or a 7-day reading plan.</span>
+              </span>
+            </Link>
+          )}
+        </div>
       )}
 
       <div className="mt-8 grid gap-4 md:grid-cols-2">

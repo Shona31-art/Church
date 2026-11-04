@@ -89,7 +89,7 @@ export function PersonPicker({
 
   let lastGroup: string | undefined;
   return (
-    <div ref={wrapRef} className="relative">
+    <div ref={wrapRef} className="relative min-w-0">
       {name && <input type="hidden" name={name} value={value} />}
       <button
         ref={buttonRef}

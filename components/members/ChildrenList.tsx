@@ -9,6 +9,7 @@ import { Alert } from "@/components/ui/Alert";
 import { FormField } from "@/components/ui/FormField";
 import { BirthdayField } from "@/components/ui/BirthdayField";
 import { PersonPicker } from "@/components/ui/PersonPicker";
+import { PersonPhoto } from "@/components/members/PersonPhoto";
 
 export interface ChildRow {
   id: string;
@@ -20,6 +21,9 @@ export interface ChildRow {
   ownerId?: string;
   mother?: ParentRef;
   father?: ParentRef;
+  /** record_members.sql: their photo (for the birthday poster) and whether the church celebrates their birthday. */
+  photoUrl?: string | null;
+  announce?: boolean;
 }
 
 /** A parent: a member (id + name) or just a name for someone not in the app. */
@@ -50,7 +54,7 @@ export function ChildrenList({ parentId, items, self, people = [] }: { parentId:
             ) : (
               <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
                 <div className="flex min-w-0 items-center gap-3">
-                  <Baby aria-hidden className="h-4 w-4 shrink-0 text-gold" />
+                  {c.photoUrl !== undefined ? <PersonPhoto kind="child" id={c.id} name={c.name} photoUrl={c.photoUrl ?? null} size="md" compact /> : <Baby aria-hidden className="h-4 w-4 shrink-0 text-gold" />}
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{c.name}</p>
                     <p className="text-xs text-ink/60">{c.birthdayLabel ? `Birthday ${c.birthdayLabel}` : "No birthday added"}</p>
@@ -149,8 +153,13 @@ export function ChildForm({ parentId, child, self, people = [], onDone }: { pare
         error={fe.birth_date}
         hint={self ? "Only your family and your pastors see it — day and month only, never the age." : "Day and month only are shown, never the age."}
       />
+      <label className="flex items-start gap-2 text-sm">
+        <input type="checkbox" name="announce" defaultChecked={v ? v.announce === "on" : child?.announce !== false} className="mt-0.5 h-4 w-4" />
+        <span>Celebrate their birthday with the church (a notification and a birthday poster in the General chat)</span>
+      </label>
+      {!child && <p className="text-xs text-ink/60">You can add their photo once they’re saved — tap the camera next to their name.</p>}
       {people.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 [&>*]:min-w-0">
           <ParentField role="mother" id={id} people={people} current={child?.mother} error={fe.mother_id} />
           <ParentField role="father" id={id} people={people} current={child?.father} error={fe.father_id} />
         </div>

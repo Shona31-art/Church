@@ -27,7 +27,7 @@ export default async function EditMemberPage({ params }: { params: { id: string 
       .eq("church_id", me.church_id)
       .maybeSingle(),
     supabase.from("departments").select("id, name").eq("church_id", me.church_id).order("name"),
-    supabase.from("member_birthdays").select("birth_date").eq("user_id", params.id).maybeSingle(),
+    supabase.from("member_birthdays").select("*").eq("user_id", params.id).maybeSingle(), // * includes announce (#63)
   ]);
   if (!member) notFound();
 
@@ -59,6 +59,7 @@ export default async function EditMemberPage({ params }: { params: { id: string 
           role: member.role as ChurchRole,
           department_id: member.department_id,
           birth_date: birthday?.birth_date ?? "",
+          birthday_announce: (birthday as { announce?: boolean } | null)?.announce !== false,
         }}
       />
     </div>

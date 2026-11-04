@@ -44,9 +44,12 @@ export async function updateMyProfile(_prev: FormState, formData: FormData): Pro
   }
 
   if (me.church_id) {
-    const { error: bdayError } = parsed.data.birthDate
-      ? await supabase.from("member_birthdays").upsert({ user_id: me.id, church_id: me.church_id, birth_date: parsed.data.birthDate, updated_by: me.id })
+    const row = { user_id: me.id, church_id: me.church_id, birth_date: parsed.data.birthDate, updated_by: me.id };
+    let { error: bdayError } = parsed.data.birthDate
+      ? await supabase.from("member_birthdays").upsert({ ...row, announce: formData.get("birthday_announce") === "on" })
       : await supabase.from("member_birthdays").delete().eq("user_id", me.id);
+    // Before record_members.sql (#63): save without the "tell the church" choice.
+    if (bdayError && parsed.data.birthDate && /announce/.test(bdayError.message)) ({ error: bdayError } = await supabase.from("member_birthdays").upsert(row));
     if (bdayError) return { error: "Your name and phone were saved, but your birthday couldn't be — please try again." };
   }
 

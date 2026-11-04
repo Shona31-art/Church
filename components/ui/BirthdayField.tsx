@@ -29,7 +29,7 @@ export function BirthdayField({ name, label = "Birthday", defaultValue, error, h
       <legend className="label">
         {label} <span className="font-normal text-ink/60">(optional)</span>
       </legend>
-      <div className="grid grid-cols-[5rem_1fr_6.5rem] gap-2">
+      <div className="grid grid-cols-[4.75rem_minmax(0,1fr)_5.5rem] gap-2">
         <select aria-label="Day" className="input" value={day} onChange={(e) => setDay(e.target.value)} aria-invalid={Boolean(error)}>
           <option value="">Day</option>
           {Array.from({ length: maxDay }, (_, i) => (

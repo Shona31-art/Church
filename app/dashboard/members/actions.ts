@@ -234,11 +234,12 @@ export async function updateMember(_prev: FormState, formData: FormData): Promis
     return { error: "Someone else changed this member while you were editing. Reload the page to see their changes, then try again.", values };
   }
 
-  const { error: bdayError } = input.birthDate
-    ? await supabase
-        .from("member_birthdays")
-        .upsert({ user_id: input.memberId, church_id: me.church_id, birth_date: input.birthDate, updated_by: me.id })
+  const bdayRow = { user_id: input.memberId, church_id: me.church_id, birth_date: input.birthDate, updated_by: me.id };
+  let { error: bdayError } = input.birthDate
+    ? await supabase.from("member_birthdays").upsert({ ...bdayRow, announce: formData.get("birthday_announce") === "on" })
     : await supabase.from("member_birthdays").delete().eq("user_id", input.memberId);
+  // Before record_members.sql (#63): save without the "tell the church" choice.
+  if (bdayError && input.birthDate && /announce/.test(bdayError.message)) ({ error: bdayError } = await supabase.from("member_birthdays").upsert(bdayRow));
   if (bdayError) {
     console.error("[members] birthday save failed:", bdayError.message);
     flash("Profile saved, but the birthday couldn't be updated — try again.", "error");
@@ -553,9 +554,9 @@ const birthDateField = z
 async function saveNewBirthday(memberId: string, me: AppUser, formData: FormData) {
   const birth = birthDateField.safeParse(formData.get("birth_date") ?? "");
   if (!birth.success || !birth.data) return;
-  const { error } = await createAdminClient()
-    .from("member_birthdays")
-    .upsert({ user_id: memberId, church_id: me.church_id, birth_date: birth.data, updated_by: me.id });
+  const row = { user_id: memberId, church_id: me.church_id, birth_date: birth.data, updated_by: me.id };
+  let { error } = await createAdminClient().from("member_birthdays").upsert({ ...row, announce: formData.get("birthday_announce") === "on" });
+  if (error && /announce/.test(error.message)) ({ error } = await createAdminClient().from("member_birthdays").upsert(row));
   if (error) console.error("[members] birthday on create failed:", error.message);
 }
 

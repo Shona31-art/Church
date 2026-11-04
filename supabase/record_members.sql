@@ -12,6 +12,9 @@
 --   * Only pastors and church admins can remove or move a prayer time.
 -- VERSE OF THE DAY
 --   * A morning notification with the verse of the day; each person can switch it off.
+-- BIRTHDAYS
+--   * On someone's birthday the church is told and a birthday poster goes in General,
+--     unless they (or a pastor for them) switch it off.
 -- ============================================================================
 
 alter table app_users add column if not exists record_only boolean not null default false;
@@ -79,3 +82,46 @@ create policy prayer_chain_slots_delete on prayer_chain_slots for delete
 -- Verse of the day as a morning notification (on unless switched off).
 -- ---------------------------------------------------------------------------
 alter table notification_preferences add column if not exists daily_verse boolean not null default true;
+
+-- ---------------------------------------------------------------------------
+-- Birthdays: the church is told on the day (and a poster goes in General),
+-- unless the person — or a pastor for them — switches it off. Day and month
+-- only; never the age.
+-- ---------------------------------------------------------------------------
+alter table member_birthdays add column if not exists announce boolean not null default true;
+
+-- Birthday posters are PNG pictures posted in the General chat by the morning job.
+update storage.buckets
+   set allowed_mime_types = array['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/aac', 'audio/mpeg', 'image/webp', 'image/jpeg', 'image/png'],
+       file_size_limit = greatest(coalesce(file_size_limit, 0), 2097152)
+ where id = 'chat-media';
+
+-- Birthday posters are posted by the church itself: the chat shows the
+-- church's name and logo, not the admin whose account carries the message.
+alter table chat_messages add column if not exists from_church boolean not null default false;
+
+-- Only the server's morning job (no signed-in user) can post as the church.
+create or replace function app_private.guard_from_church()
+returns trigger as $$
+begin
+  if auth.uid() is not null then
+    new.from_church := case when tg_op = 'UPDATE' then old.from_church else false end;
+  end if;
+  return new;
+end;
+$$ language plpgsql set search_path = public;
+drop trigger if exists trg_guard_from_church on chat_messages;
+create trigger trg_guard_from_church before insert or update on chat_messages
+  for each row execute function app_private.guard_from_church();
+
+-- The church already gets a birthday notification, so a church post doesn't
+-- also send the usual "new message in General" one.
+drop trigger if exists trg_notify_chat_message on chat_messages;
+create trigger trg_notify_chat_message after insert on chat_messages
+  for each row when (not new.from_church) execute function app_private.on_chat_message();
+
+-- Children's birthdays too: a photo for their poster (stored privately in the
+-- avatars bucket, uploaded by the app's server for a parent or pastor) and the
+-- same "celebrate with the church" switch.
+alter table member_children add column if not exists photo_path text;
+alter table member_children add column if not exists announce boolean not null default true;

@@ -15,6 +15,7 @@ import { MemberAccountActions } from "./MemberAccountActions";
 import { RemovePhotoButton } from "./RemovePhotoButton";
 import { ChatRestrictions, type ActiveRestriction } from "./ChatRestrictions";
 import { Avatar } from "@/components/ui/Avatar";
+import { PersonPhoto } from "@/components/members/PersonPhoto";
 import { getAvatarUrls } from "@/lib/avatars";
 import { BADGES, type BadgeKey } from "@/lib/games/progression";
 import { ChildrenList } from "@/components/members/ChildrenList";
@@ -105,7 +106,7 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
         back={{ href: "/dashboard/members", label: "Members" }}
         title={
           <span className="flex items-center gap-4">
-            <Avatar name={member.name} src={photoUrl} size="lg" />
+            {recordOnly && canEdit ? <PersonPhoto kind="member" id={member.id} name={member.name} photoUrl={photoUrl} size="lg" compact /> : <Avatar name={member.name} src={photoUrl} size="lg" />}
             {member.name}
           </span>
         }

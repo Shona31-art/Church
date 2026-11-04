@@ -30,7 +30,7 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
   const pendingEmail = authData.user?.new_email ?? null;
   const [{ data: profile }, { data: birthday }, { data: church }, { data: department }, chatProfile, avatars] = await Promise.all([
     supabase.from("app_users").select("phone").eq("id", me.id).maybeSingle(),
-    supabase.from("member_birthdays").select("birth_date").eq("user_id", me.id).maybeSingle(),
+    supabase.from("member_birthdays").select("*").eq("user_id", me.id).maybeSingle(), // * includes announce (#63)
     me.church_id ? supabase.from("churches").select("name, email, phone").eq("id", me.church_id).maybeSingle() : Promise.resolve({ data: null }),
     me.department_id ? supabase.from("departments").select("name").eq("id", me.department_id).maybeSingle() : Promise.resolve({ data: null }),
     // Separate query: these columns arrive with chat_v2.sql, and the rest of
@@ -125,7 +125,7 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
       )}
 
       <CollapsibleSection title="My details" description="Your name, phone and birthday." anchor="details">
-        <ProfileForm name={me.name} email={me.email} phone={profile?.phone ?? null} birthDate={birthday?.birth_date ?? ""} />
+        <ProfileForm name={me.name} email={me.email} phone={profile?.phone ?? null} birthDate={birthday?.birth_date ?? ""} announce={(birthday as { announce?: boolean } | null)?.announce !== false} />
       </CollapsibleSection>
 
       {children && (

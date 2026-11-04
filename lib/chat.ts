@@ -41,6 +41,8 @@ export interface ChatMessage {
   forwarded?: boolean;
   mentions?: string[];
   expires_at?: string | null;
+  /** record_members.sql: posted by the church itself (birthday posters) — shown with the church's name and logo. */
+  from_church?: boolean;
   /** True until the server confirms the insert. */
   pending?: boolean;
 }

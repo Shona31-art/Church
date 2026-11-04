@@ -61,7 +61,7 @@ export default async function ReadingPlansPage() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <PageHeader back={{ href: "/dashboard", label: "Home" }} title="Reading plans" description="Read the Bible a little every day — on your own, or with the whole church." />
+      <PageHeader back={{ href: "/dashboard/bible", label: "Bible" }} title="Reading plans" description="Read the Bible a little every day — on your own, or with the whole church." />
       <div className="flex flex-wrap items-center gap-3">
         <PlanForm today={today} canChurchWide={can(me.role, "postChurchWide")} />
         {myStreak > 0 && (

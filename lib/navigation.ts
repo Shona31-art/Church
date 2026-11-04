@@ -65,7 +65,6 @@ const CHURCH_NAV: { label: string; items: NavSpec[] }[] = [
     label: "Growth & resources",
     items: [
       { href: "/dashboard/bible", label: "Bible", icon: "bible", module: "bible" },
-      { href: "/dashboard/reading-plans", label: "Reading plans", icon: "readingPlans", module: "reading_plans" },
       { href: "/dashboard/journal", label: "Journal", icon: "journal", module: "journal" },
       { href: "/dashboard/games", label: "Games", icon: "games", module: "bible_games" },
       { href: "/dashboard/posters", label: "Posters", icon: "posters", module: "ai_poster", capability: "makePosters" },
@@ -118,7 +117,11 @@ export function buildNavigation(role: string, modules: ReadonlySet<string>): Nav
  * Which menu item is "current": the longest href that prefixes the path, so
  * /dashboard/giving/report highlights "Giving report", not "Giving".
  */
+// Pages that live inside another section's menu item (Reading plans is part of Bible).
+const SECTION_OF: [prefix: string, section: string][] = [["/dashboard/reading-plans", "/dashboard/bible"]];
+
 export function activeHref(pathname: string, groups: NavGroup[]): string | null {
+  for (const [prefix, section] of SECTION_OF) if (pathname === prefix || pathname.startsWith(prefix + "/")) pathname = section;
   let best: string | null = null;
   for (const item of groups.flatMap((g) => g.items)) {
     const matches = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));

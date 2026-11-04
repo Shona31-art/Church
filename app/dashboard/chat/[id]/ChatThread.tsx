@@ -72,6 +72,7 @@ export function ChatThread({
   currentUserId,
   canModerate,
   directory,
+  church = { name: "Church", photoUrl: null },
   v4 = false,
   aroundMessage = false,
   focusMessageId = null,
@@ -106,6 +107,8 @@ export function ChatThread({
   currentUserId: string;
   canModerate: boolean;
   directory: Record<string, ChatPerson>;
+  /** Shown as the sender of messages the church posts itself (birthday posters). */
+  church?: ChatPerson;
   /** chat_v4.sql has been run: stars, forwarding, polls, @mentions, disappearing messages. */
   v4?: boolean;
   /** Showing the messages around an older one (opened from search or starred). */
@@ -271,6 +274,7 @@ export function ChatThread({
       forwarded: row.forwarded ?? false,
       mentions: row.mentions ?? [],
       expires_at: row.expires_at ?? null,
+      from_church: row.from_church ?? false,
     });
     const filter = `channel_id=eq.${channelId}`;
 
@@ -764,7 +768,7 @@ export function ChatThread({
         {shown.map((m, i) => {
           const previous = shown[i - 1];
           const newDay = !previous || dayKey(previous.created_at) !== dayKey(m.created_at);
-          const isMine = m.sender_id === currentUserId;
+          const isMine = !m.from_church && m.sender_id === currentUserId;
           const quoted = m.reply_to_id ? byId.get(m.reply_to_id) : undefined;
           const messageReactions = reactions.filter((r) => r.message_id === m.id);
           const myReaction = messageReactions.find((r) => r.user_id === currentUserId)?.emoji ?? null;
@@ -794,10 +798,10 @@ export function ChatThread({
                 message={m}
                 isMine={isMine}
                 isDm={isDm}
-                showHeader={newDay || startsGroup(m, previous)}
-                sender={person(m.sender_id)}
+                showHeader={newDay || startsGroup(m, previous) || Boolean(m.from_church) !== Boolean(previous?.from_church)}
+                sender={m.from_church ? church : person(m.sender_id)}
                 quoted={quoted}
-                quotedSenderName={quoted ? (quoted.sender_id === currentUserId ? "You" : person(quoted.sender_id).name) : undefined}
+                quotedSenderName={quoted ? (quoted.from_church ? church.name : quoted.sender_id === currentUserId ? "You" : person(quoted.sender_id).name) : undefined}
                 reactions={summarizeReactions(messageReactions, currentUserId)}
                 myReaction={myReaction}
                 onReact={v2 ? (emoji) => react(m, emoji) : undefined}

@@ -119,6 +119,13 @@ export default async function ChatChannelPage({ params, searchParams }: { params
     expires_at: m.expires_at ?? null,
   }));
   const loadedIds = new Set(messages.map((m) => m.id));
+  // Messages the church posted itself (record_members.sql) — a separate query so
+  // the chat still opens before that migration has been run.
+  if (messages.length) {
+    const { data: fromChurch } = await supabase.from("chat_messages").select("id").eq("channel_id", params.id).eq("from_church", true).in("id", [...loadedIds]);
+    const ids = new Set(((fromChurch ?? []) as { id: string }[]).map((r) => r.id));
+    for (const m of messages) if (ids.has(m.id)) m.from_church = true;
+  }
 
   // Replies can quote a message older than the loaded window: fetch those few.
   const missingQuotes = [...new Set(messages.map((m) => m.reply_to_id).filter((id): id is string => Boolean(id) && !loadedIds.has(id!)))];
@@ -147,6 +154,8 @@ export default async function ChatChannelPage({ params, searchParams }: { params
   for (const p of people ?? []) directory[p.id] = { name: p.name, photoUrl: photos.get(p.id) ?? null };
 
   const other = otherUserId ? directory[otherUserId] : null;
+  const { data: churchRow } = await supabase.from("churches").select("name, logo_url").eq("id", me.church_id!).maybeSingle();
+  const churchPerson: ChatPerson = { name: (churchRow as any)?.name ?? "Church", photoUrl: (churchRow as any)?.logo_url ?? null };
   const { data: otherAbout } = otherUserId && v2 ? await supabase.from("app_users").select("about").eq("id", otherUserId).maybeSingle() : { data: null };
   const title = channel.is_dm ? other?.name ?? "Former member" : channel.name;
 
@@ -258,6 +267,7 @@ export default async function ChatChannelPage({ params, searchParams }: { params
         currentUserId={me.id}
         canModerate={!channel.is_dm && can(me.role, "moderateChat")}
         directory={directory}
+        church={churchPerson}
       />
     </div>
   );

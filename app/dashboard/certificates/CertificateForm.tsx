@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useFormState } from "react-dom";
 import { Award } from "lucide-react";
 import { createCertificate } from "./actions";
@@ -66,6 +67,7 @@ export function CertificateForm({
   certificate?: CertificateValues;
 }) {
   const e = certificate;
+  const router = useRouter();
   const [open, setOpen] = useState(Boolean(e));
   const [state, action] = useFormState(createCertificate, null);
   const v = state?.values;
@@ -100,7 +102,7 @@ export function CertificateForm({
     );
 
   return (
-    <form action={action} className="card-elevated space-y-5 rounded-2xl p-5" noValidate>
+    <form action={action} className="card-elevated min-w-0 space-y-5 overflow-hidden rounded-2xl p-5" noValidate>
       {e && <input type="hidden" name="id" value={e.id} />}
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="design" value={design} />
@@ -119,7 +121,7 @@ export function CertificateForm({
       </fieldset>
 
       {kind === "custom" && (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 [&>*]:min-w-0">
           <FormField label="Title" htmlFor="custom_title" required error={fe.custom_title} hint="e.g. Certificate of Appreciation, Ordination, Recognition">
             <input id="custom_title" name="custom_title" maxLength={80} value={customTitle} onChange={(e) => setCustomTitle(e.target.value)} className="input" placeholder="Certificate of Appreciation" />
           </FormField>
@@ -129,7 +131,7 @@ export function CertificateForm({
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 [&>*]:min-w-0">
         <FormField label="Who is it for?" htmlFor="member_id" optional hint="Members see and download it themselves; a child's shows to their parents.">
           <PersonPicker
             id="member_id"
@@ -232,9 +234,9 @@ export function CertificateForm({
       <FormActions>
         <PendingButton pendingLabel={e ? "Saving…" : "Creating…"}>{e ? "Save changes" : "Create certificate"}</PendingButton>
         {e ? (
-          <a href={`/dashboard/certificates/${e.id}`} className="btn-ghost">
+          <button type="button" className="btn-ghost" onClick={() => router.push(`/dashboard/certificates/${e.id}`)}>
             Cancel
-          </a>
+          </button>
         ) : (
           <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>
             Cancel

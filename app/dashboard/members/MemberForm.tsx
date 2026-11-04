@@ -28,6 +28,8 @@ export interface MemberFormValues {
   birth_date: string;
   /** Kept for the church's records only; can't sign in (record_members.sql). */
   record_only?: boolean;
+  /** Tell the church on their birthday (record_members.sql). */
+  birthday_announce?: boolean;
 }
 
 /**
@@ -54,7 +56,9 @@ export function MemberForm({
   const fe = state?.fieldErrors ?? {};
   const value = (name: string, fallback: string | null | undefined) => v?.[name] ?? fallback ?? "";
   const cancelHref = member ? `/dashboard/members/${member.id}` : "/dashboard/members";
-  const [recordOnly, setRecordOnly] = useState(v ? v.record_only === "on" : Boolean(member?.record_only));
+  // Record-only people have a made-up sign-in address (…@no-login.grace.app) that's never shown.
+  const isRecord = Boolean(member?.record_only || member?.email?.endsWith("@no-login.grace.app"));
+  const [recordOnly, setRecordOnly] = useState(v ? v.record_only === "on" : isRecord);
 
   return (
     // Re-keyed on the returned values so a failed save re-renders the inputs
@@ -84,7 +88,7 @@ export function MemberForm({
         </label>
       )}
 
-      {mode === "create" && recordOnly ? null : mode === "edit" && member?.record_only ? (
+      {mode === "create" && recordOnly ? null : mode === "edit" && isRecord ? (
         <p className="rounded-xl bg-ink/5 p-3 text-sm text-ink/70">Record only — no app login. Use “Give app access” on their profile if they start using Grace.</p>
       ) : mode === "create" ? (
         <FormField label="Email" htmlFor="email" required error={fe.email} hint="This is what they'll sign in with. No email is sent.">
@@ -143,7 +147,11 @@ export function MemberForm({
       </div>
 
       <div className="max-w-md">
-        <BirthdayField name="birth_date" defaultValue={value("birth_date", member?.birth_date)} error={fe.birth_date} hint="Only pastors and admins see it, for birthday reach-outs — day and month only, never the age." />
+        <BirthdayField name="birth_date" defaultValue={value("birth_date", member?.birth_date)} error={fe.birth_date} hint="Day and month only are ever shown, never the age." />
+        <label className="mt-3 flex items-start gap-2 text-sm">
+          <input type="checkbox" name="birthday_announce" defaultChecked={v ? v.birthday_announce === "on" : member?.birthday_announce !== false} className="mt-0.5 h-4 w-4" />
+          <span>Let the church know on their birthday (a notification and a birthday poster in the General chat)</span>
+        </label>
       </div>
 
       <FormActions>

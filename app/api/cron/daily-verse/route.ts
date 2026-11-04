@@ -6,9 +6,11 @@ import { fetchVerse } from "@/lib/bible/text";
 import { parseReference } from "@/lib/bible/reference";
 import { readerHref } from "@/lib/bible/books";
 import { todayInAppZone } from "@/lib/format";
+import { sendBirthdayGreetings } from "@/lib/birthdays-today";
 
 /**
- * GET /api/cron/daily-verse — every morning (Vercel Cron, vercel.json): the
+ * GET /api/cron/daily-verse — every morning (Vercel Cron, vercel.json): birthday
+ * greetings and posters (lib/birthdays-today.ts), then the
  * home page's verse of the day as a notification to everyone who uses Grace
  * (not record-only members, not people who switched it off). Tapping it opens
  * the passage in the Bible reader. Sent once a day.
@@ -31,13 +33,21 @@ export async function GET(request: Request) {
   const admin = createAdminClient();
   const today = todayInAppZone();
 
+  // Birthdays first (record_members.sql): notifications and a poster in General.
+  let birthdays = { churches: 0, people: 0, posters: 0 };
+  try {
+    birthdays = await sendBirthdayGreetings(today);
+  } catch (error) {
+    console.error("[cron] birthdays failed:", (error as Error).message);
+  }
+
   // Once a day, even if the job runs twice.
   const { count: already } = await admin
     .from("notifications")
     .select("id", { count: "exact", head: true })
     .eq("type", "bible.daily_verse")
     .gte("created_at", `${today}T00:00:00+02:00`);
-  if (already) return NextResponse.json({ sent: 0, already: true });
+  if (already) return NextResponse.json({ sent: 0, already: true, birthdays });
 
   const ref = verseRefForDate(new Date(`${today}T12:00:00Z`));
   const text = await fetchVerse(ref).catch(() => null);
@@ -59,5 +69,5 @@ export async function GET(request: Request) {
     if (error) console.error("[cron] daily verse batch failed:", error.message);
     else sent += batch.length;
   }
-  return NextResponse.json({ sent });
+  return NextResponse.json({ sent, birthdays });
 }

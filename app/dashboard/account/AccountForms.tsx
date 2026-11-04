@@ -9,7 +9,7 @@ import { Alert } from "@/components/ui/Alert";
 import { FormField } from "@/components/ui/FormField";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 
-export function ProfileForm({ name, phone, birthDate, email }: { name: string; phone: string | null; birthDate: string; email: string }) {
+export function ProfileForm({ name, phone, birthDate, email, announce = true }: { name: string; phone: string | null; birthDate: string; email: string; announce?: boolean }) {
   const [state, action] = useFormState(updateMyProfile, null);
   const fe = state?.fieldErrors ?? {};
   return (
@@ -25,7 +25,11 @@ export function ProfileForm({ name, phone, birthDate, email }: { name: string; p
         <FormField label="Phone" htmlFor="phone" optional error={fe.phone}>
           <input id="phone" name="phone" type="tel" maxLength={20} defaultValue={phone ?? ""} autoComplete="tel" className="input" aria-invalid={Boolean(fe.phone)} />
         </FormField>
-        <BirthdayField name="birth_date" defaultValue={birthDate} error={fe.birth_date} hint="Only your pastors see it, so they can wish you well — just the day and month, never your age. The year is optional." />
+        <BirthdayField name="birth_date" defaultValue={birthDate} error={fe.birth_date} hint="Just the day and month are ever shown, never your age. The year is optional." />
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" name="birthday_announce" defaultChecked={announce} className="mt-0.5 h-4 w-4" />
+          <span>Let the church know on my birthday (a notification and a birthday poster in the General chat)</span>
+        </label>
       </div>
       <PendingButton>Save my details</PendingButton>
     </form>

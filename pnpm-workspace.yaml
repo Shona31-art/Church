@@ -1,5 +1,7 @@
 # pnpm 11 blocks dependency install scripts unless explicitly allowed.
 # unrs-resolver (pulled in by eslint-config-next) only uses its script to pick
-# a native binary and falls back to a JS build, so we decline it.
+# a native binary and falls back to a JS build, so we decline it. sharp (birthday
+# posters) ships prebuilt binaries as optional packages, so it needs no script.
 allowBuilds:
+  sharp: false
   unrs-resolver: false

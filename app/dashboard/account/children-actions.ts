@@ -105,13 +105,16 @@ export async function saveChild(_prev: FormState, formData: FormData): Promise<F
     father_id: input.fatherId,
     father_name: input.fatherId ? null : input.fatherName,
   };
-  const write = (withParents: boolean) => {
-    const fields = { name: input.name, birth_date: input.birthDate, updated_by: me.id, ...(withParents ? parents : {}) };
+  const announce = formData.get("announce") === "on";
+  const write = (withParents: boolean, withAnnounce = withParents) => {
+    const fields = { name: input.name, birth_date: input.birthDate, updated_by: me.id, ...(withParents ? parents : {}), ...(withAnnounce ? { announce } : {}) };
     return input.childId
       ? supabase.from("member_children").update(fields).eq("id", input.childId)
       : supabase.from("member_children").insert({ ...fields, user_id: parentId, church_id: me.church_id });
   };
   let { error } = await write(true);
+  // Before record_members.sql: save without the birthday switch.
+  if (error && /announce/.test(error.message)) ({ error } = await write(true, false));
   // Before member_children_v2.sql: save without the parents.
   if (error?.code === "42703" || error?.code === "PGRST204") ({ error } = await write(false));
   if (error) {

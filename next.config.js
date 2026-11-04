@@ -15,6 +15,8 @@ module.exports = {
       "/dashboard": ["./public/bibles/web/**"],
       "/dashboard/bible": ["./public/bibles/web/**"],
       "/dashboard/bible/study": ["./public/bibles/web/**"],
+      // Birthday posters (lib/birthday-poster.tsx) are drawn with these fonts.
+      "/api/cron/daily-verse": ["./public/fonts/poster/*.woff"],
     },
   },
   async headers() {

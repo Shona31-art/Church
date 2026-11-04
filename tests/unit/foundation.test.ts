@@ -117,6 +117,8 @@ describe("navigation", () => {
     expect(activeHref("/dashboard/giving/report", groups)).toBe("/dashboard/giving/report");
     expect(activeHref("/dashboard/members/123/edit", groups)).toBe("/dashboard/members");
     expect(activeHref("/dashboard", groups)).toBe("/dashboard");
+    // Reading plans live inside Bible.
+    expect(activeHref("/dashboard/reading-plans/abc", buildNavigation("member", new Set(["bible", "reading_plans"])))).toBe("/dashboard/bible");
   });
 });
 

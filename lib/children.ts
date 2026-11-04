@@ -9,6 +9,8 @@ import type { ChildRow, ParentRef, Person } from "@/components/members/ChildrenL
 const V2 =
   "id, name, birth_date, user_id, mother_id, father_id, mother_name, father_name, mother:app_users!member_children_mother_id_fkey(name), father:app_users!member_children_father_id_fkey(name)";
 const V1 = "id, name, birth_date, user_id";
+/** record_members.sql: a photo and the birthday switch. */
+const V3 = `${V2}, photo_path, announce`;
 
 type Raw = {
   id: string;
@@ -21,6 +23,8 @@ type Raw = {
   father_name?: string | null;
   mother?: { name: string } | null;
   father?: { name: string } | null;
+  photo_path?: string | null;
+  announce?: boolean;
 };
 
 function parent(id: string | null | undefined, joined: { name: string } | null | undefined, typed: string | null | undefined): ParentRef {
@@ -37,12 +41,16 @@ export function toChildRow(c: Raw): ChildRow {
     ownerId: c.user_id,
     mother: parent(c.mother_id, c.mother, c.mother_name),
     father: parent(c.father_id, c.father, c.father_name),
+    // undefined before record_members.sql (no photo column yet): the camera button stays hidden.
+    photoUrl: !("photo_path" in c) ? undefined : c.photo_path ? `/api/photos/child/${c.id}?v=${encodeURIComponent(c.photo_path.slice(-12))}` : null,
+    announce: c.announce !== false,
   };
 }
 
 /** Rows for a query, falling back to the first version of the table (no parents) before member_children_v2.sql. */
 async function query(build: (columns: string) => PromiseLike<{ data: unknown; error: { code?: string; message: string } | null }>): Promise<ChildRow[] | null> {
-  let { data, error } = await build(V2);
+  let { data, error } = await build(V3);
+  if (error && error.code !== "42P01") ({ data, error } = await build(V2));
   if (error && error.code !== "42P01") ({ data, error } = await build(V1));
   if (error) {
     if (error.code !== "42P01") console.error("[children] load failed:", error.message);
@@ -59,7 +67,7 @@ export async function loadChildren(parentId: string): Promise<ChildRow[] | null>
   const supabase = createClient();
   const rows = await query((columns) => {
     const q = supabase.from("member_children").select(columns);
-    return (columns === V2 ? q.or(`user_id.eq.${parentId},mother_id.eq.${parentId},father_id.eq.${parentId}`) : q.eq("user_id", parentId))
+    return (columns !== V1 ? q.or(`user_id.eq.${parentId},mother_id.eq.${parentId},father_id.eq.${parentId}`) : q.eq("user_id", parentId))
       .order("birth_date", { ascending: true, nullsFirst: false })
       .order("created_at");
   });

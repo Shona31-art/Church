@@ -65,51 +65,99 @@ export default async function ChurchDetailPage({ params }: { params: { id: strin
       />
 
       <Section title="Account" description="Pause a church that hasn't paid (nothing is deleted), switch it back on, extend a trial, or record a payment made by EFT or cash.">
-        <DetailList
-          items={[
-            { label: "Status", value: <span className="inline-flex flex-wrap items-center gap-2"><SubscriptionBadge status={effective} />{overdue && <StatusBadge tone="danger">Payment overdue</StatusBadge>}</span> },
-            { label: "Plan", value: sub ? `${PLAN_LABELS[sub.plan_key] ?? sub.plan_key}${sub.is_lifetime ? " · lifetime" : ""}${sub.billing_interval === "yearly" ? " · yearly" : ""}` : "None" },
-            ...(sub?.plan_key === "free_trial" && sub.trial_expires_at ? [{ label: "Trial ends", value: formatDate(sub.trial_expires_at) }] : []),
-            ...(sub?.billing_date && sub.plan_key !== "free_trial" ? [{ label: overdue ? "Was due" : "Paid until", value: formatDate(sub.billing_date) }] : []),
-            ...(sub?.paystack_subscription_code ? [{ label: "Payment", value: "Card, charged by Paystack" }] : []),
-            ...(sub?.suspended_at ? [{ label: "Suspended", value: formatDate(sub.suspended_at) }] : []),
-          ]}
-        />
-        <div className="mt-5 flex flex-wrap items-start gap-2">
+        {/* At a glance */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div className="col-span-2 rounded-xl bg-ink/[0.04] p-3 sm:col-span-1">
+            <p className="text-xs text-ink/60">Status</p>
+            <p className="mt-1 flex flex-wrap items-center gap-1.5">
+              <SubscriptionBadge status={effective} />
+              {overdue && <StatusBadge tone="danger">Overdue</StatusBadge>}
+            </p>
+          </div>
+          <div className="rounded-xl bg-ink/[0.04] p-3">
+            <p className="text-xs text-ink/60">Plan</p>
+            <p className="mt-1 font-semibold">
+              {sub ? PLAN_LABELS[sub.plan_key] ?? sub.plan_key : "None"}
+              {sub?.is_lifetime ? " · lifetime" : sub?.billing_interval === "yearly" ? " · yearly" : ""}
+            </p>
+          </div>
+          <div className="rounded-xl bg-ink/[0.04] p-3">
+            <p className="text-xs text-ink/60">{sub?.plan_key === "free_trial" ? "Trial ends" : overdue ? "Was due" : "Paid until"}</p>
+            <p className="mt-1 font-semibold">
+              {sub?.plan_key === "free_trial"
+                ? sub.trial_expires_at
+                  ? formatDate(sub.trial_expires_at, { weekday: undefined })
+                  : "—"
+                : sub?.billing_date
+                ? formatDate(sub.billing_date, { weekday: undefined })
+                : "—"}
+            </p>
+          </div>
+        </div>
+        {(sub?.paystack_subscription_code || sub?.suspended_at) && (
+          <p className="mt-2 text-xs text-ink/60">
+            {sub?.paystack_subscription_code ? "Pays by card through Paystack. " : ""}
+            {sub?.suspended_at ? `Suspended on ${formatDate(sub.suspended_at, { weekday: undefined })}.` : ""}
+          </p>
+        )}
+
+        {/* Actions */}
+        <div className="mt-5 space-y-3">
           <RecordPaymentForm churchId={church.id} currentPlan={sub?.plan_key ?? "basic"} prices={prices} />
+          <div className="grid gap-2 sm:grid-cols-2">
+            <form action={sendReminderNow}>
+              <input type="hidden" name="church_id" value={church.id} />
+              <PendingButton className="btn-secondary w-full justify-center" pendingLabel="Sending…">
+                Send payment reminder
+              </PendingButton>
+            </form>
+            <EmailLeadersForm churchId={church.id} churchName={church.name} />
+          </div>
+          {(sub?.plan_key ?? "free_trial") === "free_trial" && (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line p-3">
+              <span className="mr-1 w-full text-sm font-medium sm:w-auto">Extend the trial</span>
+              {[7, 14, 30].map((d) => (
+                <form key={d} action={extendTrial}>
+                  <input type="hidden" name="church_id" value={church.id} />
+                  <input type="hidden" name="days" value={d} />
+                  <PendingButton className="rounded-full border border-line bg-surface px-3.5 py-1.5 text-sm font-semibold hover:border-ember" pendingLabel="…">
+                    +{d} days
+                  </PendingButton>
+                </form>
+              ))}
+            </div>
+          )}
           {effective === "suspended" ? (
             <form action={restoreChurch}>
               <input type="hidden" name="church_id" value={church.id} />
-              <PendingButton className="btn-secondary" pendingLabel="Restoring…">Switch back on</PendingButton>
+              <PendingButton className="btn-primary w-full justify-center" pendingLabel="Restoring…">
+                Switch back on
+              </PendingButton>
             </form>
           ) : (
-            <details className="relative">
-              <summary className="btn-danger-outline cursor-pointer list-none">Suspend (not paid)</summary>
-              <form action={suspendChurch} className="mt-2 w-72 space-y-2 rounded-xl border border-line bg-surface p-3 shadow-lg sm:absolute sm:z-10">
+            <details className="rounded-xl border border-danger-line">
+              <summary className="cursor-pointer list-none px-4 py-3 text-center text-sm font-semibold text-danger">Suspend for not paying…</summary>
+              <form action={suspendChurch} className="space-y-3 border-t border-danger-line p-3">
                 <input type="hidden" name="church_id" value={church.id} />
-                <input name="reason" maxLength={300} className="input" defaultValue="Payment not received" aria-label="Reason" />
+                <label className="block text-sm font-medium" htmlFor="suspend-reason">
+                  Reason
+                </label>
+                <input id="suspend-reason" name="reason" maxLength={300} className="input" defaultValue="Payment not received" />
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" name="notify" defaultChecked className="h-4 w-4" /> Tell their leaders (app + email)
                 </label>
-                <ConfirmSubmitButton title={`Suspend ${church.name}?`} message="Members can still sign in, but features are paused until you switch them back on. No data is deleted." confirmLabel="Suspend" pendingLabel="Suspending…">
+                <ConfirmSubmitButton
+                  className="btn-danger w-full justify-center"
+                  title={`Suspend ${church.name}?`}
+                  message="Members can still sign in, but features are paused until you switch them back on. No data is deleted."
+                  confirmLabel="Suspend"
+                  pendingLabel="Suspending…"
+                >
                   Suspend now
                 </ConfirmSubmitButton>
               </form>
             </details>
           )}
-          <form action={sendReminderNow}>
-            <input type="hidden" name="church_id" value={church.id} />
-            <PendingButton className="btn-secondary" pendingLabel="Sending…">Send payment reminder</PendingButton>
-          </form>
-          {(sub?.plan_key ?? "free_trial") === "free_trial" &&
-            [7, 14, 30].map((d) => (
-              <form key={d} action={extendTrial}>
-                <input type="hidden" name="church_id" value={church.id} />
-                <input type="hidden" name="days" value={d} />
-                <PendingButton className="btn-ghost" pendingLabel="…">+{d} trial days</PendingButton>
-              </form>
-            ))}
-          <EmailLeadersForm churchId={church.id} churchName={church.name} />
         </div>
         {sub?.notes && <p className="mt-4 whitespace-pre-line rounded-lg bg-ink/5 p-3 text-xs text-ink/70">{sub.notes}</p>}
       </Section>

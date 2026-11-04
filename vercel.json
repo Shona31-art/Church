@@ -1,4 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "crons": [{ "path": "/api/cron/expire-chat-media", "schedule": "0 1 * * *" }]
+  "crons": [
+    { "path": "/api/cron/expire-chat-media", "schedule": "0 1 * * *" },
+    { "path": "/api/cron/daily-verse", "schedule": "0 5 * * *" }
+  ]
 }

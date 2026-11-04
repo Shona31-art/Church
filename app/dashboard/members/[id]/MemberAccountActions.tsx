@@ -10,6 +10,7 @@ import { Alert } from "@/components/ui/Alert";
 import { FormField } from "@/components/ui/FormField";
 import { showToast } from "@/components/ui/Toaster";
 import type { AccountStatus } from "@/lib/permissions";
+import { DownloadDataButton } from "@/components/DownloadDataButton";
 
 /**
  * Account actions on a member profile, from least to most destructive:
@@ -53,10 +54,7 @@ export function MemberAccountActions({
         )}
 
         {canExport && (
-          // Plain link: this is a file download from an API route.
-          <a href={`/api/members/${memberId}/export`} className="btn-secondary">
-            Export their data (POPIA)
-          </a>
+          <DownloadDataButton memberId={memberId} label="Export their data (POPIA)" />
         )}
 
         {canChangeAccess && status !== "disabled" && (

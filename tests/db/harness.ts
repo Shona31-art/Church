@@ -74,6 +74,7 @@ export const MIGRATION_ORDER = [
   "billing_v4.sql",
   "church_life.sql",
   "church_life_v2.sql",
+  "record_members.sql",
 ];
 
 const SUPABASE_STUBS = `

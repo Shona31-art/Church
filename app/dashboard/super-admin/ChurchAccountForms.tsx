@@ -24,7 +24,7 @@ export function RecordPaymentForm({ churchId, currentPlan, prices }: { churchId:
   }, [state]);
   if (!open)
     return (
-      <button type="button" className="btn-primary" onClick={() => setOpen(true)}>
+      <button type="button" className="btn-primary w-full justify-center" onClick={() => setOpen(true)}>
         <Banknote aria-hidden className="h-4 w-4" /> Record a payment
       </button>
     );
@@ -72,12 +72,12 @@ export function EmailLeadersForm({ churchId, churchName }: { churchId: string; c
   }, [state]);
   if (!open)
     return (
-      <button type="button" className="btn-secondary" onClick={() => setOpen(true)}>
+      <button type="button" className="btn-secondary w-full justify-center" onClick={() => setOpen(true)}>
         <Mail aria-hidden className="h-4 w-4" /> Email their leaders
       </button>
     );
   return (
-    <form action={action} className="w-full space-y-3 rounded-xl border border-line p-4">
+    <form action={action} className="w-full space-y-3 rounded-xl border border-line p-4 sm:col-span-2">
       <input type="hidden" name="church_id" value={churchId} />
       {state?.error && <Alert tone="error">{state.error}</Alert>}
       <FormField label="Subject" htmlFor="em-subject">

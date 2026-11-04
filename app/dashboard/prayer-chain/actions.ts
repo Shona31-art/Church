@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { checkModuleAccess } from "@/lib/paywall";
 import { can } from "@/lib/permissions";
@@ -92,10 +93,16 @@ export async function bookPrayerSlot(formData: FormData): Promise<void> {
     if (error) flash(/full/.test(error.message) ? "That slot just filled up — choose another." : /over/.test(error.message) ? "That slot is already over." : error.code === "23505" ? (forSomeone ? "They're already in that slot." : "You've already booked that slot.") : "Couldn't book it — please try again.", "error");
     else flash(forSomeone ? "Added — they've been told, and they'll get a reminder before it starts." : "Booked. We'll remind you about 30 minutes before. Thank you for praying!");
   } else {
+    // Only pastors and church admins remove someone from a time (RLS agrees).
+    if (!can(me.role, "postChurchWide")) {
+      flash("Can't make it? Ask a pastor to move you to another time.", "info");
+      return;
+    }
     const who = z.string().uuid().safeParse(formData.get("user_id"));
-    const userId = who.success && can(me.role, "postChurchWide") ? who.data : me.id;
+    const userId = who.success ? who.data : me.id;
     await supabase.from("prayer_chain_slots").delete().eq("chain_id", parsed.data.chainId).eq("slot_start", parsed.data.slot).eq("user_id", userId);
-    flash(userId === me.id ? "Slot cancelled." : "Removed from that slot.");
+    if (userId !== me.id) await tellRemoved(me.church_id, me.id, userId, parsed.data.chainId, parsed.data.slot);
+    flash(userId === me.id ? "Slot cancelled." : "Removed from that slot — they've been told.");
   }
   revalidatePath(`/dashboard/prayer-chain/${parsed.data.chainId}`);
 }
@@ -151,4 +158,109 @@ export async function savePrayerAudio(input: { chainId: string; slotStart: strin
   if (before?.prayer_audio_path && before.prayer_audio_path !== p.data.path) await supabase.storage.from("prayer-audio").remove([before.prayer_audio_path]);
   revalidatePath(`/dashboard/prayer-chain/${p.data.chainId}`);
   return null;
+}
+
+/**
+ * Pastors: change a chain — name, description, people per slot, and (set-times
+ * chains) the prayer times. Removing a time cancels the bookings still to come
+ * at that time. Form fields: chain_id, title, description?, max_per_slot, times? ("05:00,15:00")
+ */
+export async function updatePrayerChain(_prev: FormState, formData: FormData): Promise<FormState> {
+  const me = await getCurrentAppUser();
+  if (!me?.church_id || !can(me.role, "postChurchWide")) return { error: SESSION_EXPIRED };
+  const id = z.string().uuid().safeParse(formData.get("chain_id"));
+  const p = z
+    .object({
+      title: z.string().trim().min(1, "Give the prayer chain a name.").max(120),
+      description: z.string().trim().max(1000).transform((v) => v || null),
+      maxPerSlot: z.coerce.number().int().min(1).max(50),
+    })
+    .safeParse({ title: formData.get("title") ?? "", description: formData.get("description") ?? "", maxPerSlot: formData.get("max_per_slot") });
+  if (!id.success) return { error: "That prayer chain couldn't be found." };
+  if (!p.success) return { error: p.error.issues[0]?.message ?? "Check the details.", values: formValues(formData) };
+  const supabase = createClient();
+  const { data: chain } = await supabase.from("prayer_chains").select("*").eq("id", id.data).eq("church_id", me.church_id).maybeSingle();
+  if (!chain) return { error: "That prayer chain couldn't be found." };
+
+  let times: string[] | undefined;
+  if (chain.times?.length) {
+    times = [...new Set(String(formData.get("times") ?? "").split(",").map((t) => t.trim()).filter((t) => TIME.test(t)))].sort().slice(0, 24);
+    if (!times.length) return { error: "Keep at least one prayer time — or delete the chain.", values: formValues(formData) };
+  }
+  const { error } = await supabase
+    .from("prayer_chains")
+    .update({ title: p.data.title, description: p.data.description, max_per_slot: p.data.maxPerSlot, ...(times ? { times } : {}) })
+    .eq("id", chain.id);
+  if (error) {
+    console.error("[prayer-chain] update failed:", error.message);
+    return { error: "Couldn't save the changes — please try again.", values: formValues(formData) };
+  }
+
+  // Bookings still to come at a time that was removed are cancelled.
+  let cancelled = 0;
+  if (times) {
+    const removed = (chain.times as string[]).filter((t) => !times!.includes(t));
+    if (removed.length) {
+      const { data: future } = await supabase.from("prayer_chain_slots").select("id, slot_start, user_id").eq("chain_id", chain.id).gt("slot_start", new Date().toISOString());
+      const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { timeZone: "Africa/Johannesburg", hour: "2-digit", minute: "2-digit", hour12: false });
+      const goneRows = ((future ?? []) as { id: string; slot_start: string; user_id: string }[]).filter((b) => removed.includes(hhmm(b.slot_start)));
+      if (goneRows.length) {
+        await supabase.from("prayer_chain_slots").delete().in("id", goneRows.map((b) => b.id));
+        cancelled = goneRows.length;
+        // Tell each person their slot was cancelled.
+        const when = (iso: string) => new Date(iso).toLocaleString("en-ZA", { timeZone: "Africa/Johannesburg", weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", hour12: false });
+        const { error: nErr } = await createAdminClient()
+          .from("notifications")
+          .insert(
+            goneRows
+              .filter((b) => b.user_id !== me.id)
+              .map((b) => ({ user_id: b.user_id, church_id: me.church_id, category: "prayer_care", type: "prayer_chain.cancelled", title: "Prayer time cancelled", body: `${p.data.title}: your slot on ${when(b.slot_start)} was removed. Choose another time if you can.`, link: `/dashboard/prayer-chain/${chain.id}`, actor_id: me.id })),
+          );
+        if (nErr) console.error("[prayer-chain] cancel notices failed:", nErr.message);
+      }
+    }
+  }
+  revalidatePath(`/dashboard/prayer-chain/${chain.id}`);
+  revalidatePath("/dashboard/prayer-chain");
+  flash(cancelled ? `Saved. ${cancelled} booking${cancelled === 1 ? "" : "s"} at the removed time${cancelled === 1 ? " was" : "s were"} cancelled.` : "Prayer chain updated.");
+  return { ok: true };
+}
+
+const whenText = (iso: string) => new Date(iso).toLocaleString("en-ZA", { timeZone: "Africa/Johannesburg", weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+
+/** A pastor took someone out of a slot: tell them. */
+async function tellRemoved(churchId: string, actorId: string, userId: string, chainId: string, slot: string) {
+  const { data: chain } = await createClient().from("prayer_chains").select("title").eq("id", chainId).maybeSingle();
+  const { error } = await createAdminClient()
+    .from("notifications")
+    .insert({ user_id: userId, church_id: churchId, category: "prayer_care", type: "prayer_chain.removed", title: "Prayer time changed", body: `${chain?.title ?? "Prayer chain"}: you're no longer down for ${whenText(slot)}.`, link: `/dashboard/prayer-chain/${chainId}`, actor_id: actorId });
+  if (error) console.error("[prayer-chain] removal notice failed:", error.message);
+}
+
+/**
+ * Pastors: move someone to another time (e.g. they can't make it). They're
+ * told the new time and date. Form fields: chain_id, booking ("<user_id>|<slot ISO>"), to_slot (ISO)
+ */
+export async function movePrayerSlot(formData: FormData): Promise<void> {
+  const me = await getCurrentAppUser();
+  if (!me?.church_id || !can(me.role, "postChurchWide")) return;
+  const [userId, fromSlot] = String(formData.get("booking") ?? "").split("|");
+  const p = z
+    .object({ chainId: z.string().uuid(), userId: z.string().uuid(), from: z.string().datetime(), to: z.string().datetime() })
+    .safeParse({ chainId: formData.get("chain_id"), userId, from: fromSlot, to: formData.get("to_slot") });
+  if (!p.success) {
+    flash("Choose the person's booking and the new time.", "error");
+    return;
+  }
+  if (p.data.from === p.data.to) return;
+  const supabase = createClient();
+  // New slot first, so a full or wrong slot leaves the old booking in place.
+  const { error } = await supabase.from("prayer_chain_slots").insert({ chain_id: p.data.chainId, church_id: me.church_id, slot_start: p.data.to, user_id: p.data.userId, added_by: me.id });
+  if (error) {
+    flash(/full/.test(error.message) ? "That time is full — choose another." : /over/.test(error.message) ? "That time has already passed." : error.code === "23505" ? "They're already at that time." : "Couldn't move them — please try again.", "error");
+    return;
+  }
+  await supabase.from("prayer_chain_slots").delete().eq("chain_id", p.data.chainId).eq("slot_start", p.data.from).eq("user_id", p.data.userId);
+  revalidatePath(`/dashboard/prayer-chain/${p.data.chainId}`);
+  flash("Moved — they've been told their new time.");
 }

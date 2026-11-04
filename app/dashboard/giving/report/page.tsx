@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { WaitingGifts, type WaitingGift } from "./WaitingGifts";
+import { DownloadButton } from "@/components/DownloadDataButton";
 
 export default async function GivingReportPage({ searchParams }: { searchParams: { year?: string; fund?: string; page?: string } }) {
   const gate = await moduleGate("giving");
@@ -84,10 +85,7 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
         title="Giving report"
         description="Gifts your church has received — confirmed bank transfers and completed card payments. Donor names are visible to church admins only."
         actions={
-          // Plain link: a CSV download from an API route.
-          <a href={`/api/giving/export${buildQuery({ year, fund })}`} className="btn-secondary">
-            Download CSV
-          </a>
+          <DownloadButton href={`/api/giving/export${buildQuery({ year, fund })}`} label="Download CSV" fallbackName="giving.csv" done="Giving report downloaded." />
         }
       />
 

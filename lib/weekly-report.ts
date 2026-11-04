@@ -34,7 +34,7 @@ export async function buildWeeklyReport(churchId: string, today = todayInAppZone
 
   const [newbies, chains, lives, shared, prayersNew, prayersAnswered, gifts, reported, bdays, kids, events, bookings, testimonies, gaps, plans, members] = await Promise.all([
     // Joined the app last week (signed in at least once: active, not just invited).
-    safe(admin.from("app_users").select("name").eq("church_id", churchId).eq("status", "active").gte("created_at", iso(from)).lt("created_at", iso(thisMonday)).order("name").limit(30)),
+    safe(admin.from("app_users").select("*").eq("church_id", churchId).eq("status", "active").gte("created_at", iso(from)).lt("created_at", iso(thisMonday)).order("name").limit(30)),
     safe(admin.from("prayer_chains").select("*").eq("church_id", churchId).gt("ends_at", iso(thisMonday)).lt("starts_at", iso(ahead)).order("starts_at").limit(5)),
     safe(admin.from("live_services").select("title, starts_at").eq("church_id", churchId).gte("starts_at", iso(thisMonday)).lt("starts_at", iso(ahead)).order("starts_at").limit(5)),
     safe(admin.from("testimonies").select("id", { count: "exact", head: true }).eq("church_id", churchId).eq("status", "approved").gte("reviewed_at", iso(from)).lt("reviewed_at", iso(thisMonday))),
@@ -97,7 +97,8 @@ export async function buildWeeklyReport(churchId: string, today = todayInAppZone
   return {
     churchName: church.name,
     weekLabel: `${label(from, { day: "numeric", month: "short" })} – ${label(sunday, { day: "numeric", month: "short" })}`,
-    newMembers: ((newbies.data ?? []) as { name: string }[]).map((n) => ({ name: n.name })),
+    // Record-only members (record_members.sql) were added to the records, not to the app.
+    newMembers: ((newbies.data ?? []) as { name: string; record_only?: boolean }[]).filter((n) => !n.record_only).map((n) => ({ name: n.name })),
     prayerChains,
     liveServices: ((lives.data ?? []) as any[]).map((l) => ({ title: l.title, when: fmt(l.starts_at) })),
     testimoniesShared: shared.count ?? 0,

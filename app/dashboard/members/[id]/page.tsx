@@ -10,6 +10,7 @@ import { PageHeader, Section, DetailList } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { MemberStatusBadge } from "../MemberBadges";
+import { GiveAccessForm } from "./GiveAccessForm";
 import { MemberAccountActions } from "./MemberAccountActions";
 import { RemovePhotoButton } from "./RemovePhotoButton";
 import { ChatRestrictions, type ActiveRestriction } from "./ChatRestrictions";
@@ -45,6 +46,9 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
   if (!z.string().uuid().safeParse(params.id).success) notFound();
 
   const supabase = createClient();
+  // record_members.sql: a missing column just means nobody is record-only yet.
+  const { data: recordRow } = await supabase.from("app_users").select("record_only").eq("id", params.id).maybeSingle();
+  const recordOnly = Boolean((recordRow as { record_only?: boolean } | null)?.record_only);
   const [{ data: member }, { data: birthday }, { count: careCount }, { data: activity }] = await Promise.all([
     supabase
       .from("app_users")
@@ -108,7 +112,7 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
         meta={
           <>
             <StatusBadge tone="neutral">{roleLabel(member.role)}</StatusBadge>
-            <MemberStatusBadge status={member.status as AccountStatus} />
+            {recordOnly ? <StatusBadge tone="neutral">Record only</StatusBadge> : <MemberStatusBadge status={member.status as AccountStatus} />}
             {isSelf && <StatusBadge tone="info">You</StatusBadge>}
           </>
         }
@@ -131,7 +135,7 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
         <Section title="Contact">
           <DetailList
             items={[
-              { label: "Email", value: <a href={`mailto:${member.email}`} className="link">{member.email}</a> },
+              { label: "Email", value: recordOnly ? <span className="text-ink/60">None — record only</span> : <a href={`mailto:${member.email}`} className="link">{member.email}</a> },
               { label: "Phone", value: member.phone ? <a href={`tel:${member.phone}`} className="link">{member.phone}</a> : null },
             ]}
           />
@@ -160,7 +164,13 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
         title="Login account"
         description="The member record above is your church's directory entry. Their login is how they sign in to the app."
       >
-        <p className="text-sm text-ink/70">
+        {recordOnly && (
+          <div className="mb-4 space-y-3">
+            <p className="text-sm text-ink/70">Record only — kept on your church&apos;s records without an app login. They aren&apos;t in chats or calls and get no notifications. If they start using Grace, give them app access.</p>
+            {canChangeAccess && <GiveAccessForm memberId={member.id} memberName={member.name} />}
+          </div>
+        )}
+        <p className={`text-sm text-ink/70 ${recordOnly ? "hidden" : ""}`}>
           {member.status === "invited" && "Added by invite email, which they haven't accepted yet. You can set a password for them below instead."}
           {member.status === "active" && "They sign in with their email address and password. If they forget it, they can use “Forgot password” on the sign-in page, or you can set a new one below."}
           {member.status === "disabled" && "Deactivated — they can't sign in. Their records and history are kept, and you can reactivate them at any time."}

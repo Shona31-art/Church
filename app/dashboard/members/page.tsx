@@ -39,7 +39,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
 
   let query = supabase
     .from("app_users")
-    .select("id, name, email, phone, role, status, department_id, departments(name)", { count: "exact" })
+    .select("*, departments(name)", { count: "exact" }) // * includes record_only once record_members.sql has run
     .eq("church_id", me.church_id)
     .order("name")
     .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
@@ -119,7 +119,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
           <EmptyState
             icon={NAV_ICONS.members}
             title="No members yet"
-            description="Add your first church member to start building your directory. They'll get an email to set up their login."
+            description="Add your first church member to start building your directory. Older members who won't use the app can be added as “record only”."
             action={<Link href="/dashboard/members/new" className="btn-primary">Add member</Link>}
           />
         )
@@ -152,7 +152,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
                           <Link href={`/dashboard/members/${m.id}`} className="font-medium hover:underline">
                             {m.name}
                           </Link>
-                          <p className="text-xs text-ink/60">{m.email}</p>
+                          <p className="text-xs text-ink/60">{(m as { record_only?: boolean }).record_only ? "Record only — no app login" : m.email}</p>
                         </div>
                       </div>
                     </td>
@@ -191,7 +191,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
                     <Avatar name={m.name} src={photos.get(m.id)} />
                     <div className="min-w-0 flex-1">
                       <p className="font-medium truncate">{m.name}</p>
-                      <p className="text-xs text-ink/60 truncate">{m.email}</p>
+                      <p className="text-xs text-ink/60 truncate">{(m as { record_only?: boolean }).record_only ? "Record only — no app login" : m.email}</p>
                       <p className="text-xs text-ink/60 mt-1">
                         {roleLabel(m.role)}
                         {m.departments?.name ? ` · ${m.departments.name}` : ""}

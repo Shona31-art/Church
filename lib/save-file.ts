@@ -27,7 +27,7 @@ async function toBase64(blob: Blob): Promise<string> {
 /** Saves `blob` as `name`. Returns false when this device can't (an older Grace Android app). */
 export async function saveBlob(blob: Blob, name: string): Promise<boolean> {
   const bridge = androidBridge();
-  if (bridge) return bridge.saveFile!(name, blob.type || "application/octet-stream", await toBase64(blob));
+  if (bridge) return bridge.saveFile!(name, (blob.type || "application/octet-stream").split(";")[0].trim(), await toBase64(blob));
   if (isOldAndroidApp()) return false;
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

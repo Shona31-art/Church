@@ -11,8 +11,9 @@ import { PageHeader, Section } from "@/components/ui/PageHeader";
 import { PersonPicker } from "@/components/ui/PersonPicker";
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
 import { VoicePlayer } from "@/app/dashboard/chat/[id]/VoicePlayer";
-import { bookPrayerSlot, deletePrayerChain } from "../actions";
+import { bookPrayerSlot, deletePrayerChain, movePrayerSlot } from "../actions";
 import { PrayerBox } from "../PrayerBox";
+import { ChainEditForm } from "../ChainEditForm";
 
 export const metadata = { title: "Prayer chain" };
 
@@ -54,6 +55,8 @@ export default async function PrayerChainPage({ params }: { params: { id: string
   for (const t of slots) days.set(dayLabel(t), [...(days.get(dayLabel(t)) ?? []), t]);
   const openSlots = slots.filter((t) => t + step > now && (bySlot.get(t)?.length ?? 0) < chain.max_per_slot);
   const people = shepherd ? await churchPeople(me.church_id!) : [];
+  // Bookings still to come, for "Move someone".
+  const upcomingBookings = [...bySlot.entries()].flatMap(([t, list]) => (t + step > now ? list.map((b) => ({ ...b, t })) : [])).sort((a, b) => a.t - b.t);
 
   return (
     <div className="max-w-3xl space-y-5">
@@ -96,6 +99,33 @@ export default async function PrayerChainPage({ params }: { params: { id: string
         </Section>
       )}
 
+      {shepherd && upcomingBookings.length > 0 && openSlots.length > 0 && (
+        <Section title="Move someone to another time" description="If someone can't make their time. They're told their new time and date.">
+          <form action={movePrayerSlot} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+            <input type="hidden" name="chain_id" value={chain.id} />
+            <div>
+              <p className="mb-1 text-sm font-medium">Who</p>
+              <PersonPicker
+                name="booking"
+                title="Whose time is changing?"
+                placeholder="Choose a booking"
+                options={upcomingBookings.map((b) => ({ value: `${b.user_id}|${new Date(b.t).toISOString()}`, label: b.name, hint: `${dayLabel(b.t)} · ${time(b.t)}` }))}
+              />
+            </div>
+            <div>
+              <p className="mb-1 text-sm font-medium">New time</p>
+              <PersonPicker
+                name="to_slot"
+                title="Move to which time?"
+                placeholder="Choose a time"
+                options={openSlots.map((t) => ({ value: new Date(t).toISOString(), label: `${time(t)} – ${time(t + step)}`, group: dayLabel(t) }))}
+              />
+            </div>
+            <PendingButton className="btn-secondary" pendingLabel="Moving…">Move</PendingButton>
+          </form>
+        </Section>
+      )}
+
       {[...days.entries()].map(([label, ts]) => (
         <Section key={label} title={label}>
           <ul className="divide-y divide-line">
@@ -112,17 +142,33 @@ export default async function PrayerChainPage({ params }: { params: { id: string
                       {time(t)}–{time(t + step)}
                     </span>
                     <span className="min-w-0 flex-1 text-sm text-ink/70">{list.length ? list.map((p) => p.name.split(" ")[0]).join(", ") : <span className="text-ink/40">Open</span>}</span>
-                    {!over && (mineHere || !full) && (
+                    {!over && mineHere && !shepherd && <span className="text-xs text-ink/60">Can&apos;t make it? Ask a pastor to move you.</span>}
+                    {!over && ((mineHere && shepherd) || (!mineHere && !full)) && (
                       <form action={bookPrayerSlot}>
                         <input type="hidden" name="chain_id" value={chain.id} />
                         <input type="hidden" name="slot_start" value={iso} />
                         <input type="hidden" name="book" value={mineHere ? "0" : "1"} />
-                        <PendingButton className={mineHere ? "btn-ghost btn-sm" : "btn-secondary btn-sm"} pendingLabel="…">
-                          {mineHere ? "Cancel mine" : "I'll pray"}
-                        </PendingButton>
+                        {mineHere ? (
+                          <PendingButton className="btn-ghost btn-sm" pendingLabel="…">
+                            Cancel mine
+                          </PendingButton>
+                        ) : (
+                          // Confirm first, so a wrong tap can be undone; once booked only a pastor can change it.
+                          <ConfirmSubmitButton
+                            tone="primary"
+                            className="btn-secondary btn-sm"
+                            title={`Pray at ${time(t)}?`}
+                            message={`${dayLabel(t)}, ${time(t)}–${time(t + step)}. Once you confirm, only a pastor can change it — we'll remind you before it starts.`}
+                            confirmLabel="Confirm"
+                            pendingLabel="Booking…"
+                          >
+                            I&apos;ll pray
+                          </ConfirmSubmitButton>
+                        )}
                       </form>
                     )}
                     {!over && full && !mineHere && <span className="text-xs font-medium text-ink/50">Full</span>}
+                    {over && <span className="text-xs font-medium text-ink/50">Passed</span>}
                   </div>
 
                   {list.some((p) => p.prayer_text || p.prayer_audio_path) && (
@@ -171,6 +217,12 @@ export default async function PrayerChainPage({ params }: { params: { id: string
           </ul>
         </Section>
       ))}
+
+      {shepherd && (
+        <Section title="Manage this prayer chain">
+          <ChainEditForm chain={{ id: chain.id, title: chain.title, description: chain.description, max_per_slot: chain.max_per_slot, times: chain.times ?? null }} />
+        </Section>
+      )}
 
       {shepherd && (
         <form action={deletePrayerChain} className="flex justify-end">

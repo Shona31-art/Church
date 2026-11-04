@@ -2,7 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 
 export interface MemberLimitStatus {
-  /** Active + invited members (deactivated people don't count). */
+  /** Active + invited members (deactivated and record-only people don't count). */
   count: number;
   /** The plan's limit; null = unlimited. */
   limit: number | null;
@@ -23,10 +23,9 @@ export async function getMemberLimitStatus(churchId: string): Promise<MemberLimi
   const { data: plan } = await supabase.from("plans").select("member_limit").eq("key", sub.plan_key).maybeSingle();
   const limit = plan?.member_limit ?? null;
   if (limit === null) return { count: 0, limit, reached: false };
-  const { count } = await supabase
-    .from("app_users")
-    .select("id", { count: "exact", head: true })
-    .eq("church_id", churchId)
-    .neq("status", "disabled");
+  const base = () => supabase.from("app_users").select("id", { count: "exact", head: true }).eq("church_id", churchId).neq("status", "disabled");
+  // Record-only members (record_members.sql) don't count; before that's run, everyone does.
+  let { count, error } = await base().eq("record_only", false);
+  if (error) ({ count } = await base());
   return { count: count ?? 0, limit, reached: (count ?? 0) >= limit };
 }

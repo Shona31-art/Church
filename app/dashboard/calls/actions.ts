@@ -333,7 +333,7 @@ export async function callInviteCandidates(callId: string): Promise<{ people?: C
   if ("error" in ctx) return { error: ctx.error };
   const { data, error } = await ctx.admin
     .from("app_users")
-    .select("id, name")
+    .select("*")
     .eq("church_id", ctx.me.church_id!)
     .eq("status", "active")
     .order("name")
@@ -342,7 +342,9 @@ export async function callInviteCandidates(callId: string): Promise<{ people?: C
     console.error("[calls] invite list failed:", error.message);
     return { error: "Couldn't load the church's members — try again." };
   }
-  return { people: ((data ?? []) as CallPerson[]).filter((p) => !ctx.already.has(p.id) && !ctx.blocked.has(p.id)) };
+  // Record-only members (record_members.sql) don't use the app, so they can't be called.
+  const people = ((data ?? []) as (CallPerson & { record_only?: boolean })[]).filter((p) => !p.record_only && !ctx.already.has(p.id) && !ctx.blocked.has(p.id));
+  return { people: people.map((p) => ({ id: p.id, name: p.name })) };
 }
 
 /** Rings these people into the call (calls_v4.sql's trigger notifies them). */

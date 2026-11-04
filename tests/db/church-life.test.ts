@@ -174,6 +174,8 @@ describe("prayer chain v2", () => {
     await expect(asUser(db, MEM, () => rows(`insert into prayer_chain_slots (chain_id, church_id, slot_start, user_id) values ($1, $2, $3, $4)`, [id, A, at("05:00"), MEM2]))).rejects.toThrow();
     await asUser(db, PASTOR, () => rows(`insert into prayer_chain_slots (chain_id, church_id, slot_start, user_id) values ($1, $2, $3, $4)`, [id, A, at("05:00"), MEM2]));
     expect(await rows(`select user_id from notifications where type = 'prayer_chain.assigned'`)).toEqual([{ user_id: MEM2 }]);
+    // Booking yourself: you're told your time and date too (record_members.sql).
+    expect((await rows(`select user_id, title from notifications where type = 'prayer_chain.booked'`)).map((r) => r.user_id)).toContain(MEM);
     // Prayers: your own slot only.
     await asUser(db, MEM, () => rows(`update prayer_chain_slots set prayer_text = 'Lord, heal our land', prayed_at = now() where chain_id = $1 and user_id = $2`, [id, MEM]));
     await asUser(db, MEM, () => rows(`update prayer_chain_slots set prayer_text = 'hijack' where chain_id = $1 and user_id = $2`, [id, MEM2]));
@@ -181,5 +183,26 @@ describe("prayer chain v2", () => {
       { user_id: MEM2, prayer_text: null },
       { user_id: MEM, prayer_text: "Lord, heal our land" },
     ]);
+  });
+});
+
+describe("record-only members", () => {
+  test("get no notifications and don't trigger 'new member' alerts", async () => {
+    const REC = "10000000-0000-0000-0000-0000000000aa";
+    await db.exec(`insert into auth.users (id) values ('${REC}')`);
+    await db.exec(`insert into app_users (id, church_id, name, email, role, record_only) values ('${REC}', '${A}', 'Gogo Dlamini', 'record.x@no-login.grace.app', 'member', true)`);
+    expect(await rows(`select count(*)::int as n from notifications where type = 'member.joined' and body like 'Gogo%'`)).toEqual([{ n: 0 }]);
+    await db.exec(`select app_private.notify(array['${REC}'::uuid, '${MEM}'::uuid], '${A}', 'church_news', 'test.record', 'Hello', null, null, null)`);
+    expect(await rows(`select user_id from notifications where type = 'test.record'`)).toEqual([{ user_id: MEM }]);
+  });
+});
+
+describe("prayer chain: only pastors remove times", () => {
+  test("a member can't delete their booking; a pastor can", async () => {
+    const before = (await rows(`select count(*)::int as n from prayer_chain_slots where user_id = $1`, [MEM]))[0].n;
+    await asUser(db, MEM, () => rows(`delete from prayer_chain_slots where user_id = $1`, [MEM]));
+    expect((await rows(`select count(*)::int as n from prayer_chain_slots where user_id = $1`, [MEM]))[0].n).toBe(before);
+    await asUser(db, PASTOR, () => rows(`delete from prayer_chain_slots where user_id = $1`, [MEM]));
+    expect((await rows(`select count(*)::int as n from prayer_chain_slots where user_id = $1`, [MEM]))[0].n).toBe(0);
   });
 });

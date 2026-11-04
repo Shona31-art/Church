@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useFormState } from "react-dom";
-import { MessageSquareText } from "lucide-react";
+import { MessageSquareText, Trash2 } from "lucide-react";
 import { savePrayerAudio, savePrayerText } from "./actions";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { Alert } from "@/components/ui/Alert";
@@ -15,15 +15,49 @@ export function PrayerBox({ chainId, slotStart, churchId, userId, initialText, h
   const [state, action] = useFormState(savePrayerText, null);
   const [audioError, setAudioError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
+  const [deleting, startDelete] = useTransition();
   useEffect(() => {
     if (state?.ok) setOpen(false);
   }, [state]);
 
+  /** Delete the typed prayer or the recording (either can be added again any time). */
+  const removeText = () =>
+    startDelete(async () => {
+      const fd = new FormData();
+      fd.set("chain_id", chainId);
+      fd.set("slot_start", slotStart);
+      fd.set("prayer_text", "");
+      await savePrayerText(null, fd);
+    });
+  const removeAudio = () =>
+    startDelete(async () => {
+      const problem = await savePrayerAudio({ chainId, slotStart, path: "", durationMs: 0 });
+      if (problem) setAudioError(problem);
+    });
+
+  const deletes = (initialText || hasAudio) && (
+    <span className="inline-flex flex-wrap gap-1">
+      {initialText && (
+        <button type="button" className="btn-ghost btn-sm text-danger" onClick={removeText} disabled={deleting}>
+          <Trash2 aria-hidden className="h-4 w-4" /> Delete typed prayer
+        </button>
+      )}
+      {hasAudio && (
+        <button type="button" className="btn-ghost btn-sm text-danger" onClick={removeAudio} disabled={deleting}>
+          <Trash2 aria-hidden className="h-4 w-4" /> Delete voice note
+        </button>
+      )}
+    </span>
+  );
+
   if (!open)
     return (
-      <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(true)}>
-        <MessageSquareText aria-hidden className="h-4 w-4" /> {initialText || hasAudio ? "Edit my prayer" : "Add my prayer"}
-      </button>
+      <span className="inline-flex flex-wrap items-center gap-1">
+        <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(true)}>
+          <MessageSquareText aria-hidden className="h-4 w-4" /> {initialText || hasAudio ? "Change my prayer" : "Add my prayer (type or voice note)"}
+        </button>
+        {deletes}
+      </span>
     );
 
   return (
@@ -39,6 +73,7 @@ export function PrayerBox({ chainId, slotStart, churchId, userId, initialText, h
           <textarea id={`prayer-${slotStart}`} name="prayer_text" rows={4} maxLength={2000} defaultValue={initialText ?? ""} className="input" placeholder="Father, we pray for…" />
           <div className="flex flex-wrap gap-2">
             <PendingButton className="btn-primary btn-sm" pendingLabel="Saving…">Save prayer</PendingButton>
+            {deletes}
             <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(false)}>
               Close
             </button>
@@ -46,7 +81,7 @@ export function PrayerBox({ chainId, slotStart, churchId, userId, initialText, h
         </form>
       )}
       <div className="space-y-1">
-        {!recording && <p className="text-sm font-semibold">…or record it</p>}
+        {!recording && <p className="text-sm font-semibold">{hasAudio ? "…or record a new voice note (replaces the old one)" : "…or record a voice note"}</p>}
         {audioError && <Alert tone="error">{audioError}</Alert>}
         <VoiceRecorder
           onActiveChange={setRecording}

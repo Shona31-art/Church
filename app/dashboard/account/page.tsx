@@ -15,10 +15,12 @@ import { makeConfigured } from "@/lib/alert-delivery";
 import { InstallApp } from "@/components/install/InstallApp";
 import { EmailChangeForm } from "./EmailChangeForm";
 import { PreviewSetting } from "@/components/notifications/PreviewSetting";
+import { DailyVerseSetting } from "@/components/notifications/DailyVerseSetting";
 import { LastSeenSetting } from "@/components/chat/LastSeenSetting";
 import { AndroidAppCard } from "@/components/android/AndroidAppCard";
 import { ChildrenList } from "@/components/members/ChildrenList";
 import { churchPeople, loadChildren } from "@/lib/children";
+import { DownloadDataButton } from "@/components/DownloadDataButton";
 
 export default async function MyAccountPage({ searchParams }: { searchParams: { email?: string } }) {
   const me = (await getCurrentAppUser())!;
@@ -57,6 +59,8 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
   const presenceRes = await supabase.from("user_presence").select("show_last_seen").eq("user_id", me.id).maybeSingle();
   // Message previews (chat_notifications_v2.sql); hidden until that's run.
   const previewRes = await supabase.from("notification_preferences").select("show_previews").eq("user_id", me.id).maybeSingle();
+  // Verse of the day (record_members.sql); hidden until that's run.
+  const verseRes = await supabase.from("notification_preferences").select("daily_verse").eq("user_id", me.id).maybeSingle();
 
   // WhatsApp alerts are for the people who get pastor & admin alerts, and only
   // show once the platform has them switched on (MAKE_WEBHOOK_URL).
@@ -108,6 +112,7 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
       <CollapsibleSection anchor="notifications" title="Notifications" description="Get a pop-up on your phone or computer when something happens, even when the app is closed.">
             <PushSettings initialPreferences={pushPrefs} />
             {!previewRes.error && <PreviewSetting initial={previewRes.data?.show_previews ?? true} />}
+            {!verseRes.error && <DailyVerseSetting initial={(verseRes.data as { daily_verse?: boolean } | null)?.daily_verse ?? true} />}
             <AndroidAppCard />
             {channelRes && !channelRes.error && (
               <AlertChannels
@@ -166,10 +171,7 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
           description="Under POPIA you can see what we hold about you and ask for it to be deleted."
         >
           <div className="flex flex-wrap gap-2">
-            {/* Plain link: a file download from an API route. */}
-            <a href={`/api/members/${me.id}/export`} className="btn-secondary">
-              Download my data
-            </a>
+            <DownloadDataButton memberId={me.id} />
           </div>
           <p className="text-xs text-ink/60 mt-3">
             To have your account and personal data deleted, ask your church admin{church?.email ? ` (${church.email})` : ""}. Your private journal

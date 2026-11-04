@@ -22,7 +22,7 @@ object Files {
     private val SAFE_NAME = Regex("[^A-Za-z0-9 ._()-]")
 
     fun save(activity: MainActivity, name: String, mime: String, base64: String): Boolean {
-        if (mime !in setOf("application/pdf", "image/jpeg", "image/png")) return false
+        if (mime !in setOf("application/pdf", "image/jpeg", "image/png", "application/json", "text/csv")) return false
         val bytes = try { Base64.decode(base64, Base64.DEFAULT) } catch (e: IllegalArgumentException) { return false }
         if (bytes.isEmpty() || bytes.size > 25 * 1024 * 1024) return false
         val fileName = name.replace(SAFE_NAME, "").trim().ifEmpty { "grace-file" }.take(80)

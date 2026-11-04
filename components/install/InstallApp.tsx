@@ -4,7 +4,8 @@ import { useState } from "react";
 import { CircleCheck, Download, LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { useInstall } from "./install-store";
-import { ANDROID_APK_URL } from "@/lib/android";
+import { ANDROID_APK_URL, graceAndroid } from "@/lib/android";
+import { AndroidUpdate } from "./AndroidUpdate";
 import { InAppBrowserSteps, IosSteps, ManualSteps } from "./InstallSteps";
 
 /**
@@ -25,6 +26,9 @@ export function InstallApp() {
   }
 
   if (mode === null) return <div aria-hidden className="h-10" />;
+
+  // Inside the Android app: its version, and "Update available" when there's a newer one.
+  if (graceAndroid()) return <AndroidUpdate />;
 
   if (installedOnDevice && mode !== "installed" && !justInstalled) {
     return (

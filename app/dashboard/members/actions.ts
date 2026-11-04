@@ -57,6 +57,7 @@ async function departmentBelongsToChurch(departmentId: string | null, churchId: 
 export async function createMember(_prev: FormState, formData: FormData): Promise<FormState> {
   const me = await requireMemberManager();
   if (!me) return { error: "Only pastors and church admins can add members. If you are one, sign in again." };
+  if (formData.get("record_only") === "on") return createRecordMember(me, formData);
 
   const parsed = memberCreateSchema.safeParse({
     name: formData.get("name"),
@@ -151,6 +152,7 @@ export async function createMember(_prev: FormState, formData: FormData): Promis
     return { error: "We couldn't create the member profile, so their login was removed again. Please try again.", values };
   }
 
+  await saveNewBirthday(created.id, me, formData);
   await logAudit({
     churchId: me.church_id,
     actorId: me.id,
@@ -161,7 +163,7 @@ export async function createMember(_prev: FormState, formData: FormData): Promis
   });
 
   revalidatePath("/dashboard/members");
-  flash(`${input.name} was added. An invite email is on its way to ${input.email}.`);
+  flash(`${input.name} was added. Share their email and password with them so they can sign in.`);
   redirect(`/dashboard/members/${created.id}`);
 }
 
@@ -538,5 +540,125 @@ export async function liftChatRestriction(_prev: FormState, formData: FormData):
   await logAudit({ churchId: me.church_id, actorId: me.id, action: "member.chat_restriction_lifted", targetTable: "member_chat_restrictions", targetId: ids.data.restrictionId, metadata: { member_id: target.id } });
   revalidatePath(`/dashboard/members/${target.id}`);
   flash("Restriction lifted.");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------- record-only
+
+const birthDateField = z
+  .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.literal("")])
+  .transform((v) => v || null);
+
+/** A birthday typed on the add-member form (best effort: the member is already added). */
+async function saveNewBirthday(memberId: string, me: AppUser, formData: FormData) {
+  const birth = birthDateField.safeParse(formData.get("birth_date") ?? "");
+  if (!birth.success || !birth.data) return;
+  const { error } = await createAdminClient()
+    .from("member_birthdays")
+    .upsert({ user_id: memberId, church_id: me.church_id, birth_date: birth.data, updated_by: me.id });
+  if (error) console.error("[members] birthday on create failed:", error.message);
+}
+
+/** A sign-in nobody can use: random address and password, and blocked (record_members.sql). */
+const recordEmail = () => `record.${crypto.randomUUID()}@no-login.grace.app`;
+
+/**
+ * Record only (record_members.sql): someone kept on the church's records who
+ * won't use the app — no email or password; doesn't count towards the plan's
+ * member limit. Form fields: name, phone?, department_id?, birth_date?
+ */
+async function createRecordMember(me: AppUser, formData: FormData): Promise<FormState> {
+  const parsed = z
+    .object({
+      name: z.string().trim().min(1, "Enter their name.").max(120),
+      phone: z.string().trim().max(20).optional(),
+      departmentId: z.union([z.string().uuid(), z.literal("")]).transform((v) => v || null),
+    })
+    .safeParse({ name: formData.get("name") ?? "", phone: optionalField(formData, "phone"), departmentId: formData.get("department_id") ?? "" });
+  const values = formValues(formData);
+  if (!parsed.success) return invalid(parsed.error, formData);
+  if (!(await departmentBelongsToChurch(parsed.data.departmentId, me.church_id!))) return { error: "That department couldn't be found — refresh and try again.", values };
+
+  const admin = createAdminClient();
+  const email = recordEmail();
+  const { data: login, error: loginError } = await admin.auth.admin.createUser({
+    email,
+    password: `${crypto.randomUUID()}${crypto.randomUUID()}`,
+    email_confirm: true,
+    ban_duration: "876000h", // ~100 years: this sign-in can never be used
+    user_metadata: { name: parsed.data.name, record_only: true },
+  });
+  if (loginError || !login.user) {
+    console.error("[members] record login failed:", loginError?.message);
+    return { error: "We couldn't add them — please try again.", values };
+  }
+  const { error } = await admin.from("app_users").insert({
+    id: login.user.id,
+    church_id: me.church_id,
+    name: parsed.data.name,
+    email,
+    phone: parsed.data.phone ?? null,
+    role: "member",
+    department_id: parsed.data.departmentId,
+    status: "active",
+    record_only: true,
+  });
+  if (error) {
+    await admin.auth.admin.deleteUser(login.user.id);
+    console.error("[members] record insert failed:", error.message);
+    return { error: /record_only/.test(error.message) ? "Record-only members need database update #63 (record_members.sql)." : "We couldn't add them — please try again.", values };
+  }
+  await saveNewBirthday(login.user.id, me, formData);
+  await logAudit({ churchId: me.church_id, actorId: me.id, action: "member.created", targetTable: "app_users", targetId: login.user.id, metadata: { record_only: true } });
+  revalidatePath("/dashboard/members");
+  flash(`${parsed.data.name} was added to your records.`);
+  redirect(`/dashboard/members/${login.user.id}`);
+}
+
+/**
+ * A record-only member starts using the app: give them an email and a first
+ * password (they choose their own when they first sign in). Form fields:
+ * member_id, email, password
+ */
+export async function giveAppAccess(_prev: FormState, formData: FormData): Promise<FormState> {
+  const me = await requireMemberManager();
+  if (!me) return { error: SESSION_EXPIRED };
+  const parsed = z
+    .object({
+      memberId: z.string().uuid(),
+      email: z.string().trim().toLowerCase().email("Enter a valid email address.").max(254),
+      password: passwordSchema,
+    })
+    .safeParse({ memberId: formData.get("member_id"), email: formData.get("email") ?? "", password: formData.get("password") ?? "" });
+  if (!parsed.success) {
+    const r = invalid(parsed.error, formData);
+    if (r?.values) delete r.values.password;
+    return r;
+  }
+  const values = formValues(formData);
+  delete values.password;
+  const admin = createAdminClient();
+  const { data: target } = await admin.from("app_users").select("id, church_id, name, record_only").eq("id", parsed.data.memberId).maybeSingle();
+  if (!target || target.church_id !== me.church_id || !target.record_only) return { error: "That member couldn't be found.", values };
+  const { data: taken } = await admin.from("app_users").select("id").eq("email", parsed.data.email).neq("id", target.id).maybeSingle();
+  if (taken) return { error: "Please fix the highlighted fields.", fieldErrors: { email: "That email already has a Grace account." }, values };
+
+  const { error: authError } = await admin.auth.admin.updateUserById(target.id, {
+    email: parsed.data.email,
+    password: parsed.data.password,
+    email_confirm: true,
+    ban_duration: "none",
+    user_metadata: { name: target.name, must_change_password: true, record_only: false },
+  });
+  if (authError) {
+    console.error("[members] give access failed:", authError.message);
+    return { error: /already|registered|exists/i.test(authError.message) ? "That email already has a Grace account." : "Couldn't set up their sign-in — please try again.", values };
+  }
+  const { error } = await admin.from("app_users").update({ email: parsed.data.email, record_only: false }).eq("id", target.id);
+  if (error) return { error: "Their sign-in is ready but the profile didn't update — please try again.", values };
+  await logAudit({ churchId: me.church_id, actorId: me.id, action: "member.app_access_given", targetTable: "app_users", targetId: target.id });
+  revalidatePath(`/dashboard/members/${target.id}`);
+  revalidatePath("/dashboard/members");
+  flash(`${target.name} can sign in now with ${parsed.data.email} and the password you chose.`);
   return { ok: true };
 }

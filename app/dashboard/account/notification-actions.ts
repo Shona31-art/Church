@@ -113,3 +113,16 @@ export async function setWhatsAppAlerts(enabled: boolean): Promise<Result> {
   }
   return { ok: true };
 }
+
+/** Input: enabled. The morning verse-of-the-day notification (record_members.sql). */
+export async function setDailyVerse(enabled: boolean): Promise<Result> {
+  const me = await getCurrentAppUser();
+  if (!me) return SIGNED_OUT;
+  if (typeof enabled !== "boolean") return { ok: false, error: "That didn't look right. Refresh and try again." };
+  const { error } = await createClient().from("notification_preferences").upsert({ user_id: me.id, daily_verse: enabled }, { onConflict: "user_id" });
+  if (error) {
+    console.error("[push] save daily verse setting failed:", error.message);
+    return { ok: false, error: error.code === "42703" ? "This setting needs a database update first (#63)." : "Couldn't save that setting. Try again." };
+  }
+  return { ok: true };
+}

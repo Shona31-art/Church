@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { OfflineSignInNotice } from "@/components/OfflineSignInNotice";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -38,16 +38,13 @@ export function LoginForm({ expired, nextPath, reason }: { expired: boolean; nex
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const passwordRef = useRef<HTMLInputElement>(null);
 
-  // Fill in the email used last time, and go straight to the password.
+  // Fill in the email used last time. Focus stays put, so the phone's password
+  // manager can offer the saved login (it fills both boxes in one tap).
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LAST_EMAIL_KEY);
-      if (saved) {
-        setEmail((current) => current || saved);
-        passwordRef.current?.focus();
-      }
+      if (saved) setEmail((current) => current || saved);
     } catch {}
   }, []);
 
@@ -114,7 +111,6 @@ export function LoginForm({ expired, nextPath, reason }: { expired: boolean; nex
         </FormField>
         <FormField label="Password" htmlFor="password" required>
           <PasswordInput
-            ref={passwordRef}
             id="password"
             name="password"
             autoComplete="current-password"

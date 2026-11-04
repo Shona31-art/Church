@@ -17,14 +17,16 @@ export default async function NewDirectMessagePage({ searchParams }: { searchPar
   const q = (searchParams.q ?? "").trim().slice(0, 80);
   let query = createClient()
     .from("app_users")
-    .select("id, name, role")
+    .select("*")
     .eq("church_id", me.church_id)
     .neq("id", me.id)
     .neq("status", "disabled")
     .order("name")
     .limit(50);
   if (q) query = query.ilike("name", likePattern(q));
-  const { data: members } = await query;
+  const { data: everyone } = await query;
+  // Record-only members (record_members.sql) can't receive messages.
+  const members = ((everyone ?? []) as { id: string; name: string; role: string; record_only?: boolean }[]).filter((m) => !m.record_only);
 
   return (
     <div className="max-w-xl">

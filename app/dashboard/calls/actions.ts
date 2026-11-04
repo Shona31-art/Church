@@ -26,7 +26,7 @@ const MIGRATION_MISSING = "Video calls need a database update first: run supabas
 async function requireCaller(): Promise<AppUser | { error: string }> {
   const me = await getCurrentAppUser();
   if (!me?.church_id) return { error: "Your session has expired — sign in again." };
-  if (!(await checkModuleAccess("video_calls")).allowed) return { error: "Video calls aren't included in your church's plan." };
+  if (!(await checkModuleAccess("video_calls")).allowed) return { error: "Calls aren't included in your church's plan." };
   return me;
 }
 
@@ -161,7 +161,7 @@ export async function startBookingCall(bookingId: string, audioOnly = false): Pr
   // RLS: the member who booked it, and the church's pastors and admins.
   const { data: booking } = await createClient().from("pastor_bookings").select("id, church_id, status, preferred_date, requested_by, pastor_id").eq("id", bookingId).maybeSingle();
   if (!booking || booking.church_id !== me.church_id) return { error: "That appointment couldn't be found." };
-  if (booking.status !== "approved") return { error: "Video calls open once the appointment is approved." };
+  if (booking.status !== "approved") return { error: "Calls open once the appointment is approved." };
   const window = bookingCallWindow(booking.preferred_date, todayInAppZone());
   if (window === "early") return { error: "The video call opens on the day of the appointment." };
   if (window === "past") return { error: "This appointment's date has passed." };

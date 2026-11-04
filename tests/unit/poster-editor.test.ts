@@ -132,13 +132,13 @@ describe("templates and resizing", () => {
 });
 
 describe("template quality", () => {
-  test("42 templates, each using only bundled fonts, with every text box on the poster at every size", async () => {
+  test("53 templates, each using only bundled fonts, with every text box on the poster at every size", async () => {
     const { POSTER_TEMPLATES, templateDesign } = await import("@/lib/posters/templates");
     const { POSTER_FONTS } = await import("@/lib/posters/fonts");
     const { POSTER_SIZE_KEYS } = await import("@/lib/posters/design");
     const fonts = new Set(POSTER_FONTS.map((f) => f.name));
-    expect(POSTER_TEMPLATES).toHaveLength(42);
-    expect(new Set(POSTER_TEMPLATES.map((t) => t.key)).size).toBe(42);
+    expect(POSTER_TEMPLATES).toHaveLength(53);
+    expect(new Set(POSTER_TEMPLATES.map((t) => t.key)).size).toBe(53);
     const problems: string[] = [];
     for (const t of POSTER_TEMPLATES) {
       for (const size of POSTER_SIZE_KEYS) {

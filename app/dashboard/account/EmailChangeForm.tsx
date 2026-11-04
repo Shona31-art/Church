@@ -5,6 +5,7 @@ import { requestEmailChange } from "./actions";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { Alert } from "@/components/ui/Alert";
 import { FormActions, FormField } from "@/components/ui/FormField";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 /**
  * Change the sign-in email. Needs the current password; nothing changes until
@@ -44,10 +45,9 @@ export function EmailChangeForm({ currentEmail, pendingEmail }: { currentEmail: 
             />
           </FormField>
           <FormField label="Current password" htmlFor="current_password" required error={fe.current_password} hint="To confirm it's you.">
-            <input
+            <PasswordInput
               id="current_password"
               name="current_password"
-              type="password"
               autoComplete="current-password"
               required
               className="input"

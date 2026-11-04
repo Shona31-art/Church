@@ -1,6 +1,6 @@
 "use client";
 
-import { AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowUp, Copy, Lock, LockOpen, Trash2, type LucideIcon } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowUp, Copy, Lock, LockOpen, Trash2, type LucideIcon, Scissors } from "lucide-react";
 import type { GroupElement, ImageElement, ImageSource, PosterDesign, PosterElement, ShapeElement, TextElement } from "@/lib/posters/design";
 import { POSTER_FONTS } from "@/lib/posters/fonts";
 import { POSTER_STYLES, type PosterStyleKey } from "@/lib/posters/styles";
@@ -33,6 +33,8 @@ export function PropertiesPanel({
   onReorder,
   onApplyStyle,
   animation,
+  onCutOut,
+  cuttingOut = false,
 }: {
   design: PosterDesign;
   element: PosterElement | undefined;
@@ -43,6 +45,9 @@ export function PropertiesPanel({
   onDuplicate: () => void;
   onDelete: () => void;
   onReorder: (where: "forward" | "backward") => void;
+  /** Cut the person out of the selected photo (lib/posters/cutout.ts). */
+  onCutOut?: () => void;
+  cuttingOut?: boolean;
   /** Re-themes the whole poster (undoable). */
   onApplyStyle: (key: PosterStyleKey) => void;
   animation: AnimationControls;
@@ -70,7 +75,7 @@ export function PropertiesPanel({
 
       {element.type === "text" && <TextSettings element={element} onChange={onChange} />}
       {element.type === "shape" && <ShapeSettings element={element} onChange={onChange} />}
-      {element.type === "image" && <ImageSettings element={element} onChange={onChange} />}
+      {element.type === "image" && <ImageSettings element={element} onChange={onChange} onCutOut={onCutOut} cuttingOut={cuttingOut} />}
       {element.type === "group" && <GroupSettings element={element} onChildChange={onChildChange} />}
       <EntranceSettings element={element} onChange={onChange} onPreview={animation.onPreview} playing={animation.playing} />
       {element.type === "icon" && (
@@ -194,7 +199,7 @@ function TextSettings({ element, onChange }: { element: TextElement; onChange: C
   );
 }
 
-function ImageSettings({ element, onChange }: { element: ImageElement; onChange: Change }) {
+function ImageSettings({ element, onChange, onCutOut, cuttingOut }: { element: ImageElement; onChange: Change; onCutOut?: () => void; cuttingOut?: boolean }) {
   const set = (changes: Partial<ImageElement>, key: string) => onChange(changes as Partial<PosterElement>, `${element.id}:${key}`);
   return (
     <div className="space-y-4">
@@ -206,7 +211,17 @@ function ImageSettings({ element, onChange }: { element: ImageElement; onChange:
           <p className="hint">Open Photos and pick a photo to fill this slot.</p>
         </>
       ) : (
-        <PhotoCredit src={element.src} />
+        <>
+          <PhotoCredit src={element.src} />
+          {onCutOut && (
+            <div>
+              <button type="button" className="btn-secondary w-full" onClick={onCutOut} disabled={cuttingOut}>
+                <Scissors aria-hidden className="h-4 w-4" /> {cuttingOut ? "Removing background…" : "Remove background"}
+              </button>
+              <p className="hint mt-1">Cuts the person out so they stand in front of your design. Works on this device; the photo isn&apos;t sent anywhere.</p>
+            </div>
+          )}
+        </>
       )}
       <div className="grid grid-cols-2 gap-2">
         <Field label="Shape" id="prop-image-shape">

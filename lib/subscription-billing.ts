@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 import { fetchSubscription, paystackConfigured, verifyTransaction } from "@/lib/paystack";
+import { sendReceiptsNow } from "@/lib/billing-mailer";
 import {
   decideBillingPayment,
   isBillingReference,
@@ -97,6 +98,7 @@ export async function settleBillingCheckout(reference: string): Promise<BillingS
     targetId: payment.church_id,
     metadata: { plan: payment.plan_key, amount_cents: payment.amount_cents, paid_until: periodEnd.toISOString() },
   });
+  await sendReceiptsNow(payment.church_id); // thank-you email with the invoice
   return "paid";
 }
 
@@ -147,6 +149,7 @@ export async function recordRenewal(reference: string): Promise<"renewed" | "ign
     .eq("church_id", sub.church_id);
   if (subError) throw new Error(`subscription renewal failed: ${subError.message}`);
   await logAudit({ churchId: sub.church_id, actorId: null, action: "billing.renewed", targetTable: "church_subscriptions", targetId: sub.church_id, metadata: { plan, amount_cents: tx.amountCents } });
+  await sendReceiptsNow(sub.church_id);
   return "renewed";
 }
 

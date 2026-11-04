@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { CHAT_MEDIA_BUCKET, mediaExpiryCutoff } from "@/lib/chat";
 import { endCancelledSubscriptions } from "@/lib/subscription-billing";
 import { announceDueChallenges } from "@/lib/games/challenge-server";
+import { sendPaymentReceipts, sendPaymentReminders } from "@/lib/billing-mailer";
+import { sendDueWeeklyReports } from "@/lib/weekly-report";
 
 /**
  * GET /api/cron/expire-chat-media — nightly clean-up, called by Vercel Cron
@@ -14,7 +16,7 @@ import { announceDueChallenges } from "@/lib/games/challenge-server";
  * Keeps storage — and cost — flat as a church's chat history grows.
  *
  * Also deletes bell notifications older than 90 days
- * (the notifications page promises 90), and ends church subscriptions that
+ * (the notifications page promises 90), sends billing reminders and receipts, and ends church subscriptions that
  * were cancelled once the month they paid for is over (online billing).
  * Kept in this one job because Vercel's
  * free plan allows only daily cron jobs; a failure there is logged and never
@@ -130,5 +132,27 @@ export async function GET(request: Request) {
     console.error("[cron] church challenge results failed (retries tomorrow):", (error as Error).message);
   }
 
-  return NextResponse.json({ expired, notificationsDeleted, subscriptionsEnded, disappearedFiles: disappeared, challengesAnnounced });
+  // Billing emails (billing_v4.sql): reminders a few days before payment dates,
+  // and any receipt that couldn't be sent straight after its payment.
+  let remindersSent = 0;
+  let receiptsSent = 0;
+  try {
+    remindersSent = await sendPaymentReminders();
+    receiptsSent = await sendPaymentReceipts();
+  } catch (error) {
+    console.error("[cron] billing emails failed (retries tomorrow):", (error as Error).message);
+  }
+
+  // Monday reports (church_life.sql), and the prayer-slot/roster reminders as a
+  // back-up where pg_cron isn't running them every 10 minutes.
+  let weeklyReports = 0;
+  try {
+    weeklyReports = await sendDueWeeklyReports();
+    const { error } = await admin.rpc("run_due_reminders");
+    if (error && !/function|does not exist/i.test(error.message)) console.error("[cron] reminders failed:", error.message);
+  } catch (error) {
+    console.error("[cron] weekly reports failed (retries tomorrow):", (error as Error).message);
+  }
+
+  return NextResponse.json({ expired, notificationsDeleted, subscriptionsEnded, disappearedFiles: disappeared, challengesAnnounced, remindersSent, receiptsSent, weeklyReports });
 }

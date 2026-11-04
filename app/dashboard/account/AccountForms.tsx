@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { BirthdayField } from "@/components/ui/BirthdayField";
 import { useFormState } from "react-dom";
 import { changeMyPassword, updateMyProfile } from "./actions";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { Alert } from "@/components/ui/Alert";
 import { FormField } from "@/components/ui/FormField";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 export function ProfileForm({ name, phone, birthDate, email }: { name: string; phone: string | null; birthDate: string; email: string }) {
   const [state, action] = useFormState(updateMyProfile, null);
@@ -23,9 +25,7 @@ export function ProfileForm({ name, phone, birthDate, email }: { name: string; p
         <FormField label="Phone" htmlFor="phone" optional error={fe.phone}>
           <input id="phone" name="phone" type="tel" maxLength={20} defaultValue={phone ?? ""} autoComplete="tel" className="input" aria-invalid={Boolean(fe.phone)} />
         </FormField>
-        <FormField label="Birthday" htmlFor="birth_date" optional error={fe.birth_date} hint="Only your pastors see this, so they can wish you well.">
-          <input id="birth_date" name="birth_date" type="date" defaultValue={birthDate} className="input" />
-        </FormField>
+        <BirthdayField name="birth_date" defaultValue={birthDate} error={fe.birth_date} hint="Only your pastors see it, so they can wish you well — just the day and month, never your age. The year is optional." />
       </div>
       <PendingButton>Save my details</PendingButton>
     </form>
@@ -43,10 +43,10 @@ export function PasswordForm() {
       {state?.error && <Alert tone="error">{state.error}</Alert>}
       <div className="grid gap-5 sm:grid-cols-2">
         <FormField label="New password" htmlFor="password" hint="At least 8 characters, letters and numbers.">
-          <input id="password" name="password" type="password" autoComplete="new-password" required className="input" />
+          <PasswordInput id="password" name="password" autoComplete="new-password" required className="input" />
         </FormField>
         <FormField label="Confirm new password" htmlFor="confirm_password">
-          <input id="confirm_password" name="confirm_password" type="password" autoComplete="new-password" required className="input" />
+          <PasswordInput id="confirm_password" name="confirm_password" autoComplete="new-password" required className="input" />
         </FormField>
       </div>
       <PendingButton className="btn-secondary" pendingLabel="Changing…">

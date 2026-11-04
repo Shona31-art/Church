@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { DisplaySettings } from "@/components/ui/DisplaySettings";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { roleLabel } from "@/lib/permissions";
-import { PageHeader, Section, DetailList } from "@/components/ui/PageHeader";
+import { PageHeader, DetailList } from "@/components/ui/PageHeader";
 import { PasswordForm, ProfileForm } from "./AccountForms";
 import { ProfilePhotoForm } from "./ProfilePhotoForm";
 import { ChatPrivacyForm } from "./ChatPrivacyForm";
@@ -15,10 +16,9 @@ import { InstallApp } from "@/components/install/InstallApp";
 import { EmailChangeForm } from "./EmailChangeForm";
 import { PreviewSetting } from "@/components/notifications/PreviewSetting";
 import { LastSeenSetting } from "@/components/chat/LastSeenSetting";
-import { RingtoneSetting } from "@/components/calls/RingtoneSetting";
 import { AndroidAppCard } from "@/components/android/AndroidAppCard";
 import { ChildrenList } from "@/components/members/ChildrenList";
-import { loadChildren } from "@/lib/children";
+import { churchPeople, loadChildren } from "@/lib/children";
 
 export default async function MyAccountPage({ searchParams }: { searchParams: { email?: string } }) {
   const me = (await getCurrentAppUser())!;
@@ -36,7 +36,7 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
     supabase.from("app_users").select("about, dm_privacy, share_read_receipts").eq("id", me.id).maybeSingle(),
     getAvatarUrls([me.id]),
   ]);
-  const children = me.church_id ? await loadChildren(me.id) : null;
+  const [children, people] = me.church_id ? await Promise.all([loadChildren(me.id), churchPeople(me.church_id)]) : [null, []];
   const photosReady = !chatProfile.error;
 
   // People I've blocked (RLS: only my own blocks are visible).
@@ -70,7 +70,7 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
       <PageHeader title="My account" description="Your details, password and personal data." back={{ href: "/dashboard", label: "Home" }} />
 
       {me.church_id && (
-        <Section title="Profile photo" description="How people in your church recognise you in chats and lists.">
+        <CollapsibleSection title="Profile photo" description="How people in your church recognise you in chats and lists.">
           {photosReady ? (
             <ProfilePhotoForm
               churchId={me.church_id}
@@ -82,39 +82,33 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
           ) : (
             <Alert tone="info">Profile photos will be available once your church&apos;s database update is installed.</Alert>
           )}
-        </Section>
+        </CollapsibleSection>
       )}
 
       {me.church_id && photosReady && (
-        <Section title="Chat privacy" description="Control who can message you privately and whether they see when you've read their messages.">
+        <CollapsibleSection title="Chat privacy" description="Control who can message you privately and whether they see when you've read their messages.">
           <ChatPrivacyForm
             dmPrivacy={(chatProfile.data?.dm_privacy as "everyone" | "leaders" | "nobody") ?? "everyone"}
             shareReadReceipts={chatProfile.data?.share_read_receipts ?? true}
             blocked={blocked}
           />
           {!presenceRes.error && <LastSeenSetting initial={presenceRes.data?.show_last_seen ?? true} />}
-        </Section>
+        </CollapsibleSection>
       )}
 
-      <div id="display" className="scroll-mt-24">
-        <Section title="Display" description="Text size, contrast and light or dark — for this device.">
+      <CollapsibleSection anchor="display" title="Display" description="Text size, contrast and light or dark — for this device.">
           <DisplaySettings />
-        </Section>
-      </div>
+        </CollapsibleSection>
 
-      <div id="install" className="scroll-mt-24">
-        <Section title="Install the app" description="Open Grace from your phone's home screen, full screen, like any other app.">
+      <CollapsibleSection anchor="install" title="Install the app" description="Open Grace from your phone's home screen, full screen, like any other app.">
           <InstallApp />
-        </Section>
-      </div>
+        </CollapsibleSection>
 
       {!prefsRes.error && (
-        <div id="notifications" className="scroll-mt-24">
-          <Section title="Notifications" description="Get a pop-up on your phone or computer when something happens, even when the app is closed.">
+      <CollapsibleSection anchor="notifications" title="Notifications" description="Get a pop-up on your phone or computer when something happens, even when the app is closed.">
             <PushSettings initialPreferences={pushPrefs} />
             {!previewRes.error && <PreviewSetting initial={previewRes.data?.show_previews ?? true} />}
             <AndroidAppCard />
-            <RingtoneSetting />
             {channelRes && !channelRes.error && (
               <AlertChannels
                 initial={channelRes.data?.whatsapp_alerts ?? true}
@@ -122,24 +116,21 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
                 available
               />
             )}
-          </Section>
-        </div>
+          </CollapsibleSection>
       )}
 
-      <Section title="My details">
+      <CollapsibleSection title="My details" description="Your name, phone and birthday." anchor="details">
         <ProfileForm name={me.name} email={me.email} phone={profile?.phone ?? null} birthDate={birthday?.birth_date ?? ""} />
-      </Section>
+      </CollapsibleSection>
 
       {children && (
-        <div id="children" className="scroll-mt-24">
-          <Section title="My children" description="Add your children's names and birthdays so your pastors can pray for them and celebrate with your family.">
-            <ChildrenList parentId={me.id} items={children} self />
-          </Section>
-        </div>
+      <CollapsibleSection anchor="children" title="My children" description="Add your children's names and birthdays so your pastors can pray for them and celebrate with your family.">
+            <ChildrenList parentId={me.id} items={children} self people={people} />
+          </CollapsibleSection>
       )}
 
       {church && (
-        <Section title="My church">
+        <CollapsibleSection title="My church">
           <DetailList
             items={[
               { label: "Church", value: church.name },
@@ -148,11 +139,10 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
               { label: "Church contact", value: [church.email, church.phone].filter(Boolean).join(" · ") || null },
             ]}
           />
-        </Section>
+        </CollapsibleSection>
       )}
 
-      <div id="email" className="scroll-mt-24">
-        <Section title="Email address" description="The address you sign in with and receive church emails at.">
+      <CollapsibleSection anchor="email" title="Email address" description="The address you sign in with and receive church emails at.">
           {searchParams?.email === "confirmed" && (
             <Alert tone="success" className="mb-4">
               Thanks — that confirmation was received. If we also emailed your other address, open that link too; your sign-in changes once both are done.
@@ -164,17 +154,14 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
             </Alert>
           )}
           <EmailChangeForm currentEmail={me.email} pendingEmail={pendingEmail} />
-        </Section>
-      </div>
+        </CollapsibleSection>
 
-      <Section title="Password">
-        <div id="password" className="scroll-mt-24">
-          <PasswordForm />
-        </div>
-      </Section>
+      <CollapsibleSection title="Password" anchor="password">
+        <PasswordForm />
+      </CollapsibleSection>
 
       {me.church_id && (
-        <Section
+        <CollapsibleSection
           title="My data"
           description="Under POPIA you can see what we hold about you and ask for it to be deleted."
         >
@@ -188,7 +175,7 @@ export default async function MyAccountPage({ searchParams }: { searchParams: { 
             To have your account and personal data deleted, ask your church admin{church?.email ? ` (${church.email})` : ""}. Your private journal
             is encrypted and is deleted with your account.
           </p>
-        </Section>
+        </CollapsibleSection>
       )}
     </div>
   );

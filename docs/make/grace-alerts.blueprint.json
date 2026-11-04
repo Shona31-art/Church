@@ -1,0 +1,48 @@
+{
+  "name": "Grace — billing emails",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": { "hook": null, "maxResults": 1 },
+      "mapper": {},
+      "metadata": { "designer": { "x": 0, "y": 0 } }
+    },
+    {
+      "id": 2,
+      "module": "google-email:ActionSendEmail",
+      "version": 2,
+      "parameters": { "account": null },
+      "filter": {
+        "name": "Only emails",
+        "conditions": [[{ "a": "{{1.kind}}", "b": "email", "o": "text:equal" }]]
+      },
+      "mapper": {
+        "to": "{{1.to}}",
+        "subject": "{{1.subject}}",
+        "html": "{{1.html}}",
+        "attachments": [],
+        "cc": [],
+        "bcc": []
+      },
+      "metadata": { "designer": { "x": 300, "y": 0 } }
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": { "orphans": [] }
+  }
+}

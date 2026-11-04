@@ -9,7 +9,10 @@ import { formatDate, formatDateTime, todayInAppZone } from "@/lib/format";
 import { PageHeader, Section, DetailList } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { BookingBadge } from "../BookingBadge";
-import { CancelMyRequest, StatusActions } from "./StatusActions";
+import { CancelMyRequest, RescheduleForm, StatusActions } from "./StatusActions";
+import { deleteBooking } from "./actions";
+import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
+import { Trash2 } from "lucide-react";
 import { videoCallState } from "@/lib/video-calls";
 import { bookingCallWindow } from "@/lib/video-call-rules";
 import { StartCallButton } from "@/components/calls/StartCallButton";
@@ -113,10 +116,40 @@ export default async function BookingDetailPage({ params }: { params: { id: stri
         </Section>
       )}
 
-      {isRequester && !shepherd && ["pending", "approved"].includes(status) && (
-        <Section title="Changed your plans?">
-          <CancelMyRequest bookingId={booking.id} />
+      {(shepherd || isRequester) && ["pending", "approved"].includes(status) && (
+        <Section title={shepherd ? "Reschedule" : "Changed your plans?"}>
+          <div className="space-y-4">
+            <RescheduleForm
+              bookingId={booking.id}
+              date={booking.preferred_date}
+              time={booking.preferred_time ? String(booking.preferred_time).slice(0, 5) : ""}
+              min={todayInAppZone()}
+              note={
+                shepherd
+                  ? isRequester ? undefined : `${booking.requester?.name ?? "The requester"} will be told about the new time.`
+                  : status === "approved" ? "Your pastor will be asked to confirm the new time." : "Your pastor will be told about the new time."
+              }
+            />
+            {isRequester && !shepherd && <CancelMyRequest bookingId={booking.id} />}
+          </div>
         </Section>
+      )}
+
+      {(shepherd || (isRequester && status !== "approved")) && (
+        <div className="flex justify-end">
+          <form action={deleteBooking}>
+            <input type="hidden" name="booking_id" value={booking.id} />
+            <ConfirmSubmitButton
+              className="btn-danger-outline"
+              title="Delete this request?"
+              message="It will be removed for good, for everyone (with its video call, if it had one). This can't be undone."
+              confirmLabel="Delete request"
+              pendingLabel="Deleting…"
+            >
+              <Trash2 aria-hidden className="h-4 w-4" /> Delete request
+            </ConfirmSubmitButton>
+          </form>
+        </div>
       )}
     </div>
   );

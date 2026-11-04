@@ -72,15 +72,19 @@ interface SermonAnalysis {
  * sermon still saves and the fields can be filled in by hand.
  * The transcript is capped at ~30k characters to keep each call's cost bounded.
  */
-async function analyseTranscript(transcript: string): Promise<SermonAnalysis | null> {
-  if (!transcript.trim() || !isAiConfigured()) return null;
+async function analyseTranscript(transcript: string, context: { title?: string; speaker?: string; scripture?: string; summary?: string } = {}): Promise<SermonAnalysis | null> {
+  const about = [context.title && `Title: ${context.title}`, context.speaker && `Preacher: ${context.speaker}`, context.scripture && `Scripture: ${context.scripture}`, context.summary && `Notes: ${context.summary}`]
+    .filter(Boolean)
+    .join("\n");
+  if ((!transcript.trim() && !about) || !isAiConfigured()) return null;
   if (!(await consumeAiQuota("sermon_analysis")).ok) return null;
 
+  const source = transcript.trim()
+    ? `Here is a sermon transcript:\n\n${transcript.slice(0, 30_000)}${about ? `\n\nAbout the sermon:\n${about}` : ""}`
+    : `There is no transcript. Write small-group study notes for a Christian sermon from what we know about it:\n\n${about.slice(0, 3000)}\n\nStay faithful to the scripture given; don't invent stories or quotes from the preacher.`;
   const parsed = await generateJson<Partial<SermonAnalysis>>({
     maxTokens: 1500,
-    prompt: `Here is a sermon transcript:
-
-${transcript.slice(0, 30_000)}
+    prompt: `${source}
 
 Respond with ONLY valid JSON, no other text, in this exact shape:
 {"summary": "2-3 sentence summary", "scriptureRefs": ["Book Chapter:Verse", ...up to 5], "discussionQuestions": ["...", ...3-5 questions for small groups], "prayerPoints": ["...", ...3-5 short prayer points]}
@@ -103,6 +107,30 @@ For scriptureRefs, give references only (e.g. "Romans 8:28"), never the verse te
  * scripture_refs?, discussion_questions?, prayer_points? (one per line),
  * use_ai ("on" = generate the study fields from the transcript).
  */
+/**
+ * "Write with AI" on the sermon form: drafts the summary, scriptures,
+ * discussion questions and prayer points for the pastor to check before
+ * saving. Uses the transcript when there is one, otherwise the title,
+ * preacher and scriptures.
+ */
+export async function draftSermonStudyNotes(input: { title: string; speaker: string; transcript: string; scripture: string; summary: string }): Promise<{ error?: string; notes?: SermonAnalysis }> {
+  const me = await requireSermonEditor();
+  if (!me) return { error: "Only pastors and church admins can do this. Sign in again." };
+  if (!isAiConfigured()) return { error: "AI isn't switched on for this app yet." };
+  if (!(await checkModuleAccess("ai_assist")).allowed) return { error: "AI help is on Premium and Unlimited." };
+  const transcript = String(input.transcript ?? "").slice(0, 100_000);
+  const title = String(input.title ?? "").trim().slice(0, 200);
+  if (!transcript.trim() && !title) return { error: "Type the sermon title (and the scripture if you have it), or paste the transcript, then try again." };
+  const notes = await analyseTranscript(transcript, {
+    title,
+    speaker: String(input.speaker ?? "").slice(0, 120),
+    scripture: String(input.scripture ?? "").slice(0, 500),
+    summary: transcript.trim() ? "" : String(input.summary ?? "").slice(0, 2000),
+  });
+  if (!notes) return { error: "The AI couldn't write these right now (or this month's AI allowance is used up). Try again in a minute, or fill them in by hand." };
+  return { notes };
+}
+
 export async function saveSermon(_prev: FormState, formData: FormData): Promise<FormState> {
   const me = await requireSermonEditor();
   if (!me) return { error: "Only pastors and church admins can publish sermons. If you are one, sign in again." };
@@ -220,6 +248,7 @@ const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
 export async function requestSermonAudioUpload(input: { contentType: string; bytes: number }): Promise<{ ok: true; path: string; token: string; url: string } | { ok: false; error: string }> {
   const me = await requireSermonEditor();
   if (!me) return { ok: false, error: "Only people who can add sermons can upload recordings." };
+  if (!(await checkModuleAccess("sermon_uploads")).allowed) return { ok: false, error: "Uploading recordings is on Premium and Unlimited. Paste a link instead (SoundCloud, YouTube, Google Drive)." };
   const ext = AUDIO_TYPES[(input.contentType || "").toLowerCase()];
   if (!ext) return { ok: false, error: "That file type can't be played in a browser. Use MP3, M4A, WAV, AAC or OGG." };
   if (!Number.isFinite(input.bytes) || input.bytes <= 0) return { ok: false, error: "That file looks empty." };
@@ -251,6 +280,7 @@ const MAX_VIDEO_MB = 1024; // keep in step with VideoField.tsx and sermon_video.
 export async function requestSermonVideoUpload(input: { contentType: string; bytes: number }): Promise<{ ok: true; uploadUrl: string; url: string } | { ok: false; error: string }> {
   const me = await requireSermonEditor();
   if (!me) return { ok: false, error: "Only people who can add sermons can upload videos." };
+  if (!(await checkModuleAccess("sermon_uploads")).allowed) return { ok: false, error: "Uploading videos is on Premium and Unlimited. Paste a YouTube or Facebook link instead." };
   const ext = VIDEO_TYPES[(input.contentType || "").toLowerCase()];
   if (!ext) return { ok: false, error: "That video type isn't supported. Use MP4 (best), MOV, M4V or WebM." };
   if (!Number.isFinite(input.bytes) || input.bytes <= 0) return { ok: false, error: "That file looks empty." };

@@ -276,12 +276,14 @@ describe("voice notes and photos", () => {
     expect(fake).toMatch(/row-level security/);
   });
 
-  test("photos are refused until the church has photo sharing switched on", async () => {
+  test("photos are refused when the church doesn't have photo sharing", async () => {
     const photo = `${CHURCH_A}/${GENERAL}/${BOB}/pic.webp`;
     const sql = `insert into chat_messages (channel_id, sender_id, content, kind, media_path) values ($1, $2, '', 'image', $3)`;
+    // Premium includes photos (church_life.sql); switched off for this church, they're refused.
+    await db.query(`insert into church_modules (church_id, module_key, enabled) values ($1, 'chat_photos', false)`, [CHURCH_A]);
     expect(await attempt(BOB, sql, [GENERAL, BOB, photo])).toMatch(/row-level security/);
 
-    await db.query(`insert into church_modules (church_id, module_key, enabled) values ($1, 'chat_photos', true)`, [CHURCH_A]);
+    await db.query(`update church_modules set enabled = true where church_id = $1 and module_key = 'chat_photos'`, [CHURCH_A]);
     expect(await attempt(BOB, sql, [GENERAL, BOB, photo])).toBeNull();
   });
 

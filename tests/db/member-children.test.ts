@@ -82,3 +82,32 @@ describe("member_children", () => {
     ]);
   });
 });
+
+describe("mother and father (member_children_v2.sql)", () => {
+  test("both parents see and manage the child; other members and other churches can't link or see", async () => {
+    const MUM = "10000000-0000-0000-0000-0000000000a1";
+    const DAD = "10000000-0000-0000-0000-0000000000a2";
+    await db.exec(`
+      insert into auth.users (id) values ('${MUM}'), ('${DAD}');
+      insert into app_users (id, church_id, name, email, role) values ('${MUM}', '${CHURCH_A}', 'Mum', 'mum@a.test', 'member'), ('${DAD}', '${CHURCH_A}', 'Dad', 'dad@a.test', 'member');
+    `);
+    const PARENT = MUM;
+    const OTHER_A = DAD;
+    const [{ id }] = (await asUser(db, PARENT, () =>
+      rows(`insert into member_children (user_id, church_id, name, mother_id, father_id, father_name) values ($1, $2, 'Joy', $1, $3, null) returning id`, [PARENT, CHURCH_A, OTHER_A])
+    )) as { id: string }[];
+    // The father (not the one who added her) sees her and can edit.
+    expect(await asUser(db, OTHER_A, () => rows(`select name from member_children where id = $1`, [id]))).toEqual([{ name: "Joy" }]);
+    await asUser(db, OTHER_A, () => rows(`update member_children set name = 'Joy Grace' where id = $1`, [id]));
+    expect((await rows(`select name from member_children where id = $1`, [id]))[0].name).toBe("Joy Grace");
+    // Someone from another church can't be linked as a parent.
+    await expect(
+      asUser(db, PARENT, () => rows(`insert into member_children (user_id, church_id, name, father_id) values ($1, $2, 'Sam', $3)`, [PARENT, CHURCH_A, MEMBER_B]))
+    ).rejects.toThrow(/row-level security/);
+    // A parent who isn't in the app: just a name.
+    await asUser(db, PASTOR_A, () => rows(`insert into member_children (user_id, church_id, name, mother_id, father_name) values ($1, $2, 'Ben', $1, 'David Moyo')`, [PARENT, CHURCH_A]));
+    expect(await asUser(db, MEMBER_B, () => rows(`select name from member_children where name in ('Joy Grace', 'Ben')`))).toEqual([]);
+    // Another member of the same church who isn't a parent: can't see them.
+    expect(await asUser(db, "10000000-0000-0000-0000-000000000003", () => rows(`select name from member_children where name in ('Joy Grace', 'Ben')`))).toEqual([]);
+  });
+});

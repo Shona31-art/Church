@@ -40,11 +40,15 @@ const CHURCH_NAV: { label: string; items: NavSpec[] }[] = [
   {
     label: "Ministry",
     items: [
+      { href: "/dashboard/live", label: "Live Sunday", icon: "live", module: "live_sunday" },
       { href: "/dashboard/service-planner", label: "Service Planner", icon: "servicePlanner", module: "service_planner" },
+      { href: "/dashboard/sermon-notes", label: "Sermon notes", icon: "sermonNotes", module: "sermon_notes" },
+      { href: "/dashboard/rosters", label: "Rosters", icon: "rosters", module: "rosters" },
       { href: "/dashboard/sermons", label: "Sermons", icon: "sermons", module: "sermon_ai" },
       { href: "/dashboard/songs", label: "Songs", icon: "songs" },
       { href: "/dashboard/booking", label: "Pastor Booking", icon: "booking", module: "pastor_booking" },
       { href: "/dashboard/pastoral-care", label: "Pastoral Care", icon: "pastoralCare", module: "pastoral_care", capability: "pastoralCare" },
+      { href: "/dashboard/certificates", label: "Certificates", icon: "certificates", module: "certificates" },
       { href: "/dashboard/counseling", label: "Counseling", icon: "counseling", module: "ai_counseling" },
     ],
   },
@@ -52,6 +56,8 @@ const CHURCH_NAV: { label: string; items: NavSpec[] }[] = [
     label: "Community",
     items: [
       { href: "/dashboard/prayer-board", label: "Prayer Board", icon: "prayer", module: "prayer_board" },
+      { href: "/dashboard/prayer-chain", label: "Prayer chain", icon: "prayerChain", module: "prayer_chain" },
+      { href: "/dashboard/testimonies", label: "Testimonies", icon: "testimonies", module: "testimonies" },
       { href: "/dashboard/chat", label: "Chats", icon: "chat", module: "dept_chats" },
     ],
   },
@@ -59,6 +65,7 @@ const CHURCH_NAV: { label: string; items: NavSpec[] }[] = [
     label: "Growth & resources",
     items: [
       { href: "/dashboard/bible", label: "Bible", icon: "bible", module: "bible" },
+      { href: "/dashboard/reading-plans", label: "Reading plans", icon: "readingPlans", module: "reading_plans" },
       { href: "/dashboard/journal", label: "Journal", icon: "journal", module: "journal" },
       { href: "/dashboard/games", label: "Games", icon: "games", module: "bible_games" },
       { href: "/dashboard/posters", label: "Posters", icon: "posters", module: "ai_poster", capability: "makePosters" },
@@ -75,6 +82,7 @@ const CHURCH_NAV: { label: string; items: NavSpec[] }[] = [
   {
     label: "Administration",
     items: [
+      { href: "/dashboard/weekly-report", label: "Monday report", icon: "report", module: "weekly_report", capability: "pastoralCare" },
       { href: "/dashboard/setup", label: "Church settings", icon: "settings", capability: "manageChurchProfile" },
       { href: "/dashboard/support", label: "Support", icon: "support", module: "support" },
     ],

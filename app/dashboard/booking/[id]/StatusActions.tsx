@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useFormState } from "react-dom";
-import { cancelMyBooking, updateBookingStatus } from "./actions";
+import { CalendarClock } from "lucide-react";
+import { cancelMyBooking, rescheduleBooking, updateBookingStatus } from "./actions";
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
 import { Alert } from "@/components/ui/Alert";
 import { FormField } from "@/components/ui/FormField";
@@ -95,6 +97,43 @@ export function CancelMyRequest({ bookingId }: { bookingId: string }) {
       >
         Cancel my request
       </ConfirmSubmitButton>
+    </form>
+  );
+}
+
+/** Move a waiting or approved booking to a new date and time. */
+export function RescheduleForm({ bookingId, date, time, min, note }: { bookingId: string; date: string; time: string; min: string; note?: string }) {
+  const [state, formAction] = useFormState(rescheduleBooking, null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (state?.ok) setOpen(false);
+  }, [state]);
+
+  if (!open)
+    return (
+      <button type="button" className="btn-secondary" onClick={() => setOpen(true)}>
+        <CalendarClock aria-hidden className="h-4 w-4" /> Reschedule
+      </button>
+    );
+  return (
+    <form action={formAction} className="space-y-3" noValidate>
+      {state?.error && <Alert tone="error">{state.error}</Alert>}
+      <input type="hidden" name="booking_id" value={bookingId} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <FormField label="New date" htmlFor="reschedule_date" required>
+          <input id="reschedule_date" name="date" type="date" required min={min} defaultValue={date >= min ? date : min} className="input" />
+        </FormField>
+        <FormField label="New time" htmlFor="reschedule_time" optional>
+          <input id="reschedule_time" name="time" type="time" defaultValue={time} className="input" />
+        </FormField>
+      </div>
+      {note && <p className="text-xs text-ink/60">{note}</p>}
+      <div className="flex flex-wrap gap-2">
+        <PendingButton pendingLabel="Saving…">Save new time</PendingButton>
+        <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+      </div>
     </form>
   );
 }

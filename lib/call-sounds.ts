@@ -346,7 +346,9 @@ export async function removeCustomRingtone(): Promise<void> {
 }
 
 /** Incoming call: the chosen ringtone, repeating, with vibration. `tone` overrides the saved choice (for previews). */
-export function startRinging(choice: Ringtone = chosenRingtone()): () => void {
+// In-app ringing uses one tune, "Rise Up". When Grace is closed the phone's
+// own ringtone rings instead (Android app: Settings → Notifications → Calls).
+export function startRinging(choice: Ringtone = "rise_up"): () => void {
   if (choice === "custom") {
     // Their own song on a loop, full volume; "Rise Up" if it's missing or won't play.
     let stopped = false;

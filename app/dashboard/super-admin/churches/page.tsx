@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { resolveAccountStatus, PLAN_LABELS } from "@/lib/subscription";
 import { formatDate } from "@/lib/format";
+import { isOverdue } from "@/lib/platform";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PAGE_SIZE, buildQuery, likePattern, pageFrom } from "@/lib/list";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FilterBar, FilterSelect } from "@/components/ui/FilterBar";
@@ -12,7 +14,7 @@ import { Alert } from "@/components/ui/Alert";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { SubscriptionBadge } from "../SubscriptionBadge";
 
-const STATUSES = ["active", "trial", "grace", "payment_pending", "suspended"];
+const STATUSES = ["active", "overdue", "trial", "grace", "payment_pending", "suspended"];
 
 export default async function AllChurchesPage({ searchParams }: { searchParams: { q?: string; status?: string; page?: string } }) {
   const me = await getCurrentAppUser();
@@ -27,7 +29,7 @@ export default async function AllChurchesPage({ searchParams }: { searchParams: 
   // Fine at platform scale (hundreds of churches); revisit beyond ~10k.
   let query = createClient()
     .from("churches")
-    .select("id, name, email, created_at, church_subscriptions(plan_key, status, is_lifetime, trial_expires_at, grace_period_end), app_users(count)")
+    .select("id, name, email, created_at, church_subscriptions(plan_key, status, is_lifetime, trial_expires_at, grace_period_end, billing_date), app_users(count)")
     .order("name")
     .limit(2000);
   if (q) query = query.ilike("name", likePattern(q));
@@ -37,9 +39,9 @@ export default async function AllChurchesPage({ searchParams }: { searchParams: 
   const rows = (data ?? [])
     .map((c: any) => {
       const sub = Array.isArray(c.church_subscriptions) ? c.church_subscriptions[0] : c.church_subscriptions;
-      return { ...c, sub, effective: sub ? resolveAccountStatus(sub) : "none", members: c.app_users?.[0]?.count ?? 0 };
+      return { ...c, sub, effective: sub ? resolveAccountStatus(sub) : "none", overdue: sub ? isOverdue(sub) : false, members: c.app_users?.[0]?.count ?? 0 };
     })
-    .filter((c) => !status || c.effective === status);
+    .filter((c) => !status || (status === "overdue" ? c.overdue : c.effective === status));
   const pageRows = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const addButton = (
     <Link href="/dashboard/super-admin/churches/new" className="btn-primary">
@@ -69,6 +71,7 @@ export default async function AllChurchesPage({ searchParams }: { searchParams: 
                   <th scope="col" className="px-4 py-3">Church</th>
                   <th scope="col" className="px-4 py-3">Plan</th>
                   <th scope="col" className="px-4 py-3">Status</th>
+                  <th scope="col" className="px-4 py-3">Paid until</th>
                   <th scope="col" className="px-4 py-3 text-right">Members</th>
                   <th scope="col" className="px-4 py-3">Joined</th>
                 </tr>
@@ -87,8 +90,12 @@ export default async function AllChurchesPage({ searchParams }: { searchParams: 
                       {c.sub?.is_lifetime ? " · lifetime" : ""}
                     </td>
                     <td className="px-4 py-3">
-                      <SubscriptionBadge status={c.effective} />
+                      <span className="inline-flex flex-wrap gap-1">
+                        <SubscriptionBadge status={c.effective} />
+                        {c.overdue && <StatusBadge tone="danger">Overdue</StatusBadge>}
+                      </span>
                     </td>
+                    <td className="px-4 py-3 text-ink/60">{c.sub?.plan_key === "free_trial" ? (c.sub.trial_expires_at ? `Trial to ${formatDate(c.sub.trial_expires_at, { weekday: undefined })}` : "—") : c.sub?.billing_date ? formatDate(c.sub.billing_date, { weekday: undefined }) : "—"}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{c.members}</td>
                     <td className="px-4 py-3 text-ink/60">{formatDate(c.created_at, { weekday: undefined })}</td>
                   </tr>
@@ -106,7 +113,10 @@ export default async function AllChurchesPage({ searchParams }: { searchParams: 
                       {c.sub ? PLAN_LABELS[c.sub.plan_key] : "No plan"} · {c.members} members
                     </p>
                   </div>
-                  <SubscriptionBadge status={c.effective} />
+                  <span className="flex flex-col items-end gap-1">
+                    <SubscriptionBadge status={c.effective} />
+                    {c.overdue && <StatusBadge tone="danger">Overdue</StatusBadge>}
+                  </span>
                 </Link>
               </li>
             ))}

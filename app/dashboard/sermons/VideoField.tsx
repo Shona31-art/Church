@@ -21,7 +21,7 @@ function videoType(file: File): string {
  * link (YouTube plays on the page). The file goes straight from the device to
  * storage, with a progress bar; the field then holds its link.
  */
-export function VideoField({ initial, error }: { initial: string; error?: string }) {
+export function VideoField({ initial, error, canUpload = true }: { initial: string; error?: string; canUpload?: boolean }) {
   const [url, setUrl] = useState(initial);
   const [progress, setProgress] = useState<number | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -71,14 +71,20 @@ export function VideoField({ initial, error }: { initial: string; error?: string
       htmlFor="video_url"
       optional
       error={problem ?? error}
-      hint={`Upload a video (MP4 works on every phone; MOV, M4V or WebM too — up to ${MAX_MB / 1024} GB), or paste a link from YouTube, Facebook, Vimeo, Google Drive or Dropbox.`}
+      hint={
+        canUpload
+          ? `Upload a video (MP4 works on every phone; MOV, M4V or WebM too — up to ${MAX_MB / 1024} GB), or paste a link from YouTube, Facebook, Vimeo, Google Drive or Dropbox.`
+          : "Paste a link from YouTube, Facebook, Vimeo, Google Drive or Dropbox. (Uploading videos is on Premium and Unlimited.)"
+      }
     >
       <div className="space-y-2">
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn-secondary" onClick={() => fileRef.current?.click()} disabled={busy}>
-            {busy ? <Upload aria-hidden className="h-4 w-4 animate-pulse" /> : <Video aria-hidden className="h-4 w-4" />}{" "}
-            {busy ? "Uploading…" : url ? "Upload a different video" : "Upload video"}
-          </button>
+          {canUpload && (
+            <button type="button" className="btn-secondary" onClick={() => fileRef.current?.click()} disabled={busy}>
+              {busy ? <Upload aria-hidden className="h-4 w-4 animate-pulse" /> : <Video aria-hidden className="h-4 w-4" />}{" "}
+              {busy ? "Uploading…" : url ? "Upload a different video" : "Upload video"}
+            </button>
+          )}
           {busy && (
             <button type="button" className="btn-ghost btn-sm" onClick={() => xhrRef.current?.abort()}>
               Cancel upload

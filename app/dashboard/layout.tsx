@@ -1,3 +1,4 @@
+import { paletteCss } from "@/lib/church-colours";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -50,6 +51,13 @@ export default async function DashboardLayout({ children, modal }: { children: R
     data: { session: authSession },
   } = await supabase.auth.getSession();
   const mustChangePassword = authSession?.user?.user_metadata?.must_change_password === true;
+
+  // Unlimited: the church's own colours (church_life.sql). A missing column just means the defaults.
+  let brandCss = "";
+  if (me.church_id && access?.modules.has("church_colours")) {
+    const { data: brand } = await supabase.from("churches").select("brand_theme").eq("id", me.church_id).maybeSingle();
+    brandCss = paletteCss((brand as { brand_theme?: string | null } | null)?.brand_theme);
+  }
 
   const churchName = me.role === "super_admin" ? "Platform administration" : churchRes?.data?.name ?? "Your church";
   const navGroups = buildNavigation(me.role, access?.modules ?? new Set());
@@ -116,6 +124,8 @@ export default async function DashboardLayout({ children, modal }: { children: R
   }
 
   return (
+    <>
+    {brandCss && <style>{brandCss}</style>}
     <DashboardChrome
       navGroups={navGroups}
       churchName={churchName}
@@ -130,5 +140,6 @@ export default async function DashboardLayout({ children, modal }: { children: R
       {children}
       {modal}
     </DashboardChrome>
+    </>
   );
 }

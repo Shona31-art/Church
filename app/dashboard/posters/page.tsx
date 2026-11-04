@@ -68,7 +68,7 @@ export default async function PostersPage({ searchParams }: { searchParams: { pa
   const posters = (data ?? []).slice(0, PAGE_SIZE);
   // Preview images live in the private bucket: short-lived links, this church only.
   const thumbs = await signPosterAssets(posters.flatMap((p) => (p.thumbnail_path ? [p.thumbnail_path] : [])), me.church_id!);
-  // "New design" opens the template gallery; "Quick poster" is the original fixed-layout maker.
+  // "New design" opens the template gallery; "Church flyers" opens it at the bold flyer designs.
   // Phones: "Create with AI" across the top, the two template options side by side under it.
   const newButton = (
     <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
@@ -80,8 +80,9 @@ export default async function PostersPage({ searchParams }: { searchParams: { pa
           New design
         </Link>
       )}
-      <Link href="/dashboard/posters/new" className={`btn-secondary justify-center ${needsMigration ? "col-span-2" : ""}`}>
-        Quick poster
+      {/* Quick poster now means a bold church flyer, fully editable; the old fixed form only before the editor's database update. */}
+      <Link href={needsMigration ? "/dashboard/posters/new" : "/dashboard/posters/new-design?occasion=Flyers"} className={`btn-secondary justify-center ${needsMigration ? "col-span-2" : ""}`}>
+        Church flyers
       </Link>
     </div>
   );

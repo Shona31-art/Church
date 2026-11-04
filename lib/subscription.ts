@@ -26,6 +26,19 @@ export const MODULE_KEYS = [
   "chat_voice", // voice notes in chat (Storage)
   "chat_photos", // photo sharing in chat (Storage) — in no plan by default
   "video_calls", // voice and video calls in chats and for pastor appointments (built in)
+  // church_life.sql (#60):
+  "live_sunday",
+  "sermon_notes",
+  "testimonies",
+  "reading_plans",
+  "prayer_chain",
+  "rosters",
+  "certificates",
+  "weekly_report",
+  // Plans, November 2026 (church_life.sql section 11):
+  "sermon_uploads", // uploading sermon audio/video (storage); Basic can still post links
+  "priority_support",
+  "church_colours",
 ] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 
@@ -53,8 +66,72 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   ai_assist: "AI writing help",
   chat_voice: "Chat voice notes",
   chat_photos: "Chat photo sharing",
-  video_calls: "Video calls",
+  video_calls: "Voice & video calls",
+  live_sunday: "Live Sunday",
+  sermon_notes: "Sermon notes",
+  testimonies: "Testimonies",
+  reading_plans: "Reading plans",
+  prayer_chain: "Prayer chain",
+  rosters: "Volunteer rosters",
+  certificates: "Certificates",
+  weekly_report: "Monday report",
+  sermon_uploads: "Sermon uploads",
+  priority_support: "Priority support",
+  church_colours: "Church colours",
 };
+
+/**
+ * Fuller names for the plan cards on Billing, so churches see what each
+ * feature now covers (MODULE_LABELS stays short for menus and messages).
+ */
+export const PLAN_CARD_LABELS: Partial<Record<ModuleKey, string>> = {
+  members: "Members, children & birthdays",
+  announcements: "Announcements",
+  calendar: "Calendar & events",
+  service_planner: "Service planner",
+  pastor_booking: "Pastor appointments & counselling bookings",
+  ai_poster: "Poster Studio & church flyers (cut-out photos)",
+  sermon_ai: "Sermons (YouTube, Facebook & audio links)",
+  dept_chats: "Church & group chats",
+  bible: "Bible reader, works offline",
+  ai_counseling: "AI counselling companion",
+  prayer_board: "Prayer wall",
+  journal: "Private prayer journal",
+  support: "Help & support",
+  bible_games: "Bible games, quiz duels & whole-church challenges",
+  giving: "Giving (EFT & card)",
+  pastoral_care: "Pastoral care follow-ups",
+  bible_study_ai: "AI Bible study helper",
+  ai_assist: "AI writing help",
+  chat_voice: "Voice notes in chat",
+  chat_photos: "Photos in chat",
+  video_calls: "Voice & video calls (incl. group calls)",
+  live_sunday: "Live Sunday: livestream, order of service & lyrics",
+  sermon_notes: "Fill-in-the-blank sermon notes",
+  testimonies: "Testimonies wall",
+  reading_plans: "Bible reading plans with streaks",
+  prayer_chain: "24-hour prayer chain with reminders",
+  rosters: "Volunteer rosters with reminders & swaps",
+  certificates: "Baptism, dedication & membership certificates",
+  weekly_report: "Monday morning report by email",
+  sermon_uploads: "Upload sermon recordings (audio & video)",
+  priority_support: "Priority support — WhatsApp, answered the same day",
+  church_colours: "Your church's own colours in the app",
+};
+
+/** Not plan switches: in every plan, shown once above the plan cards. */
+export const EVERY_PLAN_INCLUDES = [
+  "Android app & phone notifications",
+  "Worship songs & lyrics",
+  "Install on any phone (iPhone too)",
+  "Your church's own logo",
+];
+
+/** Listed in plans but not built yet: never shown on the plan cards (see app/dashboard/setup). */
+export const UNBUILT_MODULES: readonly ModuleKey[] = ["analytics", "multi_campus"];
+
+/** The AI tools: a plan with none of these says "No AI tools". */
+export const AI_MODULES: readonly ModuleKey[] = ["ai_counseling", "bible_study_ai", "ai_assist"];
 
 export const PLAN_LABELS: Record<string, string> = {
   free_trial: "Free trial",

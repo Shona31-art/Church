@@ -17,6 +17,7 @@ import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitBu
 import { Alert } from "@/components/ui/Alert";
 import { FormActions, FormField, RequiredNote } from "@/components/ui/FormField";
 import { CHURCH_ROLES, ROLE_LABELS } from "@/lib/permissions";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 type Option = { id: string; name: string };
 type Dept = Option & { church_id: string };
@@ -47,10 +48,10 @@ export function AddChurchForm() {
       </div>
       <div className="grid gap-5 sm:grid-cols-2">
         <FormField label="Initial password" htmlFor="password" required error={fe.password} hint="8+ characters, letters and numbers.">
-          <input id="password" name="password" type="password" autoComplete="new-password" required className="input" />
+          <PasswordInput id="password" name="password" autoComplete="new-password" required className="input" />
         </FormField>
         <FormField label="Confirm password" htmlFor="confirm_password" required error={fe.confirm_password}>
-          <input id="confirm_password" name="confirm_password" type="password" autoComplete="new-password" required className="input" />
+          <PasswordInput id="confirm_password" name="confirm_password" autoComplete="new-password" required className="input" />
         </FormField>
       </div>
       <FormActions>
@@ -220,10 +221,10 @@ export function CreateUserForm({ churches, departments, defaultChurchId }: { chu
       <DepartmentSelect departments={departments} churchId={churchId} defaultValue={v.department_id} error={fe.department_id} />
       <div className="grid gap-5 sm:grid-cols-2">
         <FormField label="Initial password" htmlFor="password" required error={fe.password} hint="8+ characters, letters and numbers.">
-          <input id="password" name="password" type="password" autoComplete="new-password" required className="input" />
+          <PasswordInput id="password" name="password" autoComplete="new-password" required className="input" />
         </FormField>
         <FormField label="Confirm password" htmlFor="confirm_password" required error={fe.confirm_password}>
-          <input id="confirm_password" name="confirm_password" type="password" autoComplete="new-password" required className="input" />
+          <PasswordInput id="confirm_password" name="confirm_password" autoComplete="new-password" required className="input" />
         </FormField>
       </div>
       <FormActions>
@@ -327,10 +328,10 @@ export function SetPasswordForm({ userId }: { userId: string }) {
     <form ref={ref} action={action} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end" noValidate>
       <input type="hidden" name="user_id" value={userId} />
       <FormField label="New password" htmlFor="new_password">
-        <input id="new_password" name="password" type="password" autoComplete="new-password" required className="input" />
+        <PasswordInput id="new_password" name="password" autoComplete="new-password" required className="input" />
       </FormField>
       <FormField label="Confirm" htmlFor="confirm_new_password">
-        <input id="confirm_new_password" name="confirm_password" type="password" autoComplete="new-password" required className="input" />
+        <PasswordInput id="confirm_new_password" name="confirm_password" autoComplete="new-password" required className="input" />
       </FormField>
       <PendingButton className="btn-secondary">Set password</PendingButton>
       {state?.error && <Alert tone="error" className="sm:col-span-3">{state.error}</Alert>}

@@ -52,6 +52,8 @@ interface TextOptions {
   italic?: boolean;
   rotation?: number;
   shadow?: { color: string; blur: number; offsetY: number; offsetX?: number; opacity: number };
+  /** An outline around the letters (width in template units). */
+  stroke?: { color: string; width: number };
 }
 
 export function text(f: Frame, id: string, name: string, content: string, o: TextOptions): TextElement {
@@ -80,7 +82,16 @@ export function text(f: Frame, id: string, name: string, content: string, o: Tex
     ...(o.shadow
       ? { shadow: { color: o.shadow.color, blur: r(o.shadow.blur * f.u), offsetX: r((o.shadow.offsetX ?? 0) * f.u), offsetY: r(o.shadow.offsetY * f.u), opacity: o.shadow.opacity } }
       : {}),
+    ...(o.stroke ? { stroke: { color: o.stroke.color, width: Math.max(1, Math.round(o.stroke.width * f.u * 10) / 10) } } : {}),
   };
+}
+
+/**
+ * A vertical position `units` (template units, like sizes) below the fraction
+ * `y` — for things that must stay together, e.g. text inside a box.
+ */
+export function below(f: Frame, y: number, units: number): number {
+  return y + (units * f.u) / f.H;
 }
 
 interface BoxOptions {

@@ -17,7 +17,8 @@ import { Avatar } from "@/components/ui/Avatar";
 import { getAvatarUrls } from "@/lib/avatars";
 import { BADGES, type BadgeKey } from "@/lib/games/progression";
 import { ChildrenList } from "@/components/members/ChildrenList";
-import { loadChildren } from "@/lib/children";
+import { churchPeople, loadChildren } from "@/lib/children";
+import { birthdayLabel } from "@/lib/birthdays";
 
 const ACTIVITY_LABELS: Record<string, string> = {
   "member.invited": "Added and invited",
@@ -69,7 +70,7 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
   const canChangeAccess = canEditMemberRole(me, member);
   const department = (member as any).departments?.name as string | undefined;
   const photoUrl = (await getAvatarUrls([member.id])).get(member.id) ?? null;
-  const children = await loadChildren(member.id);
+  const [children, people] = await Promise.all([loadChildren(member.id), churchPeople(me.church_id!)]);
   // Bible games badges (bible_games_v3.sql); missing table → none shown.
   const { data: badgeRows } = await supabase.from("user_badges").select("badge_key").eq("user_id", member.id);
   const badgeTitles = (badgeRows ?? []).map((b) => BADGES[b.badge_key as BadgeKey]?.title).filter(Boolean);
@@ -141,7 +142,7 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
             items={[
               { label: "Role", value: roleLabel(member.role) },
               { label: "Department", value: department },
-              { label: "Birthday", value: birthday?.birth_date ? formatDate(birthday.birth_date, { weekday: undefined }) : null },
+              { label: "Birthday", value: birthday?.birth_date ? birthdayLabel(birthday.birth_date) : null },
               { label: "Member since", value: formatDate(member.created_at, { weekday: undefined }) },
               ...(badgeTitles.length ? [{ label: "Game badges", value: badgeTitles.join(" · ") }] : []),
             ]}
@@ -151,7 +152,7 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
 
       {children && (
         <Section title="Children" description="Names and birthdays — visible to the member, pastors and church admins only.">
-          <ChildrenList parentId={member.id} items={children} self={isSelf} />
+          <ChildrenList parentId={member.id} items={children} self={isSelf} people={people} />
         </Section>
       )}
 

@@ -4,9 +4,10 @@ import { can } from "@/lib/permissions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { TemplateGallery } from "@/components/posters/TemplateGallery";
+import { OCCASIONS, type Occasion } from "@/lib/posters/templates";
 
 /** Pick a size and a template to start a new poster in the editor. */
-export default async function NewDesignPage() {
+export default async function NewDesignPage({ searchParams }: { searchParams: { occasion?: string } }) {
   const gate = await moduleGate("ai_poster");
   if (gate) return gate;
   const me = (await getCurrentAppUser())!;
@@ -19,7 +20,7 @@ export default async function NewDesignPage() {
         title="New poster"
         description="Choose a size and a template. Everything on it can be changed: text, colours, photos and layout."
       />
-      <TemplateGallery />
+      <TemplateGallery initialOccasion={(OCCASIONS as readonly string[]).includes(searchParams.occasion ?? "") ? (searchParams.occasion as Occasion) : "All"} />
     </div>
   );
 }

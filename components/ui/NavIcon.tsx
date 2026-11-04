@@ -1,4 +1,4 @@
-import { BookOpen, CalendarDays, CalendarRange, ChartColumn, Church, CreditCard, FolderKanban, Gamepad2, Gift, HandHeart, HeartHandshake, House, Image, LayoutDashboard, LifeBuoy, Megaphone, MessagesSquare, Mic, NotebookPen, Settings, Sparkles, UserRound, Users, BookUser, type LucideIcon, Music, ScrollText, Tags } from "lucide-react";
+import { Award, BookMarked, ClipboardList, Flame, Radio, Sparkle, Timer, BookOpen, CalendarDays, CalendarRange, ChartColumn, Church, CreditCard, FolderKanban, Gamepad2, Gift, HandHeart, HeartHandshake, House, Image, LayoutDashboard, LifeBuoy, Megaphone, MessagesSquare, Mic, NotebookPen, Settings, Sparkles, UserRound, Users, BookUser, type LucideIcon, Music, ScrollText, Tags } from "lucide-react";
 
 // The menu is built on the server (lib/navigation.ts) and handed to a client
 // component, which can't receive icon components as props — so menu items
@@ -31,6 +31,13 @@ export const NAV_ICONS = {
   user: UserRound,
   activity: ScrollText,
   plans: Tags,
+  live: Radio,
+  sermonNotes: ClipboardList,
+  testimonies: Sparkle,
+  readingPlans: BookMarked,
+  prayerChain: Timer,
+  rosters: Flame,
+  certificates: Award,
 } satisfies Record<string, LucideIcon>;
 
 export type NavIconName = keyof typeof NAV_ICONS;

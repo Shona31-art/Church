@@ -39,3 +39,11 @@ describe("Make payload", () => {
     expect(makePayload(user, { whatsapp_alerts: false }, msg, null, "https://g/x").whatsapp_to).toBe("");
   });
 });
+
+describe("emails through Make", () => {
+  test("payload is routed as email with every recipient", async () => {
+    const { makeEmailPayload } = await import("@/lib/email");
+    const p = makeEmailPayload({ to: [{ email: "a@x.co" }, { email: "b@x.co", name: "B" }], subject: "S", html: "<p>H</p>", text: "H" }, "reply@x.co");
+    expect(p).toEqual({ kind: "email", to: ["a@x.co", "b@x.co"], subject: "S", html: "<p>H</p>", text: "H", reply_to: "reply@x.co" });
+  });
+});

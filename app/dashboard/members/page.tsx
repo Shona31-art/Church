@@ -7,6 +7,7 @@ import { Pencil } from "lucide-react";
 import { DeleteMember, SetPassword } from "./[id]/MemberAccountActions";
 import { PAGE_SIZE, buildQuery, orFilterPattern, pageFrom } from "@/lib/list";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { MembersTabs } from "@/components/members/MembersTabs";
 import { FilterBar, FilterSelect } from "@/components/ui/FilterBar";
 import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -73,6 +74,8 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
           </Link>
         }
       />
+
+      <MembersTabs active="members" />
 
       <FilterBar query={q} placeholder="Search by name or email…" label="Search members" resetHref="/dashboard/members" active={filtered}>
         <FilterSelect

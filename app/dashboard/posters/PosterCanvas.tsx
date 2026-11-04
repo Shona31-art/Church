@@ -21,8 +21,9 @@ const DIMENSIONS: Record<PosterData["format"], { w: number; h: number }> = {
   print: { w: 1000, h: 1414 },
 };
 
-function wrapLine(text: string, maxChars: number): string {
-  return text.length > maxChars ? text.slice(0, maxChars - 1) + "…" : text;
+/** A font size that keeps `text` inside `maxWidth` (never cut off), at most `size`. ~0.6 em per character for bold serif. */
+function fitSize(text: string, size: number, maxWidth: number): number {
+  return Math.min(size, maxWidth / Math.max(1, text.length * 0.6));
 }
 
 export function PosterPreview({ data, showDownload = true }: { data: PosterData; showDownload?: boolean }) {
@@ -79,7 +80,7 @@ export function PosterPreview({ data, showDownload = true }: { data: PosterData;
           x={w / 2}
           y={data.templateKey === "bold" ? h * 0.2 : h * 0.35}
           textAnchor="middle"
-          fontSize={w * 0.045}
+          fontSize={fitSize(data.churchName, w * 0.045, w * 0.9)}
           fontWeight="700"
           fill={data.templateKey === "bold" ? "#ffffff" : "#1c1917"}
           fontFamily="Georgia, serif"
@@ -91,34 +92,34 @@ export function PosterPreview({ data, showDownload = true }: { data: PosterData;
           x={w / 2}
           y={h * 0.48}
           textAnchor="middle"
-          fontSize={w * 0.075}
+          fontSize={fitSize(data.eventTitle, w * 0.075, w * 0.9)}
           fontWeight="800"
           fill="#1c1917"
           fontFamily="Georgia, serif"
         >
-          {wrapLine(data.eventTitle, 22)}
+          {data.eventTitle}
         </text>
 
         {data.tagline && (
-          <text x={w / 2} y={h * 0.56} textAnchor="middle" fontSize={w * 0.03} fill={color} fontStyle="italic">
+          <text x={w / 2} y={h * 0.56} textAnchor="middle" fontSize={fitSize(data.tagline ?? "", w * 0.03, w * 0.9)} fill={color} fontStyle="italic">
             {data.tagline}
           </text>
         )}
 
         {data.speaker && (
-          <text x={w / 2} y={h * 0.68} textAnchor="middle" fontSize={w * 0.032} fill="#1c1917">
+          <text x={w / 2} y={h * 0.68} textAnchor="middle" fontSize={fitSize(data.speaker ?? "", w * 0.032, w * 0.9)} fill="#1c1917">
             {data.speaker}
           </text>
         )}
 
         {data.eventDate && (
-          <text x={w / 2} y={h * 0.74} textAnchor="middle" fontSize={w * 0.028} fill="#1c1917aa">
+          <text x={w / 2} y={h * 0.74} textAnchor="middle" fontSize={fitSize(data.eventDate ?? "", w * 0.028, w * 0.9)} fill="#1c1917aa">
             {data.eventDate}
           </text>
         )}
 
         {data.location && (
-          <text x={w / 2} y={h * 0.78} textAnchor="middle" fontSize={w * 0.024} fill="#1c1917aa">
+          <text x={w / 2} y={h * 0.78} textAnchor="middle" fontSize={fitSize(data.location ?? "", w * 0.024, w * 0.9)} fill="#1c1917aa">
             {data.location}
           </text>
         )}

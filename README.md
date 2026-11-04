@@ -92,6 +92,9 @@ Run these files **in this exact order** (the test suite runs the same order —
 | 55 | `calls_v5.sql` | Group calls end when everyone has left: phones in a call check in every 20 s (`video_calls.presence`); the last one out — or everyone going quiet — ends the call, so "Join" disappears. `call_presence_write()` is server-only |
 | 56 | `game_duels.sql` | Bible quiz duels: challenge someone from church to the same 10/20/30 questions against a 20 s clock; most right answers wins, a tie goes to the quicker player. Answers and the answer key are server-only (`game_duel_keys`, `game_duel_answers`); only the two players see a duel; live progress; notifications for the challenge, accept/decline and result |
 | 57 | `church_challenges.sql` | Whole-church Bible challenges: a pastor/church admin starts one (title, level, 10/20/30 questions, open 1 h–1 week); everyone is notified and plays the same questions once; live leaderboard (most right, then quickest); results sent to everyone who played when it closes (also by the nightly job). Answer key and picks server-only |
+| 58 | `member_children_v2.sql` | Children's mother and father (a member, or just a name for someone not in the app); both parents who are members can see and manage the child; pastors/admins see all children on Members → Children. Birthdays can be saved without a year (stored as 1904); the app never shows anyone's birth year or age to others |
+| 59 | `billing_v4.sql` | Basic becomes R250/month (R2,500/year) with the everyday features; Service planner, Pastor booking and Pastoral care move to Premium and up. Billing emails: invoice numbers (GBV-1001 up) on payments, `receipt_sent_at`, and `church_subscriptions.reminder_sent_for` so each payment date is reminded once |
+| 60 | `church_life.sql` | Eight church-life features: **Live Sunday** (livestream + order of service + lyrics + sermon notes), **sermon notes** (fill in the blanks, keep in your journal), **testimonies** (pastor approves first), **reading plans** (streaks; church-wide plans), **prayer chain** (book slots; reminder ~30 min before), **volunteer rosters** (teams, reminders the day before, swaps), **certificates** (baptism, dedication, membership, course; printable with the church logo) and the **Monday report** email. Basic gets the first five; Premium and up get all. Also sets the prices (Basic R250, Premium R500, Unlimited R1,000 a month; yearly = 10 months) and what each plan gets: Basic adds Sermons as links; Premium adds photos in chat and uploading sermon recordings; Unlimited adds priority support (tickets marked high, WhatsApp button) and church colours. Monthly AI allowance per church: `plans.ai_monthly_limit` (Premium 300, Unlimited 1,000, trial 50) Reminders run every 10 minutes with pg_cron (switched on by this file where available) and from the nightly job |
 
 `platform_hardening.sql` in plain language: every statement is safe to re-run;
 nothing is deleted or rewritten; new data checks are added as `NOT VALID`, so
@@ -135,6 +138,10 @@ shared prayer and care note. It refuses to run without `SEED_CONFIRM=yes` —
 | `NOTIFY_WEBHOOK_URL`, `NOTIFY_WEBHOOK_SECRET` | no | Send alerts via a Make.com/n8n webhook; blank = in-app only |
 | `CRON_SECRET` | yes in production | Lets Vercel Cron call `/api/cron/expire-chat-media` (deletes voice notes after 90 days). Blank = the job refuses to run |
 | `MAKE_WEBHOOK_URL`, `MAKE_WEBHOOK_SECRET` | no | Pastor & admin alerts on WhatsApp, through a Make.com scenario. See "WhatsApp alerts" |
+| `MAKE_EMAIL_WEBHOOK_URL` | no | Billing emails (payment reminders 3 days before, thank-you receipts with the invoice) sent from your Gmail through Make.com. See "Billing emails" |
+| `BREVO_API_KEY` or `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO` | no | Alternative to Make for billing emails (free tiers). `EMAIL_FROM` e.g. `Grace-bound Ventures <you@gmail.com>` |
+| `SUPPORT_WHATSAPP_NUMBER` | no | Your support WhatsApp number (e.g. `27821234567`): Unlimited churches get a "WhatsApp support" button on the Support page |
+| `INVOICE_COMPANY_DETAILS` | no | Your business details printed on invoices (address, registration number; `\n` for new lines) |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | no | Phone/computer pop-ups for the notification bell (Web Push). Blank = bell only. See below |
 | `FIREBASE_SERVICE_ACCOUNT`, `FIREBASE_ANDROID_APP` | no | Android app: calls ring full screen and messages pop up when the app is closed (Firebase, free). See "Android app" |
 | `NOTIFICATIONS_WEBHOOK_SECRET` | with pop-ups | Secret the Supabase Database Webhook sends to `/api/notifications/push` |
@@ -240,6 +247,26 @@ My account → Notifications.
 
 Each call is for one person and carries: `name`, `church`, `title`, `body`,
 `link`, `whatsapp_to` (e.g. `+27825550000`) and `whatsapp_text` (everything as one message).
+
+### Billing emails (optional)
+
+Grace-bound Ventures emails each church's pastors and admins **3 days before
+a payment is due**, and a **thank-you receipt with the invoice** after each
+payment (invoices are also on Billing → Payments, printable). Needs migration
+#59 and `CRON_SECRET` (the nightly job sends them). Free, from your own Gmail:
+
+1. Make → Scenarios → Create a new scenario → **⋯ → Import Blueprint** →
+   `docs/make/grace-alerts.blueprint.json`.
+2. Click the **Webhooks** circle → Add → name it "Grace" → Save → **Copy
+   address to clipboard**. Put it in Vercel as `MAKE_EMAIL_WEBHOOK_URL`. Redeploy.
+3. Click the **Gmail** circle → Add a connection → sign in with the Gmail the
+   emails should come from.
+4. In Make click **Run once**, then in Grace open Super Admin → **Send test
+   emails to me**. Two emails arrive. Switch the scenario **ON** (bottom left).
+
+If a module shows as unknown after import, delete it and add **Gmail → Send
+an email** yourself: To = `to`, Subject = `subject`, Content = `html`, with
+the filter `kind` = `email`. Keep the webhook address private.
 
 ### Creating a Super Admin
 

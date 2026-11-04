@@ -414,7 +414,7 @@ export default async function DashboardHomePage() {
                           {b.parentName && <span className="font-normal text-ink/60"> · child of {b.parentName}</span>}
                         </p>
                         <p className="text-xs text-ink/60">
-                          {describeDaysUntil(b.daysUntil)} · turning {b.turningAge}
+                          {describeDaysUntil(b.daysUntil)}
                         </p>
                       </div>
                     </div>

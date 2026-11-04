@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { useState, useTransition } from "react";
+import { ChevronDown, Sparkles } from "lucide-react";
 import { useFormState } from "react-dom";
-import { saveSermon } from "./actions";
+import { draftSermonStudyNotes, saveSermon } from "./actions";
 import { AudioField } from "./AudioField";
 import { VideoField } from "./VideoField";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
@@ -25,7 +26,7 @@ export interface SermonValues {
   prayer_points: string[] | null;
 }
 
-export function SermonForm({ sermon, aiAvailable, today }: { sermon?: SermonValues; aiAvailable: boolean; today: string }) {
+export function SermonForm({ sermon, aiAvailable, today, canUpload = true }: { sermon?: SermonValues; aiAvailable: boolean; today: string; canUpload?: boolean }) {
   const [state, action] = useFormState(saveSermon, null);
   const fe = state?.fieldErrors ?? {};
   const v = (name: string, fallback: string | null | undefined) => state?.values?.[name] ?? fallback ?? "";
@@ -55,8 +56,8 @@ export function SermonForm({ sermon, aiAvailable, today }: { sermon?: SermonValu
             <input id="sermon_date" name="sermon_date" type="date" required defaultValue={v("sermon_date", sermon?.sermon_date ?? today)} className="input" aria-invalid={Boolean(fe.sermon_date)} />
           </FormField>
         </div>
-        <VideoField initial={v("video_url", sermon?.video_url)} error={fe.video_url} />
-        <AudioField initial={v("audio_url", sermon?.audio_url)} error={fe.audio_url} />
+        <VideoField initial={v("video_url", sermon?.video_url)} error={fe.video_url} canUpload={canUpload} />
+        <AudioField initial={v("audio_url", sermon?.audio_url)} error={fe.audio_url} canUpload={canUpload} />
         <MediaHostingTips />
       </fieldset>
 
@@ -76,20 +77,14 @@ export function SermonForm({ sermon, aiAvailable, today }: { sermon?: SermonValu
           <ChevronDown aria-hidden className="h-5 w-5 shrink-0 text-ink/60 transition-transform group-open:rotate-180" />
         </summary>
         <div className="mt-5 space-y-5">
-        <FormField label="Transcript" htmlFor="transcript" optional error={fe.transcript}>
+        {aiAvailable ? (
+          <AiStudyNotesButton />
+        ) : (
+          <p className="text-xs text-ink/60">AI help is on Premium and Unlimited. Fill these in by hand, or leave them blank.</p>
+        )}
+        <FormField label="Transcript" htmlFor="transcript" optional error={fe.transcript} hint="Paste it for the best AI notes. Without it, the AI works from the title and scriptures.">
           <textarea id="transcript" name="transcript" rows={6} maxLength={100000} defaultValue={v("transcript", sermon?.transcript)} className="input" />
         </FormField>
-        {aiAvailable ? (
-          <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" name="use_ai" defaultChecked={!sermon} className="mt-1 h-4 w-4" />
-            <span>
-              Use AI to write the summary, scriptures, questions and prayer points from the transcript
-              <span className="block text-xs text-ink/60">Replaces the fields below. Check the result before sharing it.</span>
-            </span>
-          </label>
-        ) : (
-          <p className="text-xs text-ink/60">AI summaries aren&apos;t switched on for this app, so fill these in by hand (or leave them blank).</p>
-        )}
         <FormField label="Summary" htmlFor="summary" optional>
           <textarea id="summary" name="summary" rows={3} maxLength={3000} defaultValue={v("summary", sermon?.ai_summary)} className="input" />
         </FormField>
@@ -147,3 +142,43 @@ function MediaHostingTips() {
   );
 }
 
+
+/** Fills the four study-note boxes with an AI draft, there and then, for the pastor to check before saving. */
+function AiStudyNotesButton() {
+  const [pending, start] = useTransition();
+  const [message, setMessage] = useState<{ tone: "error" | "success"; text: string } | null>(null);
+  const field = (id: string) => document.getElementById(id) as HTMLTextAreaElement | HTMLInputElement | null;
+  const run = () =>
+    start(async () => {
+      setMessage(null);
+      const result = await draftSermonStudyNotes({
+        title: field("title")?.value ?? "",
+        speaker: field("speaker")?.value ?? "",
+        transcript: field("transcript")?.value ?? "",
+        scripture: field("scripture_refs")?.value ?? "",
+        summary: field("summary")?.value ?? "",
+      });
+      if (!result.notes) {
+        setMessage({ tone: "error", text: result.error ?? "Something went wrong — please try again." });
+        return;
+      }
+      const set = (id: string, value: string) => {
+        const el = field(id);
+        if (el && value) el.value = value;
+      };
+      set("summary", result.notes.summary);
+      set("scripture_refs", result.notes.scriptureRefs.join("\n"));
+      set("discussion_questions", result.notes.discussionQuestions.join("\n"));
+      set("prayer_points", result.notes.prayerPoints.join("\n"));
+      setMessage({ tone: "success", text: "Done — check the boxes below and change anything you like, then save." });
+    });
+  return (
+    <div className="space-y-2 rounded-xl border border-gold/40 bg-gold/5 p-4">
+      <button type="button" className="btn-primary" onClick={run} disabled={pending} aria-busy={pending}>
+        <Sparkles aria-hidden className="h-4 w-4" /> {pending ? "Writing…" : "Write the study notes with AI"}
+      </button>
+      <p className="text-xs text-ink/60">Fills in the summary, scriptures, discussion questions and prayer points below. Check them before saving.</p>
+      {message && <Alert tone={message.tone}>{message.text}</Alert>}
+    </div>
+  );
+}

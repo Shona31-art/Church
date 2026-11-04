@@ -7,21 +7,29 @@ import { removeChild, saveChild } from "@/app/dashboard/account/children-actions
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
 import { Alert } from "@/components/ui/Alert";
 import { FormField } from "@/components/ui/FormField";
+import { BirthdayField } from "@/components/ui/BirthdayField";
 
 export interface ChildRow {
   id: string;
   name: string;
   birthDate: string | null;
-  /** Pre-formatted on the server, e.g. "14 Mar 2018". */
+  /** Day and month only, e.g. "14 March" — never the year or age. */
   birthdayLabel: string | null;
-  age: number | null;
+  /** Who the child is filed under (the member who added them, or a parent). */
+  ownerId?: string;
+  mother?: ParentRef;
+  father?: ParentRef;
 }
+
+/** A parent: a member (id + name) or just a name for someone not in the app. */
+export type ParentRef = { id: string | null; name: string } | null;
+export type Person = { id: string; name: string };
 
 /**
  * A member's children: list, add, edit and remove. Used on My account (the
  * parent) and on a member's profile (pastors and church admins).
  */
-export function ChildrenList({ parentId, items, self }: { parentId: string; items: ChildRow[]; self: boolean }) {
+export function ChildrenList({ parentId, items, self, people = [] }: { parentId: string; items: ChildRow[]; self: boolean; people?: Person[] }) {
   const [editing, setEditing] = useState<string | "new" | null>(null);
   const close = () => setEditing(null);
 
@@ -36,7 +44,7 @@ export function ChildrenList({ parentId, items, self }: { parentId: string; item
           {items.map((c) =>
             editing === c.id ? (
               <li key={c.id} className="py-3">
-                <ChildForm parentId={parentId} child={c} self={self} onDone={close} />
+                <ChildForm parentId={c.ownerId ?? parentId} child={c} self={self} people={people} onDone={close} />
               </li>
             ) : (
               <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
@@ -44,16 +52,8 @@ export function ChildrenList({ parentId, items, self }: { parentId: string; item
                   <Baby aria-hidden className="h-4 w-4 shrink-0 text-gold" />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{c.name}</p>
-                    <p className="text-xs text-ink/60">
-                      {c.birthdayLabel ? (
-                        <>
-                          Born {c.birthdayLabel}
-                          {c.age !== null && <> · {c.age === 0 ? "under 1" : `${c.age} ${c.age === 1 ? "year" : "years"} old`}</>}
-                        </>
-                      ) : (
-                        "No birthday added"
-                      )}
-                    </p>
+                    <p className="text-xs text-ink/60">{c.birthdayLabel ? `Birthday ${c.birthdayLabel}` : "No birthday added"}</p>
+                    <ParentsLine child={c} />
                   </div>
                 </div>
                 <div className="flex shrink-0 gap-2">
@@ -61,7 +61,7 @@ export function ChildrenList({ parentId, items, self }: { parentId: string; item
                     Edit
                   </button>
                   <form action={removeChild}>
-                    <input type="hidden" name="parent_id" value={parentId} />
+                    <input type="hidden" name="parent_id" value={c.ownerId ?? parentId} />
                     <input type="hidden" name="child_id" value={c.id} />
                     <ConfirmSubmitButton
                       className="btn-danger-outline btn-sm"
@@ -81,7 +81,7 @@ export function ChildrenList({ parentId, items, self }: { parentId: string; item
       )}
 
       {editing === "new" ? (
-        <ChildForm parentId={parentId} self={self} onDone={close} />
+        <ChildForm parentId={parentId} self={self} people={people} onDone={close} />
       ) : (
         items.length < 20 && (
           <button type="button" className="btn-secondary" onClick={() => setEditing("new")}>
@@ -94,7 +94,37 @@ export function ChildrenList({ parentId, items, self }: { parentId: string; item
   );
 }
 
-function ChildForm({ parentId, child, self, onDone }: { parentId: string; child?: ChildRow; self: boolean; onDone: () => void }) {
+/** "Mother: Thandi Moyo · Father: David Moyo" */
+export function ParentsLine({ child }: { child: ChildRow }) {
+  const parts = [child.mother && `Mother: ${child.mother.name}`, child.father && `Father: ${child.father.name}`].filter(Boolean);
+  return parts.length ? <p className="text-xs text-ink/60">{parts.join(" · ")}</p> : null;
+}
+
+/** A parent: pick a member, or type the name of someone who isn't in the app. */
+function ParentField({ role, id, people, current, error }: { role: "mother" | "father"; id: string; people: Person[]; current: ParentRef | undefined; error?: string }) {
+  const initial = current?.id ?? (current?.name ? "__name" : "");
+  const [choice, setChoice] = useState(initial);
+  const label = role === "mother" ? "Mother" : "Father";
+  return (
+    <FormField label={label} htmlFor={`${id}-${role}`} optional error={error}>
+      <select id={`${id}-${role}`} className="input" value={choice} onChange={(e) => setChoice(e.target.value)} aria-invalid={Boolean(error)}>
+        <option value="">Not set</option>
+        {people.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+        <option value="__name">Someone not in the app…</option>
+      </select>
+      <input type="hidden" name={`${role}_id`} value={choice && choice !== "__name" ? choice : ""} />
+      {choice === "__name" && (
+        <input name={`${role}_name`} className="input mt-2" maxLength={80} placeholder={`${label}'s name`} defaultValue={current && !current.id ? current.name : ""} aria-label={`${label}'s name`} />
+      )}
+    </FormField>
+  );
+}
+
+export function ChildForm({ parentId, child, self, people = [], onDone }: { parentId: string; child?: ChildRow; self: boolean; people?: Person[]; onDone: () => void }) {
   const [state, action] = useFormState(saveChild, null);
   const id = useId();
   const fe = state?.fieldErrors ?? {};
@@ -109,37 +139,21 @@ function ChildForm({ parentId, child, self, onDone }: { parentId: string; child?
       {state?.error && <Alert tone="error">{state.error}</Alert>}
       <input type="hidden" name="parent_id" value={parentId} />
       <input type="hidden" name="child_id" value={child?.id ?? ""} />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="Child's name" htmlFor={`${id}-name`} required error={fe.name}>
-          <input
-            id={`${id}-name`}
-            name="name"
-            required
-            maxLength={80}
-            autoFocus
-            defaultValue={v?.name ?? child?.name ?? ""}
-            className="input"
-            aria-invalid={Boolean(fe.name)}
-          />
-        </FormField>
-        <FormField
-          label="Birthday"
-          htmlFor={`${id}-birth`}
-          optional
-          error={fe.birth_date}
-          hint={self ? "Only you and your pastors see this." : undefined}
-        >
-          <input
-            id={`${id}-birth`}
-            name="birth_date"
-            type="date"
-            max={new Date().toISOString().slice(0, 10)}
-            defaultValue={v?.birth_date ?? child?.birthDate ?? ""}
-            className="input"
-            aria-invalid={Boolean(fe.birth_date)}
-          />
-        </FormField>
-      </div>
+      <FormField label="Child's name" htmlFor={`${id}-name`} required error={fe.name}>
+        <input id={`${id}-name`} name="name" required maxLength={80} autoFocus defaultValue={v?.name ?? child?.name ?? ""} className="input" aria-invalid={Boolean(fe.name)} />
+      </FormField>
+      <BirthdayField
+        name="birth_date"
+        defaultValue={v?.birth_date ?? child?.birthDate ?? ""}
+        error={fe.birth_date}
+        hint={self ? "Only your family and your pastors see it — day and month only, never the age." : "Day and month only are shown, never the age."}
+      />
+      {people.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <ParentField role="mother" id={id} people={people} current={child?.mother} error={fe.mother_id} />
+          <ParentField role="father" id={id} people={people} current={child?.father} error={fe.father_id} />
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         <PendingButton>{child ? "Save" : "Add child"}</PendingButton>
         <button type="button" className="btn-ghost" onClick={onDone}>

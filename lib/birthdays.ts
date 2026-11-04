@@ -76,6 +76,7 @@ export function describeDaysUntil(days: number): string {
 
 /** Age in whole years on `today` (null for a bad or future date). */
 export function ageOn(birthDate: string, today: Date): number | null {
+  if (!hasBirthYear(birthDate)) return null;
   const parsed = parseIsoDate(birthDate);
   if (!parsed) return null;
   const m = today.getMonth() + 1;
@@ -83,4 +84,26 @@ export function ageOn(birthDate: string, today: Date): number | null {
   let age = today.getFullYear() - parsed.y;
   if (m < parsed.m || (m === parsed.m && d < parsed.d)) age -= 1;
   return age >= 0 ? age : null;
+}
+
+/**
+ * Birthdays saved without a year (the person chose not to give it) are
+ * stored in 1904 — a leap year, so 29 February still works.
+ */
+export const NO_YEAR = 1904;
+
+export function hasBirthYear(birthDate: string): boolean {
+  return Number(birthDate.slice(0, 4)) !== NO_YEAR;
+}
+
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/**
+ * How a birthday is shown to other people: day and month only ("14 March"),
+ * never the year — so nobody's age is on display.
+ */
+export function birthdayLabel(birthDate: string): string {
+  const [, m, d] = birthDate.split("-").map(Number);
+  if (!m || !d) return "";
+  return `${d} ${MONTHS[m - 1]}`;
 }

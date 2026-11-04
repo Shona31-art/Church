@@ -4,7 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { getChurchAccess } from "@/lib/paywall";
 import { can } from "@/lib/permissions";
-import { MODULE_LABELS, PLAN_LABELS, type ModuleKey } from "@/lib/subscription";
+import { AI_MODULES, EVERY_PLAN_INCLUDES, UNBUILT_MODULES, MODULE_LABELS, PLAN_CARD_LABELS, PLAN_LABELS, type ModuleKey } from "@/lib/subscription";
+import { invoiceNumber } from "@/lib/billing-emails";
+import { churchAiUsage } from "@/lib/ai-quota";
 import { onlineBillingState, planCodesFromEnv, SELF_SERVE_PLANS, type BillingInterval } from "@/lib/billing";
 import { onlineBillingConfigured } from "@/lib/subscription-billing";
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
@@ -14,7 +16,7 @@ import { PageHeader, Section, DetailList } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { StatusBadge, type BadgeTone } from "@/components/ui/StatusBadge";
 import { PermissionDenied } from "@/components/ui/Gates";
-import { Check } from "lucide-react";
+import { Check, X } from "lucide-react";
 
 const STATUS: Record<string, { tone: BadgeTone; label: string }> = {
   active: { tone: "success", label: "Active" },
@@ -49,10 +51,12 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
     // Empty until paystack_billing.sql (#34) has been run.
     supabase.from("billing_payments").select("*").eq("church_id", me.church_id).neq("status", "pending").order("created_at", { ascending: false }).limit(12),
   ]);
+  const aiUsage = me.church_id ? await churchAiUsage(me.church_id) : null;
   const online = onlineBillingConfigured();
   const yearlyCodes = planCodesFromEnv(process.env, "yearly");
-  // Yearly is offered when at least one plan has a yearly price and a yearly Paystack plan.
-  const yearlyAvailable = (plans ?? []).some((p: any) => Number(p.yearly_price) > 0 && yearlyCodes[p.key as keyof typeof yearlyCodes]);
+  // Yearly prices show whenever a plan has one; paying yearly online also
+  // needs that plan's yearly Paystack plan code (otherwise "Ask to switch").
+  const yearlyAvailable = (plans ?? []).some((p: any) => Number(p.yearly_price) > 0);
   const interval: BillingInterval = searchParams.interval === "yearly" && yearlyAvailable ? "yearly" : "monthly";
   const planCodes = interval === "yearly" ? yearlyCodes : planCodesFromEnv();
   const billingState = onlineBillingState(sub);
@@ -90,6 +94,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
         <DetailList
           items={[
             { label: "Active members", value: String(activeMembers ?? 0) },
+            ...(aiUsage && aiUsage.limit ? [{ label: "AI this month", value: `${aiUsage.used.toLocaleString("en-ZA")} of ${aiUsage.limit.toLocaleString("en-ZA")} requests used` }] : []),
             ...(status === "trial" && sub?.trial_expires_at ? [{ label: "Trial ends", value: `${formatDate(sub.trial_expires_at)} (${access?.trialDaysLeft ?? 0} days left)` }] : []),
             ...(status === "grace" && sub?.grace_period_end ? [{ label: "Access until", value: formatDate(sub.grace_period_end) }] : []),
             ...(billingState === "subscribed" && sub?.billing_date
@@ -139,9 +144,25 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
             </nav>
           )}
         </div>
+        <p className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-line bg-surface px-4 py-3 text-sm">
+          <span className="font-semibold">Every plan includes:</span>
+          {EVERY_PLAN_INCLUDES.map((f) => (
+            <span key={f} className="inline-flex items-center gap-1.5">
+              <Check aria-hidden className="h-4 w-4 text-success" />
+              {f}
+            </span>
+          ))}
+        </p>
         <div className="grid gap-4 md:grid-cols-3">
           {sorted.map((plan: any) => {
-            const features = (planModules ?? []).filter((m) => m.plan_key === plan.key).map((m) => MODULE_LABELS[m.module_key as ModuleKey] ?? m.module_key);
+            const keys = (planModules ?? []).filter((m) => m.plan_key === plan.key).map((m) => m.module_key as ModuleKey);
+            const shownKeys = keys.filter((k) => !UNBUILT_MODULES.includes(k));
+            const label = (k: ModuleKey) => PLAN_CARD_LABELS[k] ?? MODULE_LABELS[k] ?? k;
+            const features = shownKeys.map(label);
+            // What this plan leaves out, compared with every feature any plan offers.
+            const offered = new Set((planModules ?? []).map((m) => m.module_key as ModuleKey).filter((k) => !UNBUILT_MODULES.includes(k)));
+            const missing = [...offered].filter((k) => !keys.includes(k)).map((k) => MODULE_LABELS[k] ?? k);
+            const noAi = !AI_MODULES.some((k) => keys.includes(k));
             const current = sub?.plan_key === plan.key && status !== "suspended";
             const yearly = interval === "yearly" && Number(plan.yearly_price) > 0;
             const price = yearly ? `${formatMoney(Math.round(Number(plan.yearly_price) * 100))}/year` : `${formatMoney(Math.round(Number(plan.monthly_price) * 100))}/month`;
@@ -154,6 +175,12 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
                 </div>
                 <p className="text-2xl font-semibold tabular-nums mt-2">{price}</p>
                 {yearly && saving > 0 && <p className="text-xs font-semibold text-success">Save {formatMoney(saving * 100)} a year</p>}
+                {!yearly && Number(plan.yearly_price) > 0 && (
+                  <p className="text-xs text-ink/60">
+                    or {formatMoney(Math.round(Number(plan.yearly_price) * 100))}/year{" "}
+                    <span className="font-semibold text-success">· 2 months free</span>
+                  </p>
+                )}
                 <p className="text-sm text-ink/60 mt-1">{plan.member_limit ? `Up to ${plan.member_limit} active members` : "Unlimited members"}</p>
                 {plan.description && <p className="text-sm text-ink/70 mt-2">{plan.description}</p>}
                 <ul className="mt-4 space-y-1 text-sm flex-1">
@@ -163,6 +190,25 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
                       {f}
                     </li>
                   ))}
+                  {!noAi && Number(plan.ai_monthly_limit) > 0 && (
+                    <li className="flex gap-2 font-medium">
+                      <Check aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                      {Number(plan.ai_monthly_limit).toLocaleString("en-ZA")} AI requests a month for the church
+                    </li>
+                  )}
+                  {noAi && (
+                    <li className="flex gap-2 font-medium text-ink/70">
+                      <X aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-ink/40" />
+                      No AI tools
+                    </li>
+                  )}
+                  {missing.length > 0 && (
+                    <li className="pt-2 text-xs text-ink/60">
+                      <span className="sr-only">Not included: </span>
+                      <span aria-hidden className="font-semibold uppercase tracking-wide">Not included</span>
+                      <span className="mt-1 block">{missing.join(" · ")}</span>
+                    </li>
+                  )}
                 </ul>
                 <div className="mt-5">
                   {current && billingState !== "available" && billingState !== "cancelled" ? (
@@ -205,6 +251,11 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
+                  {p.status === "succeeded" && (
+                    <Link href={`/dashboard/billing/invoice/${p.id}`} className="text-sm font-medium text-ember underline-offset-2 hover:underline">
+                      Invoice{p.invoice_no != null ? ` ${invoiceNumber(p.invoice_no)}` : ""}
+                    </Link>
+                  )}
                   <span className="tabular font-semibold">{formatMoney(p.amount_cents)}</span>
                   <StatusBadge tone={p.status === "succeeded" ? "success" : "danger"}>{p.status === "succeeded" ? "Paid" : "Failed"}</StatusBadge>
                 </div>

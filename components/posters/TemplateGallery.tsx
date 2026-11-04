@@ -17,9 +17,9 @@ const EditorCanvas = dynamic(() => import("./editor/EditorCanvas").then((m) => m
  * the same renderer as the editor, so what you pick is exactly what opens —
  * each one only when it scrolls into view, to keep phones responsive.
  */
-export function TemplateGallery() {
+export function TemplateGallery({ initialOccasion = "All" }: { initialOccasion?: Occasion | "All" } = {}) {
   const [size, setSize] = useState<PosterSize>("square");
-  const [occasion, setOccasion] = useState<Occasion | "All">("All");
+  const [occasion, setOccasion] = useState<Occasion | "All">(initialOccasion);
   const [fontVersion, setFontVersion] = useState(0);
   const [query, setQuery] = useState("");
   const [style, setStyle] = useState<PosterStyleKey | "original">("original");

@@ -9,6 +9,7 @@ import { Alert } from "@/components/ui/Alert";
 import { FormField } from "@/components/ui/FormField";
 import { AuthShell, AuthHeading } from "@/components/brand/AuthShell";
 import { Loader2 } from "lucide-react";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 // Landing page for invite and password-reset emails. The link signs the
 // person in (Supabase puts the session in the URL), then they choose a password.
@@ -92,10 +93,10 @@ export default function ResetPasswordPage() {
     <form onSubmit={handleSubmit} className="w-full max-w-[400px] space-y-5">
       <AuthHeading eyebrow="Welcome" title="Choose your password" />
       <FormField label="New password" htmlFor="password" required hint="At least 8 characters, with letters and numbers.">
-        <input id="password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="input" />
+        <PasswordInput id="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="input" />
       </FormField>
       <FormField label="Confirm password" htmlFor="confirm" required>
-        <input id="confirm" type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required className="input" />
+        <PasswordInput id="confirm" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required className="input" />
       </FormField>
       {error && <Alert tone="error">{error}</Alert>}
       <button type="submit" disabled={loading} className="btn-primary w-full">

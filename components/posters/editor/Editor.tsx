@@ -22,6 +22,7 @@ import { playOnStage } from "./animate-stage";
 import { animateAll, clearAnimations, pickVideoType, VIDEO_FPS, videoSize } from "@/lib/posters/animation";
 import { jpegToPdf, pdfPageSize } from "@/lib/posters/pdf";
 import { shareContent } from "@/lib/share";
+import { registerPosterAsset, requestPosterUpload } from "@/app/dashboard/posters/asset-actions";
 
 // Unsaved work is kept on this device so a closed tab, crash or expired
 // session never loses a poster. Keyed by poster (or "new"); a draft is only
@@ -110,6 +111,54 @@ export function Editor({
 
   const scale = fit * zoom;
   const selected = findElement(design, selectedId);
+  const [cuttingOut, setCuttingOut] = useState(false);
+
+  /**
+   * "Remove background": cuts the person out of the selected photo on this
+   * device (lib/posters/cutout.ts), saves the cut-out to the church's photo
+   * library as a PNG, and puts it in the photo's place (undoable).
+   */
+  async function cutOutSelected() {
+    const target = selected;
+    if (!target || target.type !== "image" || cuttingOut) return;
+    const src = target.src;
+    const url = src.kind === "asset" ? urls[src.path] : src.kind === "stock" ? src.url : null;
+    if (!url) return showToast("Add a photo to this slot first.", "info");
+    setCuttingOut(true);
+    try {
+      const { cutOutPerson } = await import("@/lib/posters/cutout");
+      const cut = await cutOutPerson(url);
+      const ticket = await requestPosterUpload({ contentType: "image/png", bytes: cut.blob.size });
+      if (!ticket.ok) return showToast(ticket.error, "error");
+      const { error } = await createClient().storage.from("poster-assets").uploadToSignedUrl(ticket.data.path, ticket.data.token, cut.blob, { contentType: "image/png" });
+      if (error) throw error;
+      const saved = await registerPosterAsset({ path: ticket.data.path, width: cut.width, height: cut.height, bytes: cut.blob.size, kind: "photo", label: "Cut-out" });
+      if (!saved.ok) return showToast(saved.error, "error");
+      setUrls((u) => ({ ...u, [saved.data.path]: saved.data.url }));
+      // Same width, height to match the cut-out, bottom edge where it was (so a person still "stands" on it).
+      const height = Math.round((target.width * cut.height) / cut.width);
+      change(
+        (d) =>
+          updateElement(d, target.id, {
+            src: { kind: "asset", assetId: saved.data.id, path: saved.data.path },
+            fit: "contain",
+            shape: "rect",
+            cornerRadius: 0,
+            overlay: undefined,
+            border: undefined,
+            height,
+            y: target.y + target.height - height,
+          } as Partial<PosterElement>),
+        "",
+      );
+      showToast("Background removed. Undo (Ctrl+Z) to get the original back.", "success");
+    } catch (error) {
+      console.error("[posters] background removal failed:", error);
+      showToast(error instanceof Error && /No person/.test(error.message) ? error.message : "Couldn't remove the background on this device. Try another photo or browser.", "error");
+    } finally {
+      setCuttingOut(false);
+    }
+  }
   const dirty = design !== saved.current.design || title !== saved.current.title;
 
   /** Apply a change. Same `key` within a second merges into one undo step (typing, sliders). */
@@ -687,6 +736,8 @@ export function Editor({
               showToast(`${posterStyle(key)?.name} style applied. Undo (Ctrl+Z) to go back.`, "info");
             }}
             animation={animationControls}
+            onCutOut={cutOutSelected}
+            cuttingOut={cuttingOut}
           />
         </aside>
 
@@ -742,6 +793,8 @@ export function Editor({
                   showToast(`${posterStyle(key)?.name} style applied. Undo (Ctrl+Z) to go back.`, "info");
                 }}
                 animation={animationControls}
+                onCutOut={cutOutSelected}
+                cuttingOut={cuttingOut}
               />
             )}
           </div>

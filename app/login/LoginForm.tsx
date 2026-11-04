@@ -9,6 +9,7 @@ import { Alert } from "@/components/ui/Alert";
 import { FormField } from "@/components/ui/FormField";
 import { AuthShell, AuthHeading } from "@/components/brand/AuthShell";
 import { recordSignIn } from "./actions";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 // Only ever redirect back into the app — never to an arbitrary URL from the
 // query string (open-redirect protection).
@@ -87,9 +88,8 @@ export function LoginForm({ expired, nextPath, reason }: { expired: boolean; nex
           />
         </FormField>
         <FormField label="Password" htmlFor="password" required>
-          <input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BirthdayField } from "@/components/ui/BirthdayField";
 import { useState } from "react";
 import { generatePassword } from "@/lib/passwords";
 import { useFormState } from "react-dom";
@@ -9,6 +10,7 @@ import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { Alert } from "@/components/ui/Alert";
 import { FormActions, FormField, RequiredNote } from "@/components/ui/FormField";
 import { ROLE_LABELS, type ChurchRole } from "@/lib/permissions";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 interface Department {
   id: string;
@@ -125,9 +127,9 @@ export function MemberForm({
       </div>
 
       {mode === "edit" && (
-        <FormField label="Birthday" htmlFor="birth_date" optional error={fe.birth_date} hint="Only pastors and admins see this, for birthday reach-outs.">
-          <input id="birth_date" name="birth_date" type="date" defaultValue={value("birth_date", member?.birth_date)} className="input sm:w-auto" aria-invalid={Boolean(fe.birth_date)} />
-        </FormField>
+        <div className="max-w-md">
+          <BirthdayField name="birth_date" defaultValue={value("birth_date", member?.birth_date)} error={fe.birth_date} hint="Only pastors and admins see it, for birthday reach-outs — day and month only, never the age." />
+        </div>
       )}
 
       <FormActions>
@@ -154,24 +156,19 @@ export function PasswordField({ error, label = "Password", name = "password" }: 
       error={error}
       hint="At least 8 characters, letters and numbers. Share it with them privately; they'll be asked to choose their own when they first sign in."
     >
-      <div className="flex gap-2">
-        <input
-          id={name}
-          name={name}
-          type={shown ? "text" : "password"}
-          required
-          minLength={8}
-          maxLength={72}
-          autoComplete="new-password"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          className="input min-w-0 flex-1"
-          aria-invalid={Boolean(error)}
-        />
-        <button type="button" className="btn-secondary btn-sm shrink-0" onClick={() => setShown((s) => !s)} aria-pressed={shown}>
-          {shown ? "Hide" : "Show"}
-        </button>
-      </div>
+      <PasswordInput
+        id={name}
+        name={name}
+        shown={shown}
+        onShownChange={setShown}
+        required
+        minLength={8}
+        maxLength={72}
+        autoComplete="new-password"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        aria-invalid={Boolean(error)}
+      />
       <button
         type="button"
         className="mt-2 text-sm font-medium text-ember"

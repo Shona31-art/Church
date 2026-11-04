@@ -21,7 +21,7 @@ function audioType(file: File): string {
  * The sermon's audio: upload a recording from the phone, or paste a link.
  * The file goes straight from the phone to storage; the field then holds its link.
  */
-export function AudioField({ initial, error }: { initial: string; error?: string }) {
+export function AudioField({ initial, error, canUpload = true }: { initial: string; error?: string; canUpload?: boolean }) {
   const [url, setUrl] = useState(initial);
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -57,12 +57,14 @@ export function AudioField({ initial, error }: { initial: string; error?: string
   const file = embed ? null : playableFileUrl(url);
 
   return (
-    <FormField label="Audio" htmlFor="audio_url" optional error={problem ?? error} hint="Upload a recording from your phone (MP3, M4A, WAV, AAC or OGG, up to 50 MB), or paste a link from SoundCloud, Spotify, YouTube, Google Drive or Dropbox.">
+    <FormField label="Audio" htmlFor="audio_url" optional error={problem ?? error} hint={canUpload ? "Upload a recording from your phone (MP3, M4A, WAV, AAC or OGG, up to 50 MB), or paste a link from SoundCloud, Spotify, YouTube, Google Drive or Dropbox." : "Paste a link from SoundCloud, Spotify, YouTube, Google Drive or Dropbox. (Uploading recordings is on Premium and Unlimited.)"}>
       <div className="space-y-2">
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn-secondary" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
-            {busy ? <Upload aria-hidden className="h-4 w-4 animate-pulse" /> : <Mic aria-hidden className="h-4 w-4" />} {busy ? "Uploading…" : url ? "Upload a different recording" : "Upload audio"}
-          </button>
+          {canUpload && (
+            <button type="button" className="btn-secondary" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
+              {busy ? <Upload aria-hidden className="h-4 w-4 animate-pulse" /> : <Mic aria-hidden className="h-4 w-4" />} {busy ? "Uploading…" : url ? "Upload a different recording" : "Upload audio"}
+            </button>
+          )}
           {url && (
             <button type="button" className="btn-ghost btn-sm" onClick={() => setUrl("")} disabled={busy !== null}>
               <X aria-hidden className="h-4 w-4" /> Remove audio

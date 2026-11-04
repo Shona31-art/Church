@@ -14,9 +14,20 @@ type Cell = [number, number];
  * keyboard (Enter on each).
  */
 export function WordSearchBoard({ view, finish, finishing }: BoardProps<WordSearchView>) {
-  const [start, setStart] = useState<Cell | null>(null);
-  const [hover, setHover] = useState<Cell | null>(null);
+  const [start, setStartState] = useState<Cell | null>(null);
+  const [hover, setHoverState] = useState<Cell | null>(null);
   const dragging = useRef(false);
+  // The same values, readable from the "finger lifted anywhere" listener below.
+  const startRef = useRef<Cell | null>(null);
+  const hoverRef = useRef<Cell | null>(null);
+  const setStart = (c: Cell | null) => {
+    startRef.current = c;
+    setStartState(c);
+  };
+  const setHover = (c: Cell | null) => {
+    hoverRef.current = c;
+    setHoverState(c);
+  };
   const [finds, setFinds] = useState<WordSearchFind[]>([]);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -48,23 +59,41 @@ export function WordSearchBoard({ view, finish, finishing }: BoardProps<WordSear
     setHover(cell);
     setMessage(null);
     dragging.current = true;
-    (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+    // So moves report the square under the finger, not this one. Never let it stop the drag.
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+    } catch {
+      // No capture to release.
+    }
+    // Words along the edge: the finger often lifts just outside the grid, so
+    // listen for the lift anywhere on the page, not only on the grid.
+    const lifted = () => {
+      window.removeEventListener("pointerup", lifted);
+      window.removeEventListener("pointercancel", lifted);
+      onPointerUp();
+    };
+    window.addEventListener("pointerup", lifted);
+    window.addEventListener("pointercancel", lifted);
     haptic("select");
   }
 
   function onPointerMove(e: React.PointerEvent) {
-    if (!dragging.current || !start) return;
+    const from = startRef.current;
+    if (!dragging.current || !from) return;
     const cell = cellAt(e.clientX, e.clientY);
     if (!cell) return;
-    const snapped = snapToLine(start, cell, view.size);
-    if (!hover || snapped[0] !== hover[0] || snapped[1] !== hover[1]) setHover(snapped);
+    const snapped = snapToLine(from, cell, view.size);
+    const current = hoverRef.current;
+    if (!current || snapped[0] !== current[0] || snapped[1] !== current[1]) setHover(snapped);
   }
 
   function onPointerUp() {
     if (!dragging.current) return;
     dragging.current = false;
+    const from = startRef.current;
+    const to = hoverRef.current;
     // A drag: check it. A tap (no movement): keep the first letter chosen for tap-tap.
-    if (start && hover && (hover[0] !== start[0] || hover[1] !== start[1])) complete(start, hover);
+    if (from && to && (to[0] !== from[0] || to[1] !== from[1])) complete(from, to);
     else setHover(null);
   }
 

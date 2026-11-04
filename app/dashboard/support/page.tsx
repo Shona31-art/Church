@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
+import { getChurchAccess } from "@/lib/paywall";
 import { can } from "@/lib/permissions";
 import { formatDate } from "@/lib/format";
 import { PAGE_SIZE, buildQuery, likePattern, pageFrom } from "@/lib/list";
@@ -15,6 +16,7 @@ import { NAV_ICONS } from "@/components/ui/NavIcon";
 
 const TABS = [
   { key: "active", label: "Open & in progress" },
+  { key: "priority", label: "Priority" },
   { key: "closed", label: "Closed" },
   { key: "all", label: "All" },
 ] as const;
@@ -38,12 +40,17 @@ export default async function SupportPage({ searchParams }: { searchParams: { st
   if (!platform && can(me.role, "manageSupportTickets")) query = query.eq("church_id", me.church_id);
   else if (!platform) query = query.eq("created_by", me.id);
   if (tab === "active") query = query.neq("status", "closed");
+  if (tab === "priority") query = query.neq("status", "closed").eq("priority", "high");
   if (tab === "closed") query = query.eq("status", "closed");
   if (q) query = query.ilike("subject", likePattern(q));
   const { data, error } = await query;
   if (error) console.error("[support] list failed:", error.message);
 
-  const tickets: any[] = (data ?? []).slice(0, PAGE_SIZE);
+  // High-priority tickets (Unlimited churches) first on the page.
+  const tickets: any[] = (data ?? []).slice(0, PAGE_SIZE).sort((a: any, b: any) => Number(b.priority === "high") - Number(a.priority === "high"));
+  const access = platform ? null : await getChurchAccess();
+  const prioritySupport = Boolean(access?.modules.has("priority_support"));
+  const whatsapp = (process.env.SUPPORT_WHATSAPP_NUMBER ?? "").replace(/[^\d]/g, "");
   const newButton = platform ? null : (
     <Link href="/dashboard/support/new" className="btn-primary">
       New ticket
@@ -59,8 +66,22 @@ export default async function SupportPage({ searchParams }: { searchParams: { st
         actions={newButton}
       />
 
-      <nav aria-label="Ticket status" className="mb-4 flex gap-1 border-b border-line">
-        {TABS.map((t) => (
+      {prioritySupport && (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-success-line bg-success-tint p-4">
+          <div>
+            <p className="font-semibold">Priority support</p>
+            <p className="text-sm text-ink/70">Your plan includes priority support: your tickets go to the front of the queue and are answered the same working day.</p>
+          </div>
+          {whatsapp && (
+            <a href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Hi, this is ${me.name} (Grace church app).`)}`} target="_blank" rel="noopener noreferrer" className="btn-primary">
+              WhatsApp support
+            </a>
+          )}
+        </div>
+      )}
+
+      <nav aria-label="Ticket status" className="mb-4 flex gap-1 overflow-x-auto border-b border-line">
+        {TABS.filter((t) => t.key !== "priority" || platform).map((t) => (
           <Link
             key={t.key}
             href={buildQuery({ status: t.key === "active" ? undefined : t.key, q })}

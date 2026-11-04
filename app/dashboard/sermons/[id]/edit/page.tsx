@@ -8,6 +8,7 @@ import { isAiConfigured } from "@/lib/ai";
 import { todayInAppZone } from "@/lib/format";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PermissionDenied } from "@/components/ui/Gates";
+import { checkModuleAccess } from "@/lib/paywall";
 import { SermonForm } from "../../SermonForm";
 
 export default async function EditSermonPage({ params }: { params: { id: string } }) {
@@ -25,7 +26,7 @@ export default async function EditSermonPage({ params }: { params: { id: string 
   return (
     <div>
       <PageHeader back={{ href: `/dashboard/sermons/${sermon.id}`, label: sermon.title }} title="Edit sermon" />
-      <SermonForm sermon={sermon} aiAvailable={isAiConfigured()} today={todayInAppZone()} />
+      <SermonForm sermon={sermon} aiAvailable={isAiConfigured() && (await checkModuleAccess("ai_assist")).allowed} canUpload={(await checkModuleAccess("sermon_uploads")).allowed} today={todayInAppZone()} />
     </div>
   );
 }

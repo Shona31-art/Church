@@ -35,18 +35,19 @@ export function ChatPrivacyForm({
     <div className="space-y-6">
       <form action={action} className="space-y-5" noValidate>
         {state?.error && <Alert tone="error">{state.error}</Alert>}
-        <fieldset>
-          <legend className="label">Who can start a private message with me</legend>
-          <div className="mt-2 space-y-2">
+        <div>
+          <label htmlFor="dm_privacy" className="label">
+            Who can start a private message with me
+          </label>
+          <select id="dm_privacy" name="dm_privacy" defaultValue={dmPrivacy} className="input mt-1">
             {(Object.keys(DM_PRIVACY_OPTIONS) as DmPrivacy[]).map((value) => (
-              <label key={value} className="flex items-start gap-3 text-sm">
-                <input type="radio" name="dm_privacy" value={value} defaultChecked={dmPrivacy === value} className="mt-0.5 accent-[rgb(var(--ember))]" />
-                <span>{DM_PRIVACY_OPTIONS[value]}</span>
-              </label>
+              <option key={value} value={value}>
+                {DM_PRIVACY_OPTIONS[value]}
+              </option>
             ))}
-          </div>
+          </select>
           <p className="hint">Conversations you already have stay open. To stop someone completely, block them from your chat with them.</p>
-        </fieldset>
+        </div>
 
         <label className="flex items-start gap-3 text-sm">
           <input type="checkbox" name="share_read_receipts" defaultChecked={shareReadReceipts} className="mt-0.5 accent-[rgb(var(--ember))]" />

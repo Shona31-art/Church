@@ -7,6 +7,7 @@ import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { Alert } from "@/components/ui/Alert";
 import { FormField, RequiredNote } from "@/components/ui/FormField";
 import { AuthShell, AuthHeading } from "@/components/brand/AuthShell";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 export default function RegisterPage() {
   const [state, action] = useFormState(registerChurch, null);
@@ -51,10 +52,10 @@ export default function RegisterPage() {
           <input id="phone" name="phone" type="tel" autoComplete="tel" maxLength={20} defaultValue={v.phone} className="input" aria-invalid={Boolean(fe.phone)} />
         </FormField>
         <FormField label="Password" htmlFor="password" required error={fe.password} hint="At least 8 characters, with letters and numbers.">
-          <input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} className="input" aria-invalid={Boolean(fe.password)} />
+          <PasswordInput id="password" name="password" autoComplete="new-password" required minLength={8} className="input" aria-invalid={Boolean(fe.password)} />
         </FormField>
         <FormField label="Confirm password" htmlFor="confirm_password" required error={fe.confirm_password}>
-          <input id="confirm_password" name="confirm_password" type="password" autoComplete="new-password" required className="input" aria-invalid={Boolean(fe.confirm_password)} />
+          <PasswordInput id="confirm_password" name="confirm_password" autoComplete="new-password" required className="input" aria-invalid={Boolean(fe.confirm_password)} />
         </FormField>
 
         {/* Honeypot: hidden from people and screen readers; bots fill it in. */}

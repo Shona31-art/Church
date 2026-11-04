@@ -70,6 +70,9 @@ export const MIGRATION_ORDER = [
   "calls_v5.sql",
   "game_duels.sql",
   "church_challenges.sql",
+  "member_children_v2.sql",
+  "billing_v4.sql",
+  "church_life.sql",
 ];
 
 const SUPABASE_STUBS = `

@@ -61,6 +61,7 @@ export function makePayload(
 ) {
   const whatsappTo = prefs?.whatsapp_alerts === false ? null : toWhatsAppNumber(user.phone);
   return {
+    kind: "whatsapp" as const, // the route in the Make scenario (docs/make/)
     name: user.name,
     church: churchName,
     title: msg.title,

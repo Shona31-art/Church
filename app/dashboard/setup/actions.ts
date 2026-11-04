@@ -288,3 +288,24 @@ export async function testAiConnection(): Promise<AiCheck> {
       : "The AI works, but your church's plan doesn't include AI help, so members won't see AI features until the plan changes.",
   };
 }
+
+/** Unlimited: the church's colour scheme. Form fields: brand_theme ("" = Grace's own colours) */
+export async function setChurchColours(formData: FormData): Promise<void> {
+  const me = await getCurrentAppUser();
+  if (!me?.church_id || !can(me.role, "manageChurchProfile")) return;
+  if (!(await planIncludes("church_colours"))) {
+    flash("Church colours are on the Unlimited plan.", "error");
+    return;
+  }
+  const { PALETTES } = await import("@/lib/church-colours");
+  const choice = String(formData.get("brand_theme") ?? "");
+  const value = PALETTES.some((p) => p.key === choice) ? choice : null;
+  const { error } = await createClient().from("churches").update({ brand_theme: value }).eq("id", me.church_id);
+  if (error) {
+    flash(/brand_theme/.test(error.message) ? "Run database update #60 first." : "Couldn't save the colours — please try again.", "error");
+    return;
+  }
+  await logAudit({ churchId: me.church_id, actorId: me.id, action: "church.colours_changed", targetTable: "churches", targetId: me.church_id, metadata: { brand_theme: value } });
+  revalidatePath("/", "layout");
+  flash(value ? "Your church's colours are on — everyone sees them now." : "Back to Grace's own colours.");
+}

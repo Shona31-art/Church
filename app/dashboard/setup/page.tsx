@@ -9,6 +9,9 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PermissionDenied } from "@/components/ui/Gates";
 import { Check, Circle } from "lucide-react";
 import { AiCheckButton } from "./AiCheckButton";
+import { PendingButton } from "@/components/ConfirmSubmitButton";
+import { PALETTES } from "@/lib/church-colours";
+import { setChurchColours } from "./actions";
 
 export default async function ChurchSettingsPage() {
   const me = await getCurrentAppUser();
@@ -24,6 +27,9 @@ export default async function ChurchSettingsPage() {
     supabase.from("app_users").select("id", { count: "exact", head: true }).eq("church_id", me.church_id),
     supabase.from("counseling_settings").select("enabled").eq("church_id", me.church_id).maybeSingle(),
   ]);
+  // Before migration #60 this column doesn't exist: the default colours show.
+  const { data: brand } = await supabase.from("churches").select("brand_theme").eq("id", me.church_id).maybeSingle();
+  const brandTheme = (brand as { brand_theme?: string | null } | null)?.brand_theme ?? null;
   // Before migration #30 this table doesn't exist: the step just shows "To do".
   const { data: givingDetails } = await supabase.from("church_giving_details").select("bank_name, account_number").eq("church_id", me.church_id).maybeSingle();
 
@@ -70,6 +76,28 @@ export default async function ChurchSettingsPage() {
           </li>
         ))}
       </ol>
+
+      <Section title="Church colours" description={access?.modules.has("church_colours") ? "Use your church's colours for buttons, links and highlights everywhere in Grace, for everyone. Each choice is checked to stay easy to read, in light and dark mode." : "On the Unlimited plan: use your church's own colours throughout the app."}>
+        {access?.modules.has("church_colours") ? (
+          <form action={setChurchColours} className="space-y-4">
+            <fieldset className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <legend className="sr-only">Colour scheme</legend>
+              {[{ key: "", label: "Grace (default)", swatch: "#4c1a57" }, ...PALETTES].map((p) => (
+                <label key={p.key || "default"} className="flex cursor-pointer items-center gap-2 rounded-xl border border-line p-3 text-sm has-[:checked]:border-ember has-[:checked]:ring-2 has-[:checked]:ring-ember/30">
+                  <input type="radio" name="brand_theme" value={p.key} defaultChecked={(brandTheme ?? "") === p.key} className="sr-only" />
+                  <span aria-hidden className="h-6 w-6 shrink-0 rounded-full border border-line" style={{ background: p.swatch }} />
+                  {p.label}
+                </label>
+              ))}
+            </fieldset>
+            <PendingButton>Save colours</PendingButton>
+          </form>
+        ) : (
+          <Link href="/dashboard/billing" className="btn-secondary">
+            See the Unlimited plan
+          </Link>
+        )}
+      </Section>
 
       <Section title="AI connection" description="Check that AI writing help, AI counseling and AI posters can reach the AI service. Makes one tiny test request.">
         <AiCheckButton />

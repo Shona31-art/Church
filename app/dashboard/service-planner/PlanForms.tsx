@@ -8,6 +8,7 @@ import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitBu
 import { Alert } from "@/components/ui/Alert";
 import { FormActions, FormField, RequiredNote } from "@/components/ui/FormField";
 import { showToast } from "@/components/ui/Toaster";
+import { PersonPicker } from "@/components/ui/PersonPicker";
 
 function ErrorLine({ error }: { error?: string }) {
   return error ? <Alert tone="error" className="mt-2">{error}</Alert> : null;
@@ -130,14 +131,16 @@ export function AssignForm({
       <label htmlFor={`assign-${itemId}`} className="sr-only">
         Who leads “{itemTitle}”
       </label>
-      <select id={`assign-${itemId}`} name="assigned_to" defaultValue={assignedTo ?? ""} className="input w-auto max-w-[14rem] py-1.5">
-        <option value="">Unassigned</option>
-        {members.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.name}
-          </option>
-        ))}
-      </select>
+      <div className="w-56 max-w-full">
+        <PersonPicker
+          id={`assign-${itemId}`}
+          name="assigned_to"
+          title={`Who leads ${itemTitle}?`}
+          defaultValue={assignedTo ?? ""}
+          placeholder="Unassigned"
+          options={[{ value: "", label: "Unassigned" }, ...members.map((m) => ({ value: m.id, label: m.name }))]}
+        />
+      </div>
       <PendingButton className="btn-secondary btn-sm">
         Save<span className="sr-only"> leader for {itemTitle}</span>
       </PendingButton>

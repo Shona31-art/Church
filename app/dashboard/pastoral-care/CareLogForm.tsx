@@ -8,6 +8,7 @@ import { LOG_TYPES, LOG_TYPE_LABELS } from "@/lib/pastoral-care";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { Alert } from "@/components/ui/Alert";
 import { FormActions, FormField, RequiredNote } from "@/components/ui/FormField";
+import { PersonPicker } from "@/components/ui/PersonPicker";
 
 export interface CareLogValues {
   id: string;
@@ -48,14 +49,14 @@ export function CareLogForm({
       <RequiredNote />
 
       <FormField label="Who" htmlFor="member_id" error={fe.member_id}>
-        <select id="member_id" name="member_id" value={memberId} onChange={(e) => setMemberId(e.target.value)} className="input">
-          <option value="">Someone not in the app (type their name below)</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
+        <PersonPicker
+          id="member_id"
+          name="member_id"
+          title="Who is this about?"
+          value={memberId}
+          onChange={(v) => setMemberId(v)}
+          options={[{ value: "", label: "Someone not in the app (type their name below)" }, ...members.map((m) => ({ value: m.id, label: m.name }))]}
+        />
       </FormField>
 
       {!memberId && (

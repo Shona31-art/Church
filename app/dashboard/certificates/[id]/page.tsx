@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Pencil } from "lucide-react";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
@@ -5,10 +7,10 @@ import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
 import { can } from "@/lib/permissions";
 import { APP_TIMEZONE } from "@/lib/format";
-import { CERTIFICATE_INFO, type CertificateKind } from "@/lib/certificates";
-import { CertificateView } from "@/components/certificates/CertificateView";
+import { CERTIFICATE_COLOURS, CERTIFICATE_DESIGNS, CERTIFICATE_INFO, certificateHeading, type CertificateColourKey, type CertificateDesign, type CertificateKind } from "@/lib/certificates";
+import { CertificateArt } from "@/components/certificates/CertificateArt";
+import { CertificateActions } from "@/components/certificates/CertificateActions";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { PrintButton } from "@/components/ui/PrintButton";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { deleteCertificate } from "../actions";
 
@@ -26,35 +28,51 @@ export default async function CertificatePage({ params }: { params: { id: string
   ]);
   if (!c) notFound();
   const kind = c.kind as CertificateKind;
-  const info = CERTIFICATE_INFO[kind];
-  const churchName = church?.name ?? "Our church";
+  const design = (CERTIFICATE_DESIGNS as readonly string[]).includes(c.design) ? (c.design as CertificateDesign) : "modern";
+  const colour = (c.colour in CERTIFICATE_COLOURS ? c.colour : "royal") as CertificateColourKey;
+  const heading = certificateHeading({ kind, customTitle: c.custom_title });
+  const label = kind === "custom" ? c.custom_title ?? "Certificate" : CERTIFICATE_INFO[kind].label;
   const date = new Date(`${c.issued_on}T12:00:00Z`).toLocaleDateString("en-ZA", { timeZone: APP_TIMEZONE, day: "numeric", month: "long", year: "numeric" });
+  const fileName = `${[heading.top, heading.main].filter(Boolean).join(" ")} - ${c.recipient_name}`.replace(/[^\w .,'()-]+/g, "").slice(0, 80);
 
   return (
-    <div className="space-y-5">
-      {/* Print: landscape A4, nothing but the certificate. */}
-      <style>{`@media print { @page { size: A4 landscape; margin: 0; } body * { visibility: hidden; } #certificate, #certificate * { visibility: visible; } #certificate { position: fixed; inset: 0; margin: 0; width: 297mm; height: 210mm; border-radius: 0; box-shadow: none; } }`}</style>
-      <div className="print:hidden">
-        <PageHeader back={{ href: "/dashboard/certificates", label: "Certificates" }} title={`${info.label}: ${c.recipient_name}`} actions={<PrintButton />} />
-        <p className="text-sm text-ink/60">Tip: in the print window choose “Save as PDF”, landscape, to email or keep it.</p>
-      </div>
-
-      <CertificateView
-        kind={kind}
-        recipient={c.recipient_name}
-        churchName={churchName}
-        logoUrl={church?.logo_url ?? null}
-        date={date}
-        place={c.place}
-        courseName={c.course_name}
-        parents={c.parents}
-        officiant={c.officiant}
-        scripture={c.scripture}
-        number={c.certificate_no}
+    <div className="max-w-4xl space-y-5">
+      <PageHeader
+        back={{ href: "/dashboard/certificates", label: "Certificates" }}
+        title={`${label}: ${c.recipient_name}`}
+        actions={
+          can(me.role, "pastoralCare") ? (
+            <Link href={`/dashboard/certificates/${c.id}/edit`} className="btn-secondary">
+              <Pencil aria-hidden className="h-4 w-4" /> Edit
+            </Link>
+          ) : undefined
+        }
       />
+      <CertificateActions svgId="certificate-art" fileName={fileName} title={`${heading.top} ${heading.main}`.trim()} />
+      <div className="overflow-hidden rounded-lg shadow-xl ring-1 ring-line">
+        <CertificateArt
+          id="certificate-art"
+          kind={kind}
+          design={design}
+          colour={colour}
+          recipient={c.recipient_name}
+          churchName={church?.name ?? "Our church"}
+          logoUrl={church?.logo_url ?? null}
+          date={date}
+          place={c.place}
+          courseName={c.course_name}
+          parents={c.parents}
+          customTitle={c.custom_title}
+          customLine={c.custom_line}
+          officiant={c.officiant}
+          scripture={c.scripture}
+          number={c.certificate_no}
+        />
+      </div>
+      <p className="text-xs text-ink/60">The PDF is A4 landscape at print quality — open it and print, or send it on WhatsApp.</p>
 
       {can(me.role, "pastoralCare") && (
-        <form action={deleteCertificate} className="flex justify-end print:hidden">
+        <form action={deleteCertificate} className="flex justify-end">
           <input type="hidden" name="id" value={c.id} />
           <ConfirmSubmitButton title="Delete this certificate?" message="Printed copies are still valid; this removes it from the app." confirmLabel="Delete" pendingLabel="Deleting…">
             Delete certificate

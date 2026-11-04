@@ -7,10 +7,11 @@ import { addDuties, createTeam } from "./actions";
 import { PendingButton } from "@/components/ConfirmSubmitButton";
 import { Alert } from "@/components/ui/Alert";
 import { FormActions, FormField } from "@/components/ui/FormField";
+import { PersonPicker } from "@/components/ui/PersonPicker";
 
 type Person = { id: string; name: string };
 
-export function TeamForm({ people }: { people: Person[] }) {
+export function TeamForm({ people, departments = [] }: { people: Person[]; departments?: Person[] }) {
   const [open, setOpen] = useState(false);
   const [state, action] = useFormState(createTeam, null);
   if (!open)
@@ -30,15 +31,20 @@ export function TeamForm({ people }: { people: Person[] }) {
           ))}
         </datalist>
       </FormField>
+      {departments.length > 0 && (
+        <FormField label="Start with a department" htmlFor="department_id" optional hint="Everyone in it joins the team. You can add or take off people after.">
+          <select id="department_id" name="department_id" className="input" defaultValue="">
+            <option value="">No — I'll add people myself</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </FormField>
+      )}
       <FormField label="Leader" htmlFor="leader_id" optional hint="The leader can plan this team's roster too.">
-        <select id="leader_id" name="leader_id" className="input" defaultValue="">
-          <option value="">No leader</option>
-          {people.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+        <PersonPicker id="leader_id" name="leader_id" title="Team leader" placeholder="No leader" options={[{ value: "", label: "No leader" }, ...people.map((p) => ({ value: p.id, label: p.name }))]} />
       </FormField>
       <FormField label="Description" htmlFor="description" optional>
         <input id="description" name="description" maxLength={500} className="input" />

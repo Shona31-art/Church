@@ -8,6 +8,7 @@ import { formatDate } from "@/lib/format";
 import { PageHeader, Section } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Alert } from "@/components/ui/Alert";
+import { OnDutyList } from "@/components/rosters/OnDutyList";
 import { AddItemForm, AssignForm, DeletePlanButton, EditPlanForm, MoveButtons, PublishButton, RemoveItemButton } from "../PlanForms";
 
 export default async function ServicePlanDetailPage({ params, searchParams }: { params: { id: string }; searchParams: { template?: string } }) {
@@ -85,6 +86,10 @@ export default async function ServicePlanDetailPage({ params, searchParams }: { 
             <AddItemForm planId={plan.id} />
           </div>
         )}
+      </Section>
+
+      <Section title="On duty" description="From the volunteer rosters for this date.">
+        <OnDutyList churchId={me.church_id!} date={plan.service_date} empty="Nobody is rostered for this date yet — plan it under Rosters." />
       </Section>
 
       {canManage && (

@@ -6,7 +6,8 @@ import { useFormState } from "react-dom";
 import { Camera, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { AVATAR_BUCKET, AVATAR_MAX_SOURCE_BYTES, AVATAR_SIZE, avatarPath } from "@/lib/avatar-path";
-import { toSquareImage } from "@/lib/image-resize";
+import { toSquareImage, type SquareCrop } from "@/lib/image-resize";
+import { PhotoCropper } from "@/components/ui/PhotoCropper";
 import { Avatar } from "@/components/ui/Avatar";
 import { Alert } from "@/components/ui/Alert";
 import { FormField } from "@/components/ui/FormField";
@@ -38,6 +39,7 @@ export function ProfilePhotoForm({
   const [preview, setPreview] = useState<string | null>(photoUrl);
   const [busy, setBusy] = useState<"uploading" | "removing" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [picked, setPicked] = useState<File | null>(null);
 
   async function onPick(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -47,10 +49,13 @@ export function ProfilePhotoForm({
 
     if (!file.type.startsWith("image/")) return setError("Choose a photo (JPG, PNG, WebP or HEIC).");
     if (file.size > AVATAR_MAX_SOURCE_BYTES) return setError("That photo is over 10 MB — choose a smaller one.");
+    setPicked(file); // move and zoom it first (PhotoCropper), then save
+  }
 
+  async function save(file: File, crop: SquareCrop) {
     setBusy("uploading");
     try {
-      const { blob, extension } = await toSquareImage(file, AVATAR_SIZE);
+      const { blob, extension } = await toSquareImage(file, AVATAR_SIZE, crop);
       const path = avatarPath(churchId, userId, crypto.randomUUID(), extension);
       const { error: uploadError } = await createClient().storage.from(AVATAR_BUCKET).upload(path, blob, { contentType: blob.type, upsert: false });
       if (uploadError) {
@@ -61,6 +66,7 @@ export function ProfilePhotoForm({
       const result = await setMyPhoto(path);
       if (result.error) return setError(result.error);
       setPreview(URL.createObjectURL(blob));
+      setPicked(null);
       showToast("Profile photo updated.");
       router.refresh();
     } catch {
@@ -84,7 +90,8 @@ export function ProfilePhotoForm({
   return (
     <div className="space-y-6">
       {error && <Alert tone="error">{error}</Alert>}
-      <div className="flex flex-wrap items-center gap-5">
+      {picked && <PhotoCropper file={picked} busy={busy === "uploading"} onDone={(crop) => void save(picked, crop)} onCancel={() => setPicked(null)} />}
+      <div className={`flex flex-wrap items-center gap-5 ${picked ? "hidden" : ""}`}>
         <Avatar name={name} src={preview} size="xl" label={preview ? "Your profile photo" : "No profile photo yet"} />
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
@@ -99,7 +106,7 @@ export function ProfilePhotoForm({
               </button>
             )}
           </div>
-          <p className="hint mt-0">Shown to people in your church only. We crop it to a square and shrink it before uploading.</p>
+          <p className="hint mt-0">Shown to people in your church only. You can move and zoom it before it’s saved.</p>
         </div>
         <input ref={inputRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden onChange={onPick} />
       </div>

@@ -58,7 +58,11 @@ class IncomingCallActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setBackgroundColor(Color.parseColor("#0B1F1A"))
+            // Grace plum fading to teal, like the call screen in the app.
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.parseColor("#2A0F33"), Color.parseColor("#3B1546"), Color.parseColor("#0D3A40")),
+            )
             setPadding(dp(24), dp(96), dp(24), dp(64))
         }
         val initial = TextView(this).apply {

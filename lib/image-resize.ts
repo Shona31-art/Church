@@ -8,13 +8,29 @@ export interface SquareImage {
   extension: "webp" | "jpg";
 }
 
-export async function toSquareImage(file: File, size: number): Promise<SquareImage> {
+/**
+ * Which square of the photo to keep: zoom 1 = the largest square; x / y from
+ * -1 (left/top edge) to 1 (right/bottom edge), 0 = centred.
+ */
+export interface SquareCrop {
+  zoom: number;
+  x: number;
+  y: number;
+}
+
+/** The source square for a crop, in the photo's pixels. */
+export function cropSquare(width: number, height: number, crop: SquareCrop = { zoom: 1, x: 0, y: 0 }): { sx: number; sy: number; side: number } {
+  const zoom = Math.min(Math.max(crop.zoom || 1, 1), 5);
+  const side = Math.min(width, height) / zoom;
+  const clamp = (v: number) => Math.min(Math.max(v || 0, -1), 1);
+  return { side, sx: ((width - side) / 2) * (1 + clamp(crop.x)), sy: ((height - side) / 2) * (1 + clamp(crop.y)) };
+}
+
+export async function toSquareImage(file: File, size: number, crop?: SquareCrop): Promise<SquareImage> {
   // imageOrientation: respects phone rotation so portraits aren't sideways.
   const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
   try {
-    const side = Math.min(bitmap.width, bitmap.height);
-    const sx = (bitmap.width - side) / 2;
-    const sy = (bitmap.height - side) / 2;
+    const { sx, sy, side } = cropSquare(bitmap.width, bitmap.height, crop);
 
     const canvas = document.createElement("canvas");
     canvas.width = size;

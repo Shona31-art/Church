@@ -232,6 +232,14 @@ class MainActivity : ComponentActivity() {
             return true
         }
 
+        // Save the sign-in to the phone after every page, not only when leaving the app:
+        // if Android closes Grace in the background, the person stays signed in
+        // (e.g. answering a call straight from the ringing screen).
+        override fun onPageFinished(view: WebView, url: String?) {
+            super.onPageFinished(view, url)
+            CookieManager.getInstance().flush()
+        }
+
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
             if (!request.isForMainFrame) return
             val retry = request.url.toString().replace("'", "%27")

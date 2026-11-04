@@ -22,7 +22,7 @@ export default async function PrayerChainsPage() {
   return (
     <div className="max-w-3xl space-y-5">
       <PageHeader back={{ href: "/dashboard", label: "Home" }} title="Prayer chain" description="Pray around the clock together — book a slot and we'll remind you before it starts." />
-      {can(me.role, "postChurchWide") && <ChainForm defaultStart={utcIsoToLocalInput(localInputToUtcIso(`${todayInAppZone()}T18:00`))} />}
+      {can(me.role, "postChurchWide") && <ChainForm defaultStart={utcIsoToLocalInput(localInputToUtcIso(`${todayInAppZone()}T18:00`))} today={todayInAppZone()} />}
       {!chains.length ? (
         <EmptyState icon={Timer} title="No prayer chains yet" description="When your church holds a fast or a week of prayer, book your slot here." />
       ) : (
@@ -37,7 +37,7 @@ export default async function PrayerChainsPage() {
                     <StatusBadge tone={state === "Praying now" ? "success" : state === "Starts soon" ? "info" : "neutral"}>{state}</StatusBadge>
                   </div>
                   <p className="text-sm text-ink/60">
-                    {formatDateTime(c.starts_at)} – {formatDateTime(c.ends_at)}
+                    {formatDateTime(c.starts_at, { year: "numeric" })} – {formatDateTime(c.ends_at, { year: "numeric" })}
                   </p>
                 </Link>
               </li>

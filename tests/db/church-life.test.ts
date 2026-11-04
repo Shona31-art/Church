@@ -148,3 +148,38 @@ describe("priority support", () => {
     ]);
   });
 });
+
+describe("certificates v2", () => {
+  test("custom certificates need a title; designs and colours are checked", async () => {
+    await asUser(db, PASTOR, () =>
+      rows(`insert into certificates (church_id, kind, recipient_name, issued_on, custom_title, custom_line, design, colour) values ($1, 'custom', 'Sis Mary', current_date, 'Certificate of Appreciation', 'in grateful recognition of faithful service', 'modern', 'royal')`, [A]));
+    await expect(asUser(db, PASTOR, () => rows(`insert into certificates (church_id, kind, recipient_name, issued_on) values ($1, 'custom', 'X', current_date)`, [A]))).rejects.toThrow();
+    await expect(asUser(db, PASTOR, () => rows(`insert into certificates (church_id, kind, recipient_name, issued_on, design) values ($1, 'baptism', 'X', current_date, 'elegant')`, [A]))).rejects.toThrow();
+    expect(await rows(`select design, colour from certificates where kind = 'baptism' limit 1`)).toEqual([{ design: "modern", colour: "royal" }]);
+  });
+});
+
+describe("prayer chain v2", () => {
+  test("set times only; pastors can put people in; people add their own prayer", async () => {
+    const [{ id }] = await asUser(db, PASTOR, () =>
+      rows(`insert into prayer_chains (church_id, title, starts_at, ends_at, slot_minutes, max_per_slot, times, created_by)
+            values ($1, 'Set times', date_trunc('day', now() at time zone 'Africa/Johannesburg') at time zone 'Africa/Johannesburg' + interval '1 day',
+                    date_trunc('day', now() at time zone 'Africa/Johannesburg') at time zone 'Africa/Johannesburg' + interval '4 days', 30, 3, '{05:00,15:00,18:00}', $2) returning id`, [A, PASTOR]));
+    const day = (await rows(`select (date_trunc('day', now() at time zone 'Africa/Johannesburg') + interval '2 days')::date::text as d`))[0].d;
+    const at = (hm: string) => `${day} ${hm}:00+02`;
+    // At a set time: fine. Between set times: refused.
+    await asUser(db, MEM, () => rows(`insert into prayer_chain_slots (chain_id, church_id, slot_start, user_id) values ($1, $2, $3, $4)`, [id, A, at("15:00"), MEM]));
+    await expect(asUser(db, MEM, () => rows(`insert into prayer_chain_slots (chain_id, church_id, slot_start, user_id) values ($1, $2, $3, $4)`, [id, A, at("16:00"), MEM]))).rejects.toThrow(/not one of/);
+    // A member can't put someone else in; a pastor can, and they're told.
+    await expect(asUser(db, MEM, () => rows(`insert into prayer_chain_slots (chain_id, church_id, slot_start, user_id) values ($1, $2, $3, $4)`, [id, A, at("05:00"), MEM2]))).rejects.toThrow();
+    await asUser(db, PASTOR, () => rows(`insert into prayer_chain_slots (chain_id, church_id, slot_start, user_id) values ($1, $2, $3, $4)`, [id, A, at("05:00"), MEM2]));
+    expect(await rows(`select user_id from notifications where type = 'prayer_chain.assigned'`)).toEqual([{ user_id: MEM2 }]);
+    // Prayers: your own slot only.
+    await asUser(db, MEM, () => rows(`update prayer_chain_slots set prayer_text = 'Lord, heal our land', prayed_at = now() where chain_id = $1 and user_id = $2`, [id, MEM]));
+    await asUser(db, MEM, () => rows(`update prayer_chain_slots set prayer_text = 'hijack' where chain_id = $1 and user_id = $2`, [id, MEM2]));
+    expect(await rows(`select user_id, prayer_text from prayer_chain_slots where chain_id = $1 order by slot_start`, [id])).toEqual([
+      { user_id: MEM2, prayer_text: null },
+      { user_id: MEM, prayer_text: "Lord, heal our land" },
+    ]);
+  });
+});

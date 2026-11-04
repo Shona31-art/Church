@@ -158,7 +158,7 @@ function RingingCard({ incoming, onAnswer, onDecline, onDismiss }: { incoming: I
   const caller = incoming.title.replace(/ is calling you$/, "");
   // Full screen, like WhatsApp: who's calling, and big Decline / Accept buttons.
   return (
-    <div role="alertdialog" aria-modal="true" aria-labelledby="incoming-call-title" className="fixed inset-0 z-[100] flex flex-col items-center justify-between bg-[#0b1f1a] px-6 py-[max(3rem,env(safe-area-inset-top))] text-white motion-safe:animate-modal-in">
+    <div role="alertdialog" aria-modal="true" aria-labelledby="incoming-call-title" className="fixed inset-0 z-[100] flex flex-col items-center justify-between bg-gradient-to-b from-[#2a0f33] via-[#3b1546] to-[#0d3a40] px-6 py-[max(3rem,env(safe-area-inset-top))] text-white motion-safe:animate-modal-in">
       <div className="text-center">
         <p className="text-sm text-white/70">{ended ? "Call ended" : incoming.voice ? "Incoming voice call" : "Incoming video call"}</p>
         <h2 id="incoming-call-title" className="mt-2 text-3xl font-semibold">

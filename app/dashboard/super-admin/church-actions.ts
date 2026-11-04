@@ -14,6 +14,7 @@ import { nextPeriodEnd, type BillingInterval } from "@/lib/billing";
 import { reminderEmail } from "@/lib/billing-emails";
 import { sendReceiptsNow } from "@/lib/billing-mailer";
 import { APP_NAME, COMPANY_NAME } from "@/lib/brand";
+import { emailLayout, emailParagraph } from "@/lib/email-layout";
 
 // Platform admin: one-tap account actions on a church (suspend for
 // non-payment, restore, extend a trial, record a payment, remind, email,
@@ -46,9 +47,8 @@ async function tellChurch(churchId: string, title: string, body: string, link = 
     .insert(leaders.map((l) => ({ user_id: l.id, church_id: churchId, category: "alerts", type: "billing.platform", title, body, link })));
 }
 
-const esc = (v: string) => v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 function simpleEmail(title: string, message: string) {
-  const html = `<!doctype html><html><body style="margin:0;background:#f6f3ee;font-family:Arial,Helvetica,sans-serif;color:#1f1a14"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px"><tr><td align="center"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border-radius:16px;overflow:hidden"><tr><td style="background:#1f1a14;padding:20px 28px;color:#f3c969;font-size:20px;font-weight:bold">${esc(APP_NAME)} <span style="color:#d8cfc2;font-weight:normal;font-size:14px">by ${esc(COMPANY_NAME)}</span></td></tr><tr><td style="padding:28px"><h1 style="margin:0 0 14px;font-size:21px">${esc(title)}</h1><div style="font-size:15px;line-height:1.6;white-space:pre-line">${esc(message)}</div></td></tr></table></td></tr></table></body></html>`;
+  const html = emailLayout({ eyebrow: `A message from ${COMPANY_NAME}`, title, bodyHtml: message.split(/\n{2,}/).map((p) => emailParagraph(p)).join(""), footer: "Reply to this email if you have any questions." });
   return { html, text: `${title}\n\n${message}\n\n— ${COMPANY_NAME}` };
 }
 

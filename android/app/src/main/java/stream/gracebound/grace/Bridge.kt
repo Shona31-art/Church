@@ -24,6 +24,10 @@ class Bridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun setBadge(count: Int) = Badge.set(activity, count)
 
+    /** Saves a PDF/JPG/PNG the page made (base64) and opens it. Since app version with Files.kt. */
+    @JavascriptInterface
+    fun saveFile(name: String, mime: String, base64: String): Boolean = Files.save(activity, name, mime, base64)
+
     /** "voice", "video" or "none" — see CallMode. */
     @JavascriptInterface
     fun inCall(mode: String) {

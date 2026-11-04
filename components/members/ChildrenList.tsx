@@ -8,6 +8,7 @@ import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitBu
 import { Alert } from "@/components/ui/Alert";
 import { FormField } from "@/components/ui/FormField";
 import { BirthdayField } from "@/components/ui/BirthdayField";
+import { PersonPicker } from "@/components/ui/PersonPicker";
 
 export interface ChildRow {
   id: string;
@@ -107,15 +108,15 @@ function ParentField({ role, id, people, current, error }: { role: "mother" | "f
   const label = role === "mother" ? "Mother" : "Father";
   return (
     <FormField label={label} htmlFor={`${id}-${role}`} optional error={error}>
-      <select id={`${id}-${role}`} className="input" value={choice} onChange={(e) => setChoice(e.target.value)} aria-invalid={Boolean(error)}>
-        <option value="">Not set</option>
-        {people.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-        <option value="__name">Someone not in the app…</option>
-      </select>
+      <PersonPicker
+        id={`${id}-${role}`}
+        title={`Who is the ${role}?`}
+        value={choice}
+        onChange={(v) => setChoice(v)}
+        placeholder="Not set"
+        invalid={Boolean(error)}
+        options={[{ value: "", label: "Not set" }, { value: "__name", label: "Someone not in the app (type the name)" }, ...people.map((p) => ({ value: p.id, label: p.name }))]}
+      />
       <input type="hidden" name={`${role}_id`} value={choice && choice !== "__name" ? choice : ""} />
       {choice === "__name" && (
         <input name={`${role}_name`} className="input mt-2" maxLength={80} placeholder={`${label}'s name`} defaultValue={current && !current.id ? current.name : ""} aria-label={`${label}'s name`} />

@@ -167,18 +167,31 @@ export function CallRoom({
     }
   }, [closePeer, sayLeft, supabase]);
 
-  /** Show how the call ended for a moment, then go back to the chat / appointment. */
+  /** Show how the call ended for a moment; the effect below then goes back to the chat / appointment. */
   const finish = useCallback(
     (reason: string) => {
       hangUp();
       setPhase({ kind: "ended", reason });
-      setTimeout(() => {
-        router.push(back.href);
-        router.refresh();
-      }, 1800);
     },
-    [back.href, hangUp, router]
+    [hangUp]
   );
+
+  // However the call ended (hung up, declined, no answer, the other side left):
+  // go back to the chat / appointment after a moment, like WhatsApp.
+  const ended = phase.kind === "ended";
+  useEffect(() => {
+    if (!ended) return;
+    const soft = setTimeout(() => {
+      router.replace(back.href);
+      router.refresh();
+    }, 1800);
+    // If the app's navigation is stuck (e.g. a dropped connection), load the page outright.
+    const hard = setTimeout(() => window.location.assign(back.href), 5000);
+    return () => {
+      clearTimeout(soft);
+      clearTimeout(hard);
+    };
+  }, [ended, back.href, router]);
 
   /** End the call (two-person calls: for both of us) with a reason, then finish. */
   const endWith = useCallback(
@@ -635,7 +648,19 @@ export function CallRoom({
   // Screens
   // ---------------------------------------------------------------------------
   return (
-    <div className="fixed inset-0 z-[80] flex flex-col bg-[#0b1f1a] text-white" role="dialog" aria-label={`${kindLabel} — ${title}`}>
+    <div className="fixed inset-0 z-[80] flex flex-col overflow-hidden bg-[#1a0b20] text-white" role="dialog" aria-label={`${kindLabel} — ${title}`}>
+      {/* Background: the other person's photo, softly blurred, under Grace's plum-to-teal glow (not shown behind video). */}
+      {!remoteVideo && !(videoLayout && someoneHere && !oneToOne) && (
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          {oneToOne && other?.photoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={other.photoUrl} alt="" className="absolute inset-0 h-full w-full scale-125 object-cover opacity-60 blur-3xl" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#2a0f33]/85 via-[#3b1546]/70 to-[#0d3a40]/90" />
+          <div className="absolute -left-24 top-1/4 h-72 w-72 rounded-full bg-[#1f94a0]/25 blur-3xl" />
+          <div className="absolute -right-24 bottom-1/3 h-72 w-72 rounded-full bg-[#c2387a]/20 blur-3xl" />
+        </div>
+      )}
       {/* Two-person video: the other person fills the screen, like WhatsApp. */}
       {remoteVideo && <RemoteMedia person={remoteVideo} audioOnly={false} fill nameTag={false} />}
 
@@ -722,7 +747,7 @@ export function CallRoom({
           <>
             {!videoLayout ? (
               // Voice call: a rounded panel of labelled buttons, like WhatsApp.
-              <div className="mx-auto flex max-w-sm items-start justify-around rounded-[2rem] bg-white/10 px-4 pb-4 pt-5 backdrop-blur" role="group" aria-label="Call controls">
+              <div className="mx-auto flex w-full max-w-sm items-start justify-between gap-1 rounded-[2rem] bg-white/10 px-3 pb-3 pt-4 backdrop-blur" role="group" aria-label="Call controls">
                 {android && (
                   <RoundButton label="Speaker" tone={speaker ? "light" : "glass"} pressed={speaker} onClick={toggleSpeaker}>
                     <Volume2 aria-hidden className="h-6 w-6" />
@@ -810,7 +835,7 @@ function AddPeople({ callId, onClose }: { callId: string; onClose: () => void })
       <div
         role="dialog"
         aria-label="Add people to the call"
-        className="flex max-h-[80dvh] w-full max-w-md flex-col rounded-t-3xl bg-[#13332c] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white shadow-2xl sm:rounded-3xl"
+        className="flex max-h-[80dvh] w-full max-w-md flex-col rounded-t-3xl bg-[#2a0f33] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white shadow-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-2">
@@ -875,10 +900,10 @@ function groupGrid(n: number): string {
 }
 
 function RoundButton({ label, tone, pressed, onClick, hideLabel = false, children }: { label: string; tone: "red" | "green" | "glass" | "light"; pressed?: boolean; onClick: () => void; hideLabel?: boolean; children: React.ReactNode }) {
-  const colors = { red: "bg-red-600 text-white", green: "bg-green-600 text-white", glass: "bg-white/15 text-white", light: "bg-white text-[#0b1f1a]" }[tone];
+  const colors = { red: "bg-red-600 text-white", green: "bg-green-600 text-white", glass: "bg-white/15 text-white", light: "bg-white text-[#2a0f33]" }[tone];
   return (
-    <span className="flex flex-col items-center gap-1.5">
-      <button type="button" onClick={onClick} aria-label={label} aria-pressed={pressed} className={`flex h-16 w-16 items-center justify-center rounded-full ${colors} active:scale-95 motion-safe:transition-transform`}>
+    <span className="flex min-w-0 flex-col items-center gap-1.5">
+      <button type="button" onClick={onClick} aria-label={label} aria-pressed={pressed} className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full sm:h-16 sm:w-16 ${colors} active:scale-95 motion-safe:transition-transform`}>
         {children}
       </button>
       {!hideLabel && (

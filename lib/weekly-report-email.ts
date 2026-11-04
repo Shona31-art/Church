@@ -1,65 +1,88 @@
 // The Monday morning report: its shape and its email (pure, unit-tested).
-import { APP_NAME, COMPANY_NAME } from "@/lib/brand";
+import { APP_NAME } from "@/lib/brand";
 import { formatMoney } from "@/lib/format";
+import { emailLayout, emailParagraph, escapeHtml as esc } from "@/lib/email-layout";
 
 export interface WeeklyReport {
   churchName: string;
   /** Monday … Sunday just gone, e.g. "27 Oct – 2 Nov". */
   weekLabel: string;
-  members: { total: number; newThisWeek: { name: string }[]; invitedWaiting: number };
+  /** People who joined the app last week. */
+  newMembers: { name: string }[];
   prayer: { newRequests: number; answered: number };
   giving: { totalCents: number; gifts: number; awaitingConfirmation: number } | null;
   birthdays: { name: string; when: string; child: boolean }[];
   events: { title: string; when: string }[];
+  liveServices: { title: string; when: string }[];
+  prayerChains: { title: string; when: string; schedule: string; covered: number; total: number }[];
+  testimoniesShared: number;
   needsAttention: { label: string; count: number; link: string }[];
   rosterGaps: { team: string; when: string; why: "nobody" | "swap" }[];
   readingPlans: { title: string; readers: number }[];
   appUrl: string;
 }
 
-const esc = (v: string) => v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+export interface ReportSection {
+  title: string;
+  lines: string[];
+}
 
-function sections(r: WeeklyReport) {
-  const out: { title: string; lines: string[] }[] = [];
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** The report's sections, in order; anything with nothing to say is left out. */
+export function reportSections(r: WeeklyReport): ReportSection[] {
+  const out: ReportSection[] = [];
   out.push({
-    title: "People",
-    lines: [
-      `${r.members.total} active members`,
-      r.members.newThisWeek.length ? `${r.members.newThisWeek.length} new this week: ${r.members.newThisWeek.map((m) => m.name).join(", ")}` : "No new members this week",
-      ...(r.members.invitedWaiting ? [`${r.members.invitedWaiting} invited but not signed in yet`] : []),
-    ],
+    title: "New people",
+    lines: r.newMembers.length ? [`${plural(r.newMembers.length, "person", "people")} joined Grace: ${r.newMembers.map((m) => m.name).join(", ")}. Welcome them!`] : ["No one new joined this week."],
   });
-  out.push({ title: "Prayer", lines: [`${r.prayer.newRequests} new prayer request${r.prayer.newRequests === 1 ? "" : "s"}`, ...(r.prayer.answered ? [`${r.prayer.answered} marked answered 🙌`] : [])] });
-  if (r.giving)
+  if (r.prayerChains.length)
+    out.push({ title: "Prayer chain", lines: r.prayerChains.map((c) => `${c.title} — ${c.when}, ${c.schedule}. ${c.covered} of ${plural(c.total, "slot")} covered${c.covered < c.total ? "; encourage the church to book the rest" : " 🙌"}.`) });
+  const ahead = [...r.liveServices.map((l) => `🔴 ${l.title} — ${l.when} (Live Sunday)`), ...r.events.map((e) => `${e.title} — ${e.when}`)];
+  if (ahead.length) out.push({ title: "Coming up this week", lines: ahead });
+  if (r.birthdays.length) out.push({ title: "Birthdays this week", lines: r.birthdays.map((b) => `${b.name}${b.child ? " (child)" : ""} — ${b.when}`) });
+  if (r.prayer.newRequests || r.prayer.answered || r.testimoniesShared)
+    out.push({
+      title: "Prayer & testimonies",
+      lines: [
+        ...(r.prayer.newRequests ? [`${plural(r.prayer.newRequests, "new prayer request")}`] : []),
+        ...(r.prayer.answered ? [`${plural(r.prayer.answered, "prayer")} marked answered 🙌`] : []),
+        ...(r.testimoniesShared ? [`${plural(r.testimoniesShared, "testimony", "testimonies")} on the wall`] : []),
+      ],
+    });
+  if (r.giving && (r.giving.gifts || r.giving.awaitingConfirmation))
     out.push({
       title: "Giving",
-      lines: [`${formatMoney(r.giving.totalCents)} from ${r.giving.gifts} gift${r.giving.gifts === 1 ? "" : "s"}`, ...(r.giving.awaitingConfirmation ? [`${r.giving.awaitingConfirmation} bank transfer${r.giving.awaitingConfirmation === 1 ? "" : "s"} waiting to be confirmed`] : [])],
+      lines: [
+        ...(r.giving.gifts ? [`${formatMoney(r.giving.totalCents)} from ${plural(r.giving.gifts, "gift")}`] : []),
+        ...(r.giving.awaitingConfirmation ? [`${plural(r.giving.awaitingConfirmation, "bank transfer")} waiting to be confirmed`] : []),
+      ],
     });
-  out.push({ title: "Birthdays this week", lines: r.birthdays.length ? r.birthdays.map((b) => `${b.name}${b.child ? " (child)" : ""} — ${b.when}`) : ["None this week"] });
-  if (r.events.length) out.push({ title: "Coming up", lines: r.events.map((e) => `${e.title} — ${e.when}`) });
   if (r.rosterGaps.length) out.push({ title: "Roster gaps", lines: r.rosterGaps.map((g) => `${g.team}, ${g.when}: ${g.why === "nobody" ? "nobody on duty" : "swap asked"}`) });
-  if (r.readingPlans.length) out.push({ title: "Reading together", lines: r.readingPlans.map((p) => `${p.title}: ${p.readers} reading`) });
+  if (r.readingPlans.length) out.push({ title: "Reading together", lines: r.readingPlans.map((p) => `${p.title}: ${plural(p.readers, "person", "people")} reading`) });
   if (r.needsAttention.length) out.push({ title: "Needs your attention", lines: r.needsAttention.map((n) => `${n.count} ${n.label}`) });
   return out;
 }
 
 export function weeklyReportEmail(r: WeeklyReport) {
   const subject = `${r.churchName}: your Monday report (${r.weekLabel})`;
-  const parts = sections(r);
-  const html = `<!doctype html><html><body style="margin:0;background:#f6f3ee;font-family:Arial,Helvetica,sans-serif;color:#1f1a14">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f3ee;padding:24px 12px"><tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden">
-<tr><td style="background:#1f1a14;padding:20px 28px;color:#f3c969;font-size:20px;font-weight:bold">${esc(APP_NAME)} <span style="color:#d8cfc2;font-weight:normal;font-size:14px">Monday report</span></td></tr>
-<tr><td style="padding:24px 28px 8px"><h1 style="margin:0;font-size:22px">${esc(r.churchName)}</h1><p style="margin:4px 0 0;color:#6b6257;font-size:14px">The week of ${esc(r.weekLabel)}. Good morning — here's your church at a glance.</p></td></tr>
-${parts
-  .map(
-    (s) => `<tr><td style="padding:14px 28px 0"><h2 style="margin:0 0 6px;font-size:15px;color:#8a6a28;text-transform:uppercase;letter-spacing:.06em">${esc(s.title)}</h2>
-<ul style="margin:0;padding-left:18px;font-size:15px;line-height:1.6">${s.lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul></td></tr>`,
-  )
-  .join("")}
-<tr><td style="padding:24px 28px"><a href="${esc(r.appUrl)}" style="background:#c2410c;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:bold;display:inline-block">Open ${esc(APP_NAME)}</a></td></tr>
-<tr><td style="padding:16px 28px;background:#faf7f2;color:#6b6257;font-size:12px">Sent every Monday to your church's pastors and admins by ${esc(COMPANY_NAME)}. Private prayer, counselling and journal content is never included.</td></tr>
-</table></td></tr></table></body></html>`;
-  const text = [`${r.churchName} — Monday report (${r.weekLabel})`, "", ...parts.flatMap((s) => [s.title.toUpperCase(), ...s.lines.map((l) => `• ${l}`), ""]), `Open ${APP_NAME}: ${r.appUrl}`].join("\n");
-  return { subject, html, text, sections: parts };
+  const sections = reportSections(r);
+  const sectionHtml = sections
+    .map(
+      (s) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;background:#fbf7fb;border-radius:14px"><tr><td style="padding:14px 18px">
+<p style="margin:0 0 6px;font-size:12px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;color:#1f94a0">${esc(s.title)}</p>
+${s.lines.map((l) => `<p style="margin:0 0 4px;font-size:15px;line-height:1.55;color:#1f1025">${esc(l)}</p>`).join("")}
+</td></tr></table>`,
+    )
+    .join("");
+  const html = emailLayout({
+    preheader: sections.map((s) => s.lines[0]).slice(0, 2).join(" · "),
+    eyebrow: `Monday report · ${r.weekLabel}`,
+    title: `Good morning, ${r.churchName}`,
+    bodyHtml: emailParagraph("Here's your church at a glance — last week, and what's coming up.") + sectionHtml,
+    button: { href: r.appUrl, label: `Open ${APP_NAME}` },
+    footer: "Sent every Monday to your church's pastors and admins. Private prayers, counselling and journals are never included. Switch it off on the Monday report page in the app.",
+  });
+  const text = [`${r.churchName} — Monday report (${r.weekLabel})`, "", ...sections.flatMap((s) => [s.title.toUpperCase(), ...s.lines.map((l) => `• ${l}`), ""]), `Open ${APP_NAME}: ${r.appUrl}`].join("\n");
+  return { subject, html, text, sections };
 }

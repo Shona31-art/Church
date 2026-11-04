@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AutoRedirect } from "@/components/AutoRedirect";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
@@ -44,6 +45,7 @@ export default async function CallPage({ params, searchParams }: { params: { id:
         <Link href={back.href} className="btn-primary">
           {back.label}
         </Link>
+        <AutoRedirect href={back.href} after={2500} />
       </div>
     );
   }

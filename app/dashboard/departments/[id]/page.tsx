@@ -9,6 +9,8 @@ import { PermissionDenied } from "@/components/ui/Gates";
 import { DeleteDepartmentButton, RenameDepartmentForm } from "../DepartmentForms";
 import { DepartmentPeople, type DeptPerson } from "./DepartmentPeople";
 import { getAvatarUrls } from "@/lib/avatars";
+import { OnDutyList } from "@/components/rosters/OnDutyList";
+import { todayInAppZone } from "@/lib/format";
 
 export default async function DepartmentDetailPage({ params }: { params: { id: string } }) {
   const me = await getCurrentAppUser();
@@ -77,6 +79,10 @@ export default async function DepartmentDetailPage({ params }: { params: { id: s
         />
       </Section>
 
+      {members.length > 0 && (
+        <OnDutySection churchId={me.church_id!} userIds={members.map((m) => m.id)} />
+      )}
+
       <Section title="Settings">
         <RenameDepartmentForm id={department.id} name={department.name} />
       </Section>
@@ -93,5 +99,18 @@ export default async function DepartmentDetailPage({ params }: { params: { id: s
         </Section>
       )}
     </div>
+  );
+}
+
+/** The department's people on the rosters over the next four weeks (nothing when there are none). */
+async function OnDutySection({ churchId, userIds }: { churchId: string; userIds: string[] }) {
+  const today = todayInAppZone();
+  const to = new Date(Date.parse(`${today}T12:00:00Z`) + 27 * 86_400_000).toISOString().slice(0, 10);
+  const list = await OnDutyList({ churchId, from: today, to, userIds });
+  if (!list) return null;
+  return (
+    <Section title="On duty soon" description="This department's people on the volunteer rosters in the next four weeks.">
+      {list}
+    </Section>
   );
 }

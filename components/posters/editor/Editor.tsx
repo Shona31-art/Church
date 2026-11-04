@@ -1,5 +1,6 @@
 "use client";
 
+import { saveBlob, saveUrl } from "@/lib/save-file";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type Konva from "konva";
@@ -353,10 +354,9 @@ export function Editor({
   }
 
   function saveFile(url: string, name: string) {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.click();
+    void saveUrl(url, name).then((ok) => {
+      if (!ok) showToast("Update the Grace app to save files here — or open Grace in Chrome and download it there.", "info");
+    });
   }
 
   /** Full-size image of the poster; very large posters fall back to half size on low-memory devices. */
@@ -392,9 +392,8 @@ export function Editor({
     if (!image) return;
     const jpeg = new Uint8Array(await (await fetch(image.url)).arrayBuffer());
     const pdf = jpegToPdf(jpeg, pdfPageSize(design.size, design.width, design.height), title.trim() || "Poster");
-    const url = URL.createObjectURL(new Blob([pdf as BlobPart], { type: "application/pdf" }));
-    saveFile(url, `${fileName()}.pdf`);
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    const ok = await saveBlob(new Blob([pdf as BlobPart], { type: "application/pdf" }), `${fileName()}.pdf`);
+    if (!ok) showToast("Update the Grace app to save files here — or open Grace in Chrome and download it there.", "info");
   }
 
   /** Sends the poster image to the phone's share sheet (WhatsApp, etc.); downloads it where sharing files isn't supported. */

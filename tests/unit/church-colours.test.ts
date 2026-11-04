@@ -44,3 +44,12 @@ describe("AI allowance month", () => {
     expect(monthBounds("2026-12-31")).toEqual({ start: "2026-12-01", nextMonth: "2027-01-01" });
   });
 });
+
+describe("photo crop", () => {
+  test("zoom and move stay inside the photo", async () => {
+    const { cropSquare } = await import("@/lib/image-resize");
+    expect(cropSquare(1000, 600)).toEqual({ side: 600, sx: 200, sy: 0 });
+    expect(cropSquare(1000, 600, { zoom: 2, x: -1, y: 1 })).toEqual({ side: 300, sx: 0, sy: 300 });
+    expect(cropSquare(1000, 600, { zoom: 9, x: 5, y: 0 })).toEqual({ side: 120, sx: 880, sy: 240 });
+  });
+});

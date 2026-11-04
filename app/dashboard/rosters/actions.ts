@@ -28,8 +28,9 @@ export async function createTeam(_prev: FormState, formData: FormData): Promise<
       name: z.string().trim().min(1, "Name the team.").max(80),
       description: z.string().trim().max(500).transform((v) => v || null),
       leaderId: z.union([z.string().uuid(), z.literal("")]).transform((v) => v || null),
+      departmentId: z.union([z.string().uuid(), z.literal("")]).transform((v) => v || null),
     })
-    .safeParse({ name: formData.get("name") ?? "", description: formData.get("description") ?? "", leaderId: formData.get("leader_id") ?? "" });
+    .safeParse({ name: formData.get("name") ?? "", description: formData.get("description") ?? "", leaderId: formData.get("leader_id") ?? "", departmentId: formData.get("department_id") ?? "" });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message, values: formValues(formData) };
   const supabase = createClient();
   const { data, error } = await supabase
@@ -38,10 +39,33 @@ export async function createTeam(_prev: FormState, formData: FormData): Promise<
     .select("id")
     .single();
   if (error || !data) return { error: "Couldn't create the team — please try again.", values: formValues(formData) };
-  if (parsed.data.leaderId) await supabase.from("roster_team_members").insert({ team_id: data.id, user_id: parsed.data.leaderId, church_id: me.church_id });
+  const added = parsed.data.departmentId ? await addDepartmentPeople(data.id, parsed.data.departmentId, me.church_id) : 0;
+  if (parsed.data.leaderId) await supabase.from("roster_team_members").upsert({ team_id: data.id, user_id: parsed.data.leaderId, church_id: me.church_id }, { ignoreDuplicates: true });
   refresh();
-  flash(`${parsed.data.name} created. Add the people on the team next.`);
+  flash(added ? `${parsed.data.name} created with ${added} ${added === 1 ? "person" : "people"} from the department.` : `${parsed.data.name} created. Add the people on the team next.`);
   redirect(`/dashboard/rosters/${data.id}`);
+}
+
+/** Everyone active in a department joins the team (people already on it stay). Returns how many were in the department. */
+async function addDepartmentPeople(teamId: string, departmentId: string, churchId: string): Promise<number> {
+  const supabase = createClient();
+  const { data: people } = await supabase.from("app_users").select("id").eq("church_id", churchId).eq("department_id", departmentId).eq("status", "active");
+  if (!people?.length) return 0;
+  const { error } = await supabase
+    .from("roster_team_members")
+    .upsert(people.map((p) => ({ team_id: teamId, user_id: p.id, church_id: churchId })), { ignoreDuplicates: true });
+  if (error) console.error("[rosters] add department failed:", error.message);
+  return error ? 0 : people.length;
+}
+
+/** Team managers: add everyone in a department to the team. Form fields: team_id, department_id */
+export async function addDepartmentToTeam(formData: FormData): Promise<void> {
+  const me = await getCurrentAppUser();
+  const p = z.object({ team: z.string().uuid(), dept: z.string().uuid() }).safeParse({ team: formData.get("team_id"), dept: formData.get("department_id") });
+  if (!me?.church_id || !p.success) return;
+  const n = await addDepartmentPeople(p.data.team, p.data.dept, me.church_id);
+  refresh(p.data.team);
+  flash(n ? `Everyone in that department is on the team now (${n}).` : "Nobody active in that department yet.", n ? "success" : "info");
 }
 
 /** Pastors. Form fields: team_id, leader_id? */

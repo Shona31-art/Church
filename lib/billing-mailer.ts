@@ -128,7 +128,7 @@ export async function sendPaymentReceipts(churchId?: string): Promise<number> {
       invoiceNo: p.invoice_no,
       planKey: p.plan_key,
       interval: p.interval === "yearly" ? "yearly" : "monthly",
-      kind: p.kind === "renewal" ? "renewal" : "checkout",
+      kind: p.kind === "renewal" ? "renewal" : p.kind === "manual" ? "manual" : "checkout",
       amountCents: p.amount_cents,
       paidAt: p.paid_at ?? p.created_at,
       periodEnd: p.period_end,

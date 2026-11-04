@@ -10,7 +10,8 @@ import { PageHeader, Section } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
 import { DutyForm } from "../RosterForms";
-import { deleteTeam, setTeamLeader, setTeamMember, updateDuty } from "../actions";
+import { addDepartmentToTeam, deleteTeam, setTeamLeader, setTeamMember, updateDuty } from "../actions";
+import { PersonPicker } from "@/components/ui/PersonPicker";
 
 export const metadata = { title: "Team roster" };
 
@@ -30,10 +31,11 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
   const shepherd = can(me.role, "planServices");
   const manage = shepherd || team.leader_id === me.id;
   const today = todayInAppZone();
-  const [{ data: memberRows }, { data: duties }, people] = await Promise.all([
+  const [{ data: memberRows }, { data: duties }, people, { data: departments }] = await Promise.all([
     supabase.from("roster_team_members").select("user_id, app_users(name)").eq("team_id", team.id),
     supabase.from("roster_duties").select("id, duty_date, role, user_id, swap_requested, person:app_users!roster_duties_user_id_fkey(name)").eq("team_id", team.id).gte("duty_date", today).order("duty_date").order("role").limit(300),
     manage ? churchPeople(me.church_id!) : Promise.resolve([]),
+    manage ? supabase.from("departments").select("id, name").eq("church_id", me.church_id).order("name") : Promise.resolve({ data: [] as { id: string; name: string }[] }),
   ]);
   const members = ((memberRows ?? []) as any[]).map((m) => ({ id: m.user_id as string, name: (m.app_users?.name as string) ?? "Former member" })).sort((a, b) => a.name.localeCompare(b.name));
   const memberIds = new Set(members.map((m) => m.id));
@@ -120,17 +122,26 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
           <form action={setTeamMember} className="mt-4 flex gap-2">
             <input type="hidden" name="team_id" value={team.id} />
             <input type="hidden" name="add" value="1" />
-            <select name="user_id" className="input" aria-label="Add someone to the team" required defaultValue="">
+            <div className="min-w-0 flex-1">
+              <PersonPicker name="user_id" title="Add someone to the team" placeholder="Add someone…" options={notOnTeam.map((p) => ({ value: p.id, label: p.name }))} />
+            </div>
+            <PendingButton className="btn-secondary shrink-0" pendingLabel="…">Add</PendingButton>
+          </form>
+        )}
+        {manage && (departments ?? []).length > 0 && (
+          <form action={addDepartmentToTeam} className="mt-2 flex gap-2">
+            <input type="hidden" name="team_id" value={team.id} />
+            <select name="department_id" className="input" aria-label="Add everyone from a department" required defaultValue="">
               <option value="" disabled>
-                Add someone…
+                Add everyone from a department…
               </option>
-              {notOnTeam.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
+              {(departments ?? []).map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
                 </option>
               ))}
             </select>
-            <PendingButton className="btn-secondary shrink-0" pendingLabel="…">Add</PendingButton>
+            <PendingButton className="btn-secondary shrink-0" pendingLabel="…">Add all</PendingButton>
           </form>
         )}
       </Section>

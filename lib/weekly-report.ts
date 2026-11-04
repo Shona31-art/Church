@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { absoluteLink } from "@/lib/alert-delivery";
 import { APP_TIMEZONE, todayInAppZone } from "@/lib/format";
 import { emailConfigured, sendEmail } from "@/lib/email";
+import { chainSchedule, slotStarts } from "@/lib/prayer-chain";
 import { weeklyReportEmail, type WeeklyReport } from "@/lib/weekly-report-email";
 
 // The Monday morning report (church_life.sql). Built with the service client
@@ -31,10 +32,12 @@ export async function buildWeeklyReport(churchId: string, today = todayInAppZone
   const { data: church } = await admin.from("churches").select("name").eq("id", churchId).maybeSingle();
   if (!church) return null;
 
-  const [total, newbies, invited, prayersNew, prayersAnswered, gifts, reported, bdays, kids, events, bookings, testimonies, gaps, plans, members] = await Promise.all([
-    safe(admin.from("app_users").select("id", { count: "exact", head: true }).eq("church_id", churchId).eq("status", "active")),
-    safe(admin.from("app_users").select("name").eq("church_id", churchId).neq("status", "disabled").gte("created_at", iso(from)).lt("created_at", iso(thisMonday)).limit(30)),
-    safe(admin.from("app_users").select("id", { count: "exact", head: true }).eq("church_id", churchId).eq("status", "invited")),
+  const [newbies, chains, lives, shared, prayersNew, prayersAnswered, gifts, reported, bdays, kids, events, bookings, testimonies, gaps, plans, members] = await Promise.all([
+    // Joined the app last week (signed in at least once: active, not just invited).
+    safe(admin.from("app_users").select("name").eq("church_id", churchId).eq("status", "active").gte("created_at", iso(from)).lt("created_at", iso(thisMonday)).order("name").limit(30)),
+    safe(admin.from("prayer_chains").select("*").eq("church_id", churchId).gt("ends_at", iso(thisMonday)).lt("starts_at", iso(ahead)).order("starts_at").limit(5)),
+    safe(admin.from("live_services").select("title, starts_at").eq("church_id", churchId).gte("starts_at", iso(thisMonday)).lt("starts_at", iso(ahead)).order("starts_at").limit(5)),
+    safe(admin.from("testimonies").select("id", { count: "exact", head: true }).eq("church_id", churchId).eq("status", "approved").gte("reviewed_at", iso(from)).lt("reviewed_at", iso(thisMonday))),
     safe(admin.from("prayer_board_items").select("id", { count: "exact", head: true }).eq("church_id", churchId).gte("created_at", iso(from)).lt("created_at", iso(thisMonday))),
     safe(admin.from("prayer_board_items").select("id", { count: "exact", head: true }).eq("church_id", churchId).gte("answered_at", iso(from)).lt("answered_at", iso(thisMonday))),
     safe(admin.from("givings").select("amount_cents").eq("church_id", churchId).eq("status", "succeeded").gte("created_at", iso(from)).lt("created_at", iso(thisMonday)).limit(5000)),
@@ -71,16 +74,33 @@ export async function buildWeeklyReport(churchId: string, today = todayInAppZone
     return Date.parse(`${p.start_date}T00:00:00Z`) <= ahead.getTime() && end >= from.getTime();
   });
 
+  const nb = bookings.count ?? 0;
+  const nt = testimonies.count ?? 0;
   const needsAttention = [
-    { label: "booking request(s) waiting", count: bookings.count ?? 0, link: "/dashboard/booking" },
-    { label: "testimony(ies) waiting for approval", count: testimonies.count ?? 0, link: "/dashboard/testimonies?tab=review" },
+    { label: `booking ${nb === 1 ? "request" : "requests"} waiting`, count: nb, link: "/dashboard/booking" },
+    { label: `${nt === 1 ? "testimony" : "testimonies"} waiting for approval`, count: nt, link: "/dashboard/testimonies?tab=review" },
   ].filter((n) => n.count > 0);
 
   const sunday = new Date(thisMonday.getTime() - DAY + 12 * 3_600_000);
+  const fmt = (d: string | Date) => new Date(d).toLocaleString("en-ZA", { timeZone: APP_TIMEZONE, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+
+  // Prayer chains running or starting this week, with how many slots are covered.
+  const chainRows = (chains.data ?? []) as any[];
+  const { data: slotRows } = chainRows.length
+    ? await admin.from("prayer_chain_slots").select("chain_id, slot_start").in("chain_id", chainRows.map((c) => c.id)).limit(20000)
+    : { data: [] as { chain_id: string; slot_start: string }[] };
+  const prayerChains = chainRows.map((c) => {
+    const all = slotStarts(c);
+    const taken = new Set(((slotRows ?? []) as { chain_id: string; slot_start: string }[]).filter((s) => s.chain_id === c.id).map((s) => Date.parse(s.slot_start)));
+    return { title: c.title, when: `${fmt(c.starts_at)} – ${fmt(c.ends_at)}`, schedule: chainSchedule(c), covered: all.filter((t) => taken.has(t)).length, total: all.length };
+  });
   return {
     churchName: church.name,
     weekLabel: `${label(from, { day: "numeric", month: "short" })} – ${label(sunday, { day: "numeric", month: "short" })}`,
-    members: { total: total.count ?? 0, newThisWeek: ((newbies.data ?? []) as { name: string }[]).map((n) => ({ name: n.name })), invitedWaiting: invited.count ?? 0 },
+    newMembers: ((newbies.data ?? []) as { name: string }[]).map((n) => ({ name: n.name })),
+    prayerChains,
+    liveServices: ((lives.data ?? []) as any[]).map((l) => ({ title: l.title, when: fmt(l.starts_at) })),
+    testimoniesShared: shared.count ?? 0,
     prayer: { newRequests: prayersNew.count ?? 0, answered: prayersAnswered.count ?? 0 },
     giving: gifts.data ? { totalCents: giftRows.reduce((s, g) => s + (g.amount_cents ?? 0), 0), gifts: giftRows.length, awaitingConfirmation: reported.count ?? 0 } : null,
     birthdays,
@@ -123,8 +143,12 @@ export async function sendDueWeeklyReports(today = todayInAppZone()): Promise<nu
     admin.from("church_modules").select("church_id, enabled").eq("module_key", "weekly_report"),
   ]);
   const plans = new Set((planMods ?? []).map((p) => p.plan_key));
+  // Churches that switched the report off (church_life_v2.sql); none before that's run.
+  const { data: off } = await admin.from("churches").select("id").eq("weekly_report_enabled", false);
+  const switchedOff = new Set((off ?? []).map((c) => c.id));
   let sent = 0;
   for (const s of subs ?? []) {
+    if (switchedOff.has(s.church_id)) continue;
     const override = (overrides ?? []).find((o: any) => o.church_id === s.church_id) as { enabled?: boolean } | undefined;
     if (!(override ? override.enabled !== false : plans.has(s.plan_key))) continue;
     const { error } = await admin.from("weekly_report_log").insert({ church_id: s.church_id, week_start: week });

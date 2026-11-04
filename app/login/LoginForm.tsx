@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { OfflineSignInNotice } from "@/components/OfflineSignInNotice";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -16,6 +16,9 @@ import { PasswordInput } from "@/components/ui/PasswordInput";
 function safeNext(next: string | null) {
   return next && next.startsWith("/dashboard") && !next.startsWith("//") && !next.includes("\\") ? next : "/dashboard";
 }
+
+/** The last email used to sign in on this device (a convenience only; never the password). */
+const LAST_EMAIL_KEY = "grace-last-email";
 
 const REASON_MESSAGES: Record<string, { tone: "warning" | "error"; text: string }> = {
   disabled: {
@@ -35,6 +38,18 @@ export function LoginForm({ expired, nextPath, reason }: { expired: boolean; nex
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
+
+  // Fill in the email used last time, and go straight to the password.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LAST_EMAIL_KEY);
+      if (saved) {
+        setEmail((current) => current || saved);
+        passwordRef.current?.focus();
+      }
+    } catch {}
+  }, []);
 
   const next = safeNext(nextPath);
   const reasonMessage = reason ? REASON_MESSAGES[reason] : undefined;
@@ -60,6 +75,14 @@ export function LoginForm({ expired, nextPath, reason }: { expired: boolean; nex
       );
       return;
     }
+    try {
+      localStorage.setItem(LAST_EMAIL_KEY, email.trim());
+    } catch {}
+    // Lets Chrome / Android offer to save the password (and fill it next time).
+    try {
+      const PC = (window as unknown as { PasswordCredential?: new (data: { id: string; password: string }) => Credential }).PasswordCredential;
+      if (PC && navigator.credentials?.store) await navigator.credentials.store(new PC({ id: email.trim(), password }));
+    } catch {}
     await recordSignIn();
     router.push(next);
     router.refresh();
@@ -79,8 +102,10 @@ export function LoginForm({ expired, nextPath, reason }: { expired: boolean; nex
         <FormField label="Email" htmlFor="email" required>
           <input
             id="email"
+            name="email"
             type="email"
-            autoComplete="email"
+            inputMode="email"
+            autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -89,7 +114,9 @@ export function LoginForm({ expired, nextPath, reason }: { expired: boolean; nex
         </FormField>
         <FormField label="Password" htmlFor="password" required>
           <PasswordInput
+            ref={passwordRef}
             id="password"
+            name="password"
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

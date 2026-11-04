@@ -39,11 +39,12 @@ export default async function RostersPage() {
   const mine = all.filter((d) => d.user_id === me.id);
   const swaps = all.filter((d) => d.swap_requested && d.user_id !== me.id && (inTeam.has(d.team_id) || shepherd));
   const people = shepherd ? await churchPeople(me.church_id!) : [];
+  const { data: departments } = shepherd ? await supabase.from("departments").select("id, name").eq("church_id", me.church_id).order("name") : { data: [] };
 
   return (
     <div className="max-w-3xl space-y-6">
       <PageHeader back={{ href: "/dashboard", label: "Home" }} title="Rosters" description="Who serves when — with a reminder the day before, and easy swaps." />
-      {shepherd && <TeamForm people={people} />}
+      {shepherd && <TeamForm people={people} departments={departments ?? []} />}
 
       <Section title="My duties">
         {!mine.length ? (

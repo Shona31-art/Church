@@ -34,7 +34,7 @@ test("sign-in form has labelled fields and links to password reset", async ({ pa
   await page.goto("/login");
   await expect(page.getByRole("heading", { name: "Sign in to your church" })).toBeVisible();
   await expect(page.getByLabel("Email")).toBeVisible();
-  await expect(page.getByLabel("Password")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Password", exact: true })).toBeVisible();
   await page.getByRole("link", { name: /Forgot password/i }).click();
   await expect(page).toHaveURL(/\/forgot-password$/);
   await expect(page.getByRole("heading", { name: "Reset your password" })).toBeVisible();

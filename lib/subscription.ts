@@ -140,7 +140,7 @@ export const PLAN_LABELS: Record<string, string> = {
   free_trial: "Free trial",
   basic: "Grace",
   premium: "Grace Plus",
-  enterprise: "Unlimited (no longer offered)",
+  enterprise: "Unlimited",
   sponsored: "Sponsored",
 };
 

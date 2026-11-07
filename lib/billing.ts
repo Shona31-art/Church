@@ -6,7 +6,7 @@
 export const SELF_SERVE_PLANS = ["basic", "premium"] as const;
 /**
  * Every plan churches pay for online, including Unlimited ("enterprise"),
- * which is no longer offered but still renews for churches already on it.
+ * which the platform team arranges (churches don't choose it on Billing).
  */
 export const PAID_PLANS = ["basic", "premium", "enterprise"] as const;
 export type SelfServePlan = (typeof PAID_PLANS)[number];

@@ -12,8 +12,9 @@
 --     member's photos, voice notes and files use storage). Everything in Grace, plus AI counselling, AI poster
 --     pictures, calls, voice notes, photos in chat, sermon uploads, church
 --     colours and priority support (1,000 AI requests a month).
---   * Unlimited ("enterprise") is no longer offered. Churches already on it
---     keep it (and its Paystack subscription) until they choose a new plan.
+--   * Unlimited ("enterprise") is now by arrangement only: churches can't
+--     choose it on Billing, but the platform team can give it (lifetime or
+--     sponsored churches, very large churches). Churches on it keep it.
 --   * AI poster pictures get their own switch (ai_pictures), so the cheaper
 --     plan can have AI writing help without the costlier pictures.
 --   Churches with a special price keep it. Prices can be changed any time in
@@ -35,7 +36,9 @@ update plans
        description = 'For up to 500 members, with the full AI tools, calls, media and priority support. Bigger church? Ask us for a price.'
  where key = 'premium';
 
-update plans set name = 'Unlimited (no longer offered)' where key = 'enterprise';
+-- Unlimited stays for churches the platform team arranges it for (e.g. lifetime
+-- or sponsored churches, very large churches); churches can't choose it themselves.
+update plans set name = 'Unlimited', description = 'By arrangement with the platform team' where key = 'enterprise';
 
 -- Grace: the pastoral tools and AI writing help.
 insert into plan_modules (plan_key, module_key)

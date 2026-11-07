@@ -36,9 +36,11 @@ export const MODULE_KEYS = [
   "certificates",
   "weekly_report",
   // Plans, November 2026 (church_life.sql section 11):
-  "sermon_uploads", // uploading sermon audio/video (storage); Basic can still post links
+  "sermon_uploads", // uploading sermon audio/video (storage); Grace can still post links
   "priority_support",
   "church_colours",
+  // Plans v4 (plans_v4.sql): AI poster pictures, apart from AI writing help.
+  "ai_pictures",
 ] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 
@@ -78,6 +80,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   sermon_uploads: "Sermon uploads",
   priority_support: "Priority support",
   church_colours: "Church colours",
+  ai_pictures: "AI poster pictures",
 };
 
 /**
@@ -131,13 +134,13 @@ export const EVERY_PLAN_INCLUDES = [
 export const UNBUILT_MODULES: readonly ModuleKey[] = ["analytics", "multi_campus"];
 
 /** The AI tools: a plan with none of these says "No AI tools". */
-export const AI_MODULES: readonly ModuleKey[] = ["ai_counseling", "bible_study_ai", "ai_assist"];
+export const AI_MODULES: readonly ModuleKey[] = ["ai_counseling", "bible_study_ai", "ai_assist", "ai_pictures"];
 
 export const PLAN_LABELS: Record<string, string> = {
   free_trial: "Free trial",
-  basic: "Basic",
-  premium: "Premium",
-  enterprise: "Unlimited",
+  basic: "Grace",
+  premium: "Grace Plus",
+  enterprise: "Unlimited (no longer offered)",
   sponsored: "Sponsored",
 };
 

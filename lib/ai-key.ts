@@ -12,6 +12,16 @@ export function geminiApiKey(env: Record<string, string | undefined> = process.e
   return undefined;
 }
 
+/**
+ * Optional free-tier Gemini key (a Google project WITHOUT billing), used for
+ * the light, public writing jobs — announcements, prayer drafts, poster
+ * wording, Bible study. Anything private (counselling) and all pictures use
+ * the paid key. Server only.
+ */
+export function geminiFreeApiKey(env: Record<string, string | undefined> = process.env): string | undefined {
+  return env.GEMINI_FREE_API_KEY?.trim().replace(/^["']|["']$/g, "") || undefined;
+}
+
 /** Which name the key was found under (for the admin "Test AI" check). */
 export function geminiKeyName(env: Record<string, string | undefined> = process.env): string | undefined {
   return NAMES.find((n) => env[n]?.trim());

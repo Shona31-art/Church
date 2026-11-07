@@ -44,6 +44,7 @@ export async function generatePosterTagline(params: {
   const speaker = params.speaker?.slice(0, 80);
   const date = params.eventDate?.slice(0, 80);
   const text = await generateText({
+    free: true, // light, public writing: the free-tier key when set (lib/ai.ts)
     maxTokens: 100,
     prompt: `Write ONE short, warm, inviting tagline (under 10 words, no quotation marks) for a church event poster. Event: "${title}"${speaker ? `, speaker: ${speaker}` : ""}${date ? `, on ${date}` : ""}. Respond with ONLY the tagline text, nothing else.`,
   });

@@ -74,7 +74,7 @@ export function VideoField({ initial, error, canUpload = true }: { initial: stri
       hint={
         canUpload
           ? `Upload a video (MP4 works on every phone; MOV, M4V or WebM too — up to ${MAX_MB / 1024} GB), or paste a link from YouTube, Facebook, Vimeo, Google Drive or Dropbox.`
-          : "Paste a link from YouTube, Facebook, Vimeo, Google Drive or Dropbox. (Uploading videos is on Premium and Unlimited.)"
+          : "Paste a link from YouTube, Facebook, Vimeo, Google Drive or Dropbox. (Uploading videos is on Grace Plus.)"
       }
     >
       <div className="space-y-2">

@@ -2,9 +2,14 @@
 // subscriptions (docs/plans/paystack-billing.md). Pure — unit-tested in
 // tests/unit/paystack-billing.test.ts.
 
-/** Plans shown to church admins on the Billing page (others are arranged by the platform team). */
-export const SELF_SERVE_PLANS = ["basic", "premium", "enterprise"] as const;
-export type SelfServePlan = (typeof SELF_SERVE_PLANS)[number];
+/** Plans churches can choose on the Billing page: Grace and Grace Plus (plans_v4.sql). */
+export const SELF_SERVE_PLANS = ["basic", "premium"] as const;
+/**
+ * Every plan churches pay for online, including Unlimited ("enterprise"),
+ * which is no longer offered but still renews for churches already on it.
+ */
+export const PAID_PLANS = ["basic", "premium", "enterprise"] as const;
+export type SelfServePlan = (typeof PAID_PLANS)[number];
 
 export const BILLING_INTERVALS = ["monthly", "yearly"] as const;
 export type BillingInterval = (typeof BILLING_INTERVALS)[number];
@@ -23,7 +28,7 @@ export const isBillingReference = (reference: string) => /^gbsub-[0-9a-f-]{36}$/
  */
 export function planCodesFromEnv(env: Record<string, string | undefined> = process.env, interval: BillingInterval = "monthly"): Partial<Record<SelfServePlan, string>> {
   const codes: Partial<Record<SelfServePlan, string>> = {};
-  for (const plan of SELF_SERVE_PLANS) {
+  for (const plan of PAID_PLANS) {
     const code = env[`PAYSTACK_PLAN_${plan.toUpperCase()}${interval === "yearly" ? "_YEARLY" : ""}`]?.trim();
     if (code && /^PLN_[A-Za-z0-9]+$/.test(code)) codes[plan] = code;
   }

@@ -1,5 +1,5 @@
 import "server-only";
-import { geminiApiKey } from "@/lib/ai-key";
+import { geminiApiKey, geminiFreeApiKey } from "@/lib/ai-key";
 import Anthropic from "@anthropic-ai/sdk";
 import { extractJson } from "@/lib/json";
 
@@ -63,8 +63,19 @@ export async function generateText(params: {
   messages?: AiTurn[];
   system?: string;
   maxTokens?: number;
+  /**
+   * A light, public writing job: use the free-tier key (GEMINI_FREE_API_KEY)
+   * when there is one. If it fails or hits its daily limit, the paid key
+   * answers instead, so the button still works.
+   */
+  free?: boolean;
 }): Promise<string | null> {
   const messages: AiTurn[] = params.messages ?? [{ role: "user", content: params.prompt ?? "" }];
+  const freeKey = params.free ? geminiFreeApiKey() : undefined;
+  if (freeKey) {
+    const text = await generateWithGemini({ ...params, messages }, freeKey);
+    if (text) return text;
+  }
   if (aiProvider() === "gemini") return generateWithGemini({ ...params, messages });
 
   const ai = getClient();
@@ -136,8 +147,7 @@ export function geminiText(json: GeminiResponse): string | null {
   return text || null;
 }
 
-async function generateWithGemini(params: { messages: AiTurn[]; system?: string; maxTokens?: number }): Promise<string | null> {
-  const key = geminiApiKey();
+async function generateWithGemini(params: { messages: AiTurn[]; system?: string; maxTokens?: number }, key = geminiApiKey()): Promise<string | null> {
   if (!key) return null;
   const url = `${GEMINI_URL}/${encodeURIComponent(GEMINI_MODEL)}:generateContent`;
   const body = JSON.stringify(geminiRequestBody(params));
@@ -177,6 +187,7 @@ export async function generateJson<T>(params: {
   prompt: string;
   system?: string;
   maxTokens?: number;
+  free?: boolean;
 }): Promise<T | null> {
   const text = await generateText(params);
   if (!text) return null;

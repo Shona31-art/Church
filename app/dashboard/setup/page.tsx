@@ -77,7 +77,7 @@ export default async function ChurchSettingsPage() {
         ))}
       </ol>
 
-      <Section title="Church colours" description={access?.modules.has("church_colours") ? "Use your church's colours for buttons, links and highlights everywhere in Grace, for everyone. Each choice is checked to stay easy to read, in light and dark mode." : "On the Unlimited plan: use your church's own colours throughout the app."}>
+      <Section title="Church colours" description={access?.modules.has("church_colours") ? "Use your church's colours for buttons, links and highlights everywhere in Grace, for everyone. Each choice is checked to stay easy to read, in light and dark mode." : "On Grace Plus: use your church's own colours throughout the app."}>
         {access?.modules.has("church_colours") ? (
           <form action={setChurchColours} className="space-y-4">
             <fieldset className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -94,7 +94,7 @@ export default async function ChurchSettingsPage() {
           </form>
         ) : (
           <Link href="/dashboard/billing" className="btn-secondary">
-            See the Unlimited plan
+            See Grace Plus
           </Link>
         )}
       </Section>

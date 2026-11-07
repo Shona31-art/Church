@@ -35,9 +35,9 @@ export function RecordPaymentForm({ churchId, currentPlan, prices }: { churchId:
       <div className="grid gap-3 sm:grid-cols-2">
         <FormField label="Plan" htmlFor="pay-plan">
           <select id="pay-plan" name="plan_key" value={plan} onChange={(e) => setPlan(e.target.value)} className="input">
-            <option value="basic">Basic</option>
-            <option value="premium">Premium</option>
-            <option value="enterprise">Unlimited</option>
+            <option value="basic">Grace</option>
+            <option value="premium">Grace Plus</option>
+            <option value="enterprise">Unlimited (no longer offered)</option>
           </select>
         </FormField>
         <FormField label="Paid for" htmlFor="pay-interval">

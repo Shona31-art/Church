@@ -19,7 +19,7 @@ export default async function AiPosterPage() {
   if (!can(me.role, "makePosters")) return <PermissionDenied message="Posters are made by pastors, church admins and department leaders." backHref="/dashboard/posters" />;
 
   const [onPlan, { data: church }] = await Promise.all([
-    planIncludes("ai_assist"),
+    planIncludes("ai_pictures"),
     createClient().from("churches").select("logo_url").eq("id", me.church_id).maybeSingle(),
   ]);
 
@@ -31,7 +31,7 @@ export default async function AiPosterPage() {
         description="Describe it, add photos if you like, and the AI designs the whole poster. Then ask for changes until it's just right."
       />
       {!onPlan ? (
-        <Alert tone="info" title="AI posters are part of Premium">
+        <Alert tone="info" title="AI posters are part of Grace Plus">
           Your church&apos;s plan doesn&apos;t include AI help. You can still make posters from templates in Poster Studio.
         </Alert>
       ) : !isPosterAiConfigured() ? (

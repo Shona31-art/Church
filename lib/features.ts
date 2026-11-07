@@ -33,4 +33,4 @@ export async function aiAssistAvailable(): Promise<boolean> {
 }
 
 /** Shown when a Basic church reaches an AI helper some other way (e.g. a stale page). */
-export const AI_NOT_ON_PLAN = "AI writing help is included with Premium. You can still write it yourself.";
+export const AI_NOT_ON_PLAN = "This AI help isn't included in your church's plan. You can still write it yourself.";

@@ -7,7 +7,7 @@ import { can } from "@/lib/permissions";
 import { AI_MODULES, EVERY_PLAN_INCLUDES, UNBUILT_MODULES, MODULE_LABELS, PLAN_CARD_LABELS, PLAN_LABELS, type ModuleKey } from "@/lib/subscription";
 import { invoiceNumber } from "@/lib/billing-emails";
 import { churchAiUsage } from "@/lib/ai-quota";
-import { onlineBillingState, planCodesFromEnv, SELF_SERVE_PLANS, type BillingInterval } from "@/lib/billing";
+import { onlineBillingState, PAID_PLANS, planCodesFromEnv, SELF_SERVE_PLANS, type BillingInterval } from "@/lib/billing";
 import { onlineBillingConfigured } from "@/lib/subscription-billing";
 import { ConfirmSubmitButton, PendingButton } from "@/components/ConfirmSubmitButton";
 import { cancelSubscription, startSubscription } from "./actions";
@@ -45,8 +45,8 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
   const [access, { data: sub }, { data: plans }, { data: planModules }, { count: activeMembers }, { data: payments }] = await Promise.all([
     getChurchAccess(),
     supabase.from("church_subscriptions").select("*").eq("church_id", me.church_id).maybeSingle(),
-    supabase.from("plans").select("*").in("key", [...SELF_SERVE_PLANS]),
-    supabase.from("plan_modules").select("plan_key, module_key").in("plan_key", [...SELF_SERVE_PLANS]),
+    supabase.from("plans").select("*").in("key", [...PAID_PLANS]),
+    supabase.from("plan_modules").select("plan_key, module_key").in("plan_key", [...PAID_PLANS]),
     supabase.from("app_users").select("id", { count: "exact", head: true }).eq("church_id", me.church_id).neq("status", "disabled"),
     // Empty until paystack_billing.sql (#34) has been run.
     supabase.from("billing_payments").select("*").eq("church_id", me.church_id).neq("status", "pending").order("created_at", { ascending: false }).limit(12),
@@ -63,7 +63,9 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
   const result = searchParams.payment ? PAYMENT_RESULT[searchParams.payment] : undefined;
 
   const status = access?.status ?? "none";
-  const sorted = [...(plans ?? [])].sort((a, b) => Number(a.monthly_price) - Number(b.monthly_price));
+  // Grace and Grace Plus; a church still on the old Unlimited plan also sees its own.
+  const shownPlans = (plans ?? []).filter((p: any) => (SELF_SERVE_PLANS as readonly string[]).includes(p.key) || p.key === sub?.plan_key);
+  const sorted = [...shownPlans].sort((a, b) => Number(a.monthly_price) - Number(b.monthly_price));
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -153,7 +155,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
             </span>
           ))}
         </p>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className={`grid gap-4 ${sorted.length > 2 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
           {sorted.map((plan: any) => {
             const keys = (planModules ?? []).filter((m) => m.plan_key === plan.key).map((m) => m.module_key as ModuleKey);
             const shownKeys = keys.filter((k) => !UNBUILT_MODULES.includes(k));

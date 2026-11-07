@@ -117,7 +117,7 @@ export async function draftSermonStudyNotes(input: { title: string; speaker: str
   const me = await requireSermonEditor();
   if (!me) return { error: "Only pastors and church admins can do this. Sign in again." };
   if (!isAiConfigured()) return { error: "AI isn't switched on for this app yet." };
-  if (!(await checkModuleAccess("ai_assist")).allowed) return { error: "AI help is on Premium and Unlimited." };
+  if (!(await checkModuleAccess("ai_assist")).allowed) return { error: "AI help isn't included in your church's plan." };
   const transcript = String(input.transcript ?? "").slice(0, 100_000);
   const title = String(input.title ?? "").trim().slice(0, 200);
   if (!transcript.trim() && !title) return { error: "Type the sermon title (and the scripture if you have it), or paste the transcript, then try again." };
@@ -248,7 +248,7 @@ const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
 export async function requestSermonAudioUpload(input: { contentType: string; bytes: number }): Promise<{ ok: true; path: string; token: string; url: string } | { ok: false; error: string }> {
   const me = await requireSermonEditor();
   if (!me) return { ok: false, error: "Only people who can add sermons can upload recordings." };
-  if (!(await checkModuleAccess("sermon_uploads")).allowed) return { ok: false, error: "Uploading recordings is on Premium and Unlimited. Paste a link instead (SoundCloud, YouTube, Google Drive)." };
+  if (!(await checkModuleAccess("sermon_uploads")).allowed) return { ok: false, error: "Uploading recordings is on Grace Plus. Paste a link instead (SoundCloud, YouTube, Google Drive)." };
   const ext = AUDIO_TYPES[(input.contentType || "").toLowerCase()];
   if (!ext) return { ok: false, error: "That file type can't be played in a browser. Use MP3, M4A, WAV, AAC or OGG." };
   if (!Number.isFinite(input.bytes) || input.bytes <= 0) return { ok: false, error: "That file looks empty." };
@@ -280,7 +280,7 @@ const MAX_VIDEO_MB = 1024; // keep in step with VideoField.tsx and sermon_video.
 export async function requestSermonVideoUpload(input: { contentType: string; bytes: number }): Promise<{ ok: true; uploadUrl: string; url: string } | { ok: false; error: string }> {
   const me = await requireSermonEditor();
   if (!me) return { ok: false, error: "Only people who can add sermons can upload videos." };
-  if (!(await checkModuleAccess("sermon_uploads")).allowed) return { ok: false, error: "Uploading videos is on Premium and Unlimited. Paste a YouTube or Facebook link instead." };
+  if (!(await checkModuleAccess("sermon_uploads")).allowed) return { ok: false, error: "Uploading videos is on Grace Plus. Paste a YouTube or Facebook link instead." };
   const ext = VIDEO_TYPES[(input.contentType || "").toLowerCase()];
   if (!ext) return { ok: false, error: "That video type isn't supported. Use MP4 (best), MOV, M4V or WebM." };
   if (!Number.isFinite(input.bytes) || input.bytes <= 0) return { ok: false, error: "That file looks empty." };

@@ -49,6 +49,7 @@ export async function runBibleStudy(
   const passageText = isReference ? await fetchVerse(parsed.data.query) : null;
 
   const text = await generateText({
+    free: true, // light, public writing: the free-tier key when set (lib/ai.ts)
     maxTokens: 1500,
     system:
       "You are a careful, warm Bible study assistant for a mainstream Christian church. Be faithful to the text and to historic Christian teaching; where Christians genuinely differ, say so briefly and even-handedly. Use plain language. Format with short paragraphs or simple numbered lists — no markdown headings, no tables. Never quote modern copyrighted translations; refer to verses by reference.",

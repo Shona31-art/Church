@@ -80,7 +80,7 @@ export function SermonForm({ sermon, aiAvailable, today, canUpload = true }: { s
         {aiAvailable ? (
           <AiStudyNotesButton />
         ) : (
-          <p className="text-xs text-ink/60">AI help is on Premium and Unlimited. Fill these in by hand, or leave them blank.</p>
+          <p className="text-xs text-ink/60">AI help isn't included in your church's plan. Fill these in by hand, or leave them blank.</p>
         )}
         <FormField label="Transcript" htmlFor="transcript" optional error={fe.transcript} hint="Paste it for the best AI notes. Without it, the AI works from the title and scriptures.">
           <textarea id="transcript" name="transcript" rows={6} maxLength={100000} defaultValue={v("transcript", sermon?.transcript)} className="input" />

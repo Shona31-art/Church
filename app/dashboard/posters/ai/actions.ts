@@ -60,7 +60,7 @@ export async function createAiPoster(input: {
   if (!me || !me.church_id) return { ok: false, error: "Your session has expired — sign in again." };
   if (!can(me.role, "makePosters")) return { ok: false, error: "Posters are made by pastors, church admins and department leaders." };
   if (!(await checkModuleAccess("ai_poster")).allowed) return { ok: false, error: "Poster Studio isn't included in your church's plan." };
-  if (!(await planIncludes("ai_assist"))) return { ok: false, error: AI_NOT_ON_PLAN };
+  if (!(await planIncludes("ai_pictures"))) return { ok: false, error: AI_NOT_ON_PLAN };
   if (!isPosterAiConfigured()) return { ok: false, error: "AI posters need a Gemini API key (GEMINI_API_KEY). Ask your platform admin." };
 
   const parsed = inputSchema.safeParse(input);

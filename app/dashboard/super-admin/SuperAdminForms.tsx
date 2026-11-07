@@ -85,9 +85,9 @@ export function SubscriptionForm({
         <FormField label="Plan" htmlFor="plan_key">
           <select id="plan_key" name="plan_key" defaultValue={sub?.plan_key ?? "free_trial"} className="input">
             <option value="free_trial">Free trial</option>
-            <option value="basic">Basic</option>
-            <option value="premium">Premium</option>
-            <option value="enterprise">Unlimited</option>
+            <option value="basic">Grace</option>
+            <option value="premium">Grace Plus</option>
+            <option value="enterprise">Unlimited (no longer offered)</option>
             <option value="sponsored">Sponsored (free)</option>
           </select>
         </FormField>

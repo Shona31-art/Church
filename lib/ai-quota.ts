@@ -47,7 +47,7 @@ export async function consumeAiQuota(feature: string): Promise<{ ok: true } | { 
         error:
           usage.limit === 0
             ? "AI tools aren't included in your church's plan."
-            : `Your church has used all ${usage.limit} AI requests for this month. They start again on ${resets}${usage.limit < 1000 ? " — or your church admin can move to Unlimited for 1,000 a month" : ""}.`,
+            : `Your church has used all ${usage.limit} AI requests for this month. They start again on ${resets}${usage.limit < 1000 ? " — or your church admin can move to Grace Plus for 1,000 a month" : ""}.`,
       };
     }
   }

@@ -239,6 +239,7 @@ export async function draftPrayerWithAi(
   if (!quota.ok) return { error: quota.error };
 
   const text = await generateText({
+    free: true, // light, public writing: the free-tier key when set (lib/ai.ts)
     maxTokens: 600,
     system:
       "You help church members put their prayers into words. Write a short, sincere, first-person prayer (80-140 words) addressed to God, in plain warm language. You may mention one Bible reference by reference only (e.g. 'Philippians 4:6-7') — never quote verse text. No headings, no markdown, no preamble — just the prayer, ending with 'Amen.'",

@@ -7,9 +7,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { can } from "@/lib/permissions";
-import { planIncludes, AI_NOT_ON_PLAN } from "@/lib/features";
-import { consumeAiQuota } from "@/lib/ai-quota";
-import { generateJigsawPicture, isPosterAiConfigured } from "@/lib/ai-image";
 import { JIGSAW_BUCKET } from "@/lib/games/jigsaw";
 
 // Pastors and church admins manage the church's jigsaw pictures
@@ -27,7 +24,7 @@ async function manager() {
   return { me: me as typeof me & { church_id: string } } as const;
 }
 
-async function save(me: { id: string; church_id: string }, image: { mimeType: string; data: string }, title: string, reference: string | null, source: "ai" | "upload"): Promise<PictureResult> {
+async function save(me: { id: string; church_id: string }, image: { mimeType: string; data: string }, title: string, reference: string | null, source: "upload"): Promise<PictureResult> {
   const ext = EXT[image.mimeType];
   if (!ext) return { ok: false, error: "Pictures must be JPG, PNG or WebP." };
   const bytes = Buffer.from(image.data, "base64");
@@ -50,24 +47,6 @@ async function save(me: { id: string; church_id: string }, image: { mimeType: st
   }
   revalidatePath("/dashboard/games/pictures");
   return { ok: true };
-}
-
-/** AI paints a Bible story. Input: story (what to paint), title, reference?. */
-export async function createPictureWithAi(input: { story: string; title: string; reference?: string }): Promise<PictureResult> {
-  const auth = await manager();
-  if ("error" in auth) return { ok: false, error: auth.error! };
-  const parsed = z
-    .object({ story: z.string().trim().min(5, "Describe the Bible story to paint.").max(600), title: z.string().trim().min(1, "Give the picture a title.").max(120), reference: z.string().trim().max(60).optional() })
-    .safeParse(input);
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the details." };
-  if (!(await planIncludes("ai_assist"))) return { ok: false, error: AI_NOT_ON_PLAN };
-  if (!isPosterAiConfigured()) return { ok: false, error: "AI pictures need a Gemini API key (GEMINI_API_KEY) with billing turned on." };
-  const quota = await consumeAiQuota("jigsaw_picture");
-  if (!quota.ok) return { ok: false, error: quota.error };
-
-  const result = await generateJigsawPicture(parsed.data.story);
-  if ("error" in result) return { ok: false, error: result.error };
-  return save(auth.me, result.image, parsed.data.title, parsed.data.reference || null, "ai");
 }
 
 /** Upload a picture (shrunk in the browser first). */

@@ -294,7 +294,7 @@ export async function setChurchColours(formData: FormData): Promise<void> {
   const me = await getCurrentAppUser();
   if (!me?.church_id || !can(me.role, "manageChurchProfile")) return;
   if (!(await planIncludes("church_colours"))) {
-    flash("Church colours are on the Unlimited plan.", "error");
+    flash("Church colours are on Grace Plus.", "error");
     return;
   }
   const { PALETTES } = await import("@/lib/church-colours");

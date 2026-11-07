@@ -3,8 +3,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
 import { can } from "@/lib/permissions";
-import { planIncludes } from "@/lib/features";
-import { isPosterAiConfigured } from "@/lib/ai-image";
 import { JIGSAW_BUCKET } from "@/lib/games/jigsaw";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PermissionDenied } from "@/components/ui/Gates";
@@ -61,7 +59,7 @@ export default async function JigsawPicturesPage() {
       <PageHeader
         back={{ href: "/dashboard/games", label: "Games" }}
         title="Jigsaw pictures"
-        description="Add your own pictures to your church's Bible jigsaw — they join the built-in pictures. Paint them with AI or upload your own."
+        description="Add your own pictures to your church's Bible jigsaw — they join the built-in pictures. Upload your own Bible pictures."
       />
       {notSetUp ? (
         <Alert tone="warning" title="Needs a database update">
@@ -79,12 +77,7 @@ export default async function JigsawPicturesPage() {
               </Alert>
             </div>
           )}
-          <PictureManager
-            pictures={pictures}
-            aiAvailable={
-              isPosterAiConfigured() && (await planIncludes("ai_assist"))
-            }
-          />
+          <PictureManager pictures={pictures} />
         </>
       )}
     </div>

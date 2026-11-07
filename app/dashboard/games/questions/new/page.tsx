@@ -1,4 +1,3 @@
-import { aiAssistAvailable } from "@/lib/features";
 import { moduleGate } from "@/lib/gate";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { can } from "@/lib/permissions";
@@ -12,5 +11,5 @@ export default async function NewQuestionPage() {
   if (!me || !can(me.role, "manageQuizQuestions")) {
     return <PermissionDenied message="Only church admins and pastors can add quiz questions." backHref="/dashboard/games" />;
   }
-  return <NewQuestionsForm aiAvailable={await aiAssistAvailable()} />;
+  return <NewQuestionsForm />;
 }

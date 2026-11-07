@@ -31,7 +31,7 @@ export default async function PlansPage() {
   });
   const monthly = planCodesFromEnv();
   const yearly = planCodesFromEnv(process.env, "yearly");
-  const missing = (["basic", "premium", "enterprise"] as const).flatMap((k) => [
+  const missing = (["basic", "premium"] as const).flatMap((k) => [
     ...(monthly[k] ? [] : [`PAYSTACK_PLAN_${k.toUpperCase()}`]),
     ...(yearlySupported && !yearly[k] ? [`PAYSTACK_PLAN_${k.toUpperCase()}_YEARLY`] : []),
   ]);

@@ -57,7 +57,7 @@ export function AudioField({ initial, error, canUpload = true }: { initial: stri
   const file = embed ? null : playableFileUrl(url);
 
   return (
-    <FormField label="Audio" htmlFor="audio_url" optional error={problem ?? error} hint={canUpload ? "Upload a recording from your phone (MP3, M4A, WAV, AAC or OGG, up to 50 MB), or paste a link from SoundCloud, Spotify, YouTube, Google Drive or Dropbox." : "Paste a link from SoundCloud, Spotify, YouTube, Google Drive or Dropbox. (Uploading recordings is on Premium and Unlimited.)"}>
+    <FormField label="Audio" htmlFor="audio_url" optional error={problem ?? error} hint={canUpload ? "Upload a recording from your phone (MP3, M4A, WAV, AAC or OGG, up to 50 MB), or paste a link from SoundCloud, Spotify, YouTube, Google Drive or Dropbox." : "Paste a link from SoundCloud, Spotify, YouTube, Google Drive or Dropbox. (Uploading recordings is on Grace Plus.)"}>
       <div className="space-y-2">
         <div className="flex flex-wrap gap-2">
           {canUpload && (

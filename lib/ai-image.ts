@@ -146,18 +146,3 @@ async function requestImage(requestBody: unknown, what: string): Promise<{ image
   return { error: `Couldn't create the ${what} just now. Please try again.` };
 }
 
-/** The instructions for a jigsaw picture. Exported for tests. */
-export function jigsawPicturePrompt(story: string): string {
-  return [
-    `A beautiful, richly detailed painting of the Bible story: ${story}.`,
-    "Style: reverent classical oil painting with warm, glowing light and vivid colour, like a fine illustrated Bible.",
-    "People look natural and dignified, in clothing of Bible times. Respectful; nothing frightening or violent.",
-    "Fill the whole square with interesting detail in every part (sky, people, land or water), because it will be cut into jigsaw pieces.",
-    "No words, letters, captions, borders, frames or signatures anywhere in the image.",
-  ].join("\n");
-}
-
-/** A square Bible picture for the jigsaw game. */
-export async function generateJigsawPicture(story: string): Promise<{ image: ImageInput } | { error: string }> {
-  return requestImage(posterRequestBody(jigsawPicturePrompt(story), [], "square"), "picture");
-}

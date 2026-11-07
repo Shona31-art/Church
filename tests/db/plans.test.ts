@@ -40,25 +40,22 @@ beforeAll(async () => {
 }, 120_000);
 
 describe("Basic plan", () => {
-  test("allows 50 members; prices are R250 / R500 / R1,000 a month, 10 months' price a year", async () => {
-    expect(await rows(`select member_limit from plans where key = 'basic'`)).toEqual([{ member_limit: 50 }]);
-    expect(await rows(`select key, monthly_price::float as m, yearly_price::float as y from plans where key in ('basic', 'premium', 'enterprise') order by monthly_price`)).toEqual([
-      { key: "basic", m: 250, y: 2500 },
-      { key: "premium", m: 500, y: 5000 },
-      { key: "enterprise", m: 1000, y: 10000 },
+  test("plans_v4: Grace R249 (up to 100 members) and Grace Plus R599 (up to 500); 10 months' price a year", async () => {
+    expect(await rows(`select key, name, member_limit, monthly_price::float as m, yearly_price::float as y from plans where key in ('basic', 'premium') order by monthly_price`)).toEqual([
+      { key: "basic", name: "Grace", member_limit: 100, m: 249, y: 2490 },
+      { key: "premium", name: "Grace Plus", member_limit: 500, m: 599, y: 5990 },
     ]);
   });
 
-  test("plans (Nov 2026): Basic has Sermons as links; Premium adds uploads and photos; Unlimited adds priority support and colours; AI allowances", async () => {
+  test("Grace Plus has everything the old Unlimited had, plus AI pictures; AI allowances", async () => {
     const mods = async (plan: string) => (await rows(`select module_key from plan_modules where plan_key = '${plan}'`)).map((r) => r.module_key);
     expect(await mods("basic")).toContain("sermon_ai");
-    expect(await mods("premium")).toEqual(expect.arrayContaining(["chat_photos", "sermon_uploads", "video_calls"]));
-    expect(await mods("premium")).not.toContain("priority_support");
-    expect(await mods("enterprise")).toEqual(expect.arrayContaining(["priority_support", "church_colours", "sermon_uploads"]));
-    expect(await rows(`select key, ai_monthly_limit as n from plans where key in ('basic', 'premium', 'enterprise') order by n`)).toEqual([
-      { key: "basic", n: 0 },
-      { key: "premium", n: 300 },
-      { key: "enterprise", n: 1000 },
+    const plus = await mods("premium");
+    expect(plus).toEqual(expect.arrayContaining(["chat_photos", "sermon_uploads", "video_calls", "priority_support", "church_colours", "ai_pictures", "ai_counseling"]));
+    for (const m of await mods("enterprise")) expect(plus).toContain(m);
+    expect(await rows(`select key, ai_monthly_limit as n from plans where key in ('basic', 'premium') order by n`)).toEqual([
+      { key: "basic", n: 100 },
+      { key: "premium", n: 1000 },
     ]);
   });
 
@@ -67,12 +64,10 @@ describe("Basic plan", () => {
     expect(d).toContain("billing_invoice_no_seq");
   });
 
-  test("includes the free-to-run features and none of the costly switches", async () => {
+  test("Grace: every church feature and AI writing help, none of the costly switches", async () => {
     const basic = (await rows(`select module_key from plan_modules where plan_key = 'basic' order by 1`)).map((r) => r.module_key);
-    expect(basic).toEqual(expect.arrayContaining(["bible", "dept_chats", "announcements", "prayer_board", "giving", "bible_games"]));
-    // billing_v4.sql: the leadership tools are Premium and up.
-    for (const premiumOnly of ["service_planner", "pastor_booking", "pastoral_care", "video_calls"]) expect(basic).not.toContain(premiumOnly);
-    for (const costly of ["ai_assist", "chat_voice", "chat_photos", "sermon_uploads", "ai_counseling", "ai_poster", "bible_study_ai"]) {
+    expect(basic).toEqual(expect.arrayContaining(["bible", "dept_chats", "announcements", "prayer_board", "giving", "bible_games", "service_planner", "pastor_booking", "pastoral_care", "ai_assist", "bible_study_ai"]));
+    for (const costly of ["video_calls", "chat_voice", "chat_photos", "sermon_uploads", "ai_counseling", "ai_pictures", "priority_support", "church_colours"]) {
       expect(basic).not.toContain(costly);
     }
   });

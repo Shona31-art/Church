@@ -204,6 +204,7 @@ export async function draftAnnouncementWithAi(title: string, details: string, ch
 
   const { data: church } = await createClient().from("churches").select("name").eq("id", me.church_id).maybeSingle();
   const text = await generateText({
+    free: true, // light, public writing: the free-tier key when set (lib/ai.ts)
     maxTokens: 800,
     system:
       "You write church communications. Use ONLY the facts provided — never invent dates, times, places, names or phone numbers. If something important is missing, leave a clear placeholder like [time]. Output only the announcement text.",

@@ -2,7 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { emailConfigured, sendEmail } from "@/lib/email";
 import { absoluteLink } from "@/lib/alert-delivery";
-import { SELF_SERVE_PLANS } from "@/lib/billing";
+import { PAID_PLANS } from "@/lib/billing";
 import { REMINDER_DAYS_BEFORE, receiptEmail, reminderEmail } from "@/lib/billing-emails";
 
 // Billing emails from Grace-bound Ventures to a church's pastors and admins
@@ -46,7 +46,7 @@ export async function sendPaymentReminders(now: Date = new Date()): Promise<numb
     .in("status", ["active", "grace"])
     .eq("is_lifetime", false)
     .is("cancelled_at", null)
-    .in("plan_key", [...SELF_SERVE_PLANS])
+    .in("plan_key", [...PAID_PLANS])
     .gt("billing_date", now.toISOString())
     .lte("billing_date", until)
     .limit(200);
@@ -56,7 +56,7 @@ export async function sendPaymentReminders(now: Date = new Date()): Promise<numb
   }
   if (!due?.length) return 0;
 
-  const { data: plans } = await admin.from("plans").select("key, monthly_price, yearly_price").in("key", [...SELF_SERVE_PLANS]);
+  const { data: plans } = await admin.from("plans").select("key, monthly_price, yearly_price").in("key", [...PAID_PLANS]);
   let sent = 0;
   for (const sub of due as any[]) {
     if (sub.reminder_sent_for && new Date(sub.reminder_sent_for).getTime() === new Date(sub.billing_date).getTime()) continue;

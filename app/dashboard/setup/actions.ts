@@ -15,7 +15,7 @@ import { CHURCH_LOGO_BUCKET, churchLogoPathFromUrl, isOwnChurchLogoPath } from "
 import { churchNameSchema } from "@/lib/account-schemas";
 import { phoneSchema } from "@/lib/member-schemas";
 import { FormState, SESSION_EXPIRED, formValues, invalid, optionalField } from "@/lib/forms";
-import { givingDetailsSchema } from "@/lib/giving";
+import { givingDetailsSchema, paymentOptionsSchema } from "@/lib/giving";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { bankForBranchCode } from "@/lib/banks-za";
 import { PaystackError, createSubaccount, paystackConfigured, updateSubaccount } from "@/lib/paystack";
@@ -108,6 +108,29 @@ export async function saveGivingDetails(_prev: FormState, formData: FormData): P
   revalidatePath("/dashboard/giving");
   flash("Bank details saved. Every church admin has been notified of the change.");
   redirect("/dashboard/setup");
+}
+
+/** Church admin: PayShap ID and the church's own payment link (giving_v2.sql). Empty fields switch them off. */
+export async function savePaymentOptions(_prev: FormState, formData: FormData): Promise<FormState> {
+  const me = await getCurrentAppUser();
+  if (!me || !me.church_id) return { error: SESSION_EXPIRED };
+  if (!can(me.role, "manageChurchProfile")) return { error: "Only church admins can change how members give." };
+  const parsed = paymentOptionsSchema.safeParse({
+    payshap_id: formData.get("payshap_id") ?? "",
+    link_label: formData.get("link_label") ?? "",
+    link_url: formData.get("link_url") ?? "",
+  });
+  if (!parsed.success) return invalid(parsed.error, formData);
+  const { error } = await createClient()
+    .from("church_payment_options")
+    .upsert({ church_id: me.church_id, ...parsed.data, updated_at: new Date().toISOString(), updated_by: me.id });
+  if (error) {
+    console.error("[setup] payment options save failed:", error.message);
+    return { error: error.code === "42P01" ? "PayShap and payment links need a database update: run #65 in Supabase." : "Couldn't save — please try again.", values: formValues(formData) };
+  }
+  revalidatePath("/dashboard/setup/giving");
+  revalidatePath("/dashboard/giving");
+  return { ok: true };
 }
 
 /**

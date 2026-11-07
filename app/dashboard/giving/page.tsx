@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
 import { can } from "@/lib/permissions";
-import { ACCOUNT_TYPE_LABELS, cardFeeRateFromEnv, eftReference, fundLabel } from "@/lib/giving";
+import { ACCOUNT_TYPE_LABELS, cardFeeRateFromEnv, channelLabel, eftReference, fundLabel } from "@/lib/giving";
 import { paystackConfigured } from "@/lib/paystack";
 import { formatDate, formatMoney, todayInAppZone } from "@/lib/format";
 import { PageHeader, Section } from "@/components/ui/PageHeader";
@@ -40,13 +40,10 @@ export default async function GivingPage({ searchParams }: { searchParams: { car
   const me = (await getCurrentAppUser())!;
   const year = todayInAppZone().slice(0, 4);
   const supabase = createClient();
-  const [{ data: recent, error }, { data: yearRows }, { data: details, error: detailsError }, { data: card }] = await Promise.all([
-    supabase
-      .from("givings")
-      .select("id, amount_cents, fund, status, method, paid_on, created_at")
-      .eq("user_id", me.id)
-      .order("created_at", { ascending: false })
-      .limit(20),
+  const history = (columns: string) => supabase.from("givings").select(columns).eq("user_id", me.id).order("created_at", { ascending: false }).limit(20);
+  const [historyRes, { data: yearRows }, { data: details, error: detailsError }, { data: card }, { data: options }] = await Promise.all([
+    // giving_v2.sql adds channel (how it was paid); before that, without it.
+    history("id, amount_cents, fund, status, method, channel, paid_on, created_at"),
     supabase.from("givings").select("amount_cents").eq("user_id", me.id).eq("status", "succeeded").gte("created_at", `${year}-01-01T00:00:00Z`).limit(5000),
     supabase
       .from("church_giving_details")
@@ -54,7 +51,11 @@ export default async function GivingPage({ searchParams }: { searchParams: { car
       .eq("church_id", me.church_id)
       .maybeSingle(),
     supabase.from("church_card_giving").select("enabled").eq("church_id", me.church_id).maybeSingle(),
+    supabase.from("church_payment_options").select("payshap_id, link_label, link_url").eq("church_id", me.church_id).maybeSingle(),
   ]);
+  let { data: recent, error } = historyRes as { data: any[] | null; error: { code?: string; message: string } | null };
+  if (error?.code === "42703") ({ data: recent, error } = (await history("id, amount_cents, fund, status, method, paid_on, created_at")) as any);
+  const payOptions = (options ?? null) as { payshap_id: string | null; link_label: string | null; link_url: string | null } | null;
   if (detailsError && !missingTable(detailsError.code)) console.error("[giving] bank details load failed:", detailsError.message);
 
   const cardAvailable = paystackConfigured() && Boolean(card?.enabled);
@@ -119,7 +120,8 @@ export default async function GivingPage({ searchParams }: { searchParams: { car
             />
           ) : (
             <>
-              <Section title="1. Pay from your banking app" description="Use these details and your personal reference.">
+              <Section title="1. Pay" description={payOptions?.payshap_id || payOptions?.link_url ? "Choose the way that suits you, and always use your personal reference." : "Use these details and your personal reference, from your banking app."}>
+                {(payOptions?.payshap_id || payOptions?.link_url) && <p className="mb-2 text-sm font-semibold">Bank transfer</p>}
                 <BankDetails
                   rows={[
                     { label: "Account holder", value: details.account_name },
@@ -131,9 +133,27 @@ export default async function GivingPage({ searchParams }: { searchParams: { car
                   reference={eftReference(details.reference_prefix, me.id)}
                   lastChanged={`Details last changed ${formatDate(details.updated_at, { weekday: undefined })}.`}
                 />
+                {payOptions?.payshap_id && (
+                  <div className="mt-6">
+                    <p className="mb-1 text-sm font-semibold">PayShap — instant, from your banking app</p>
+                    <p className="mb-2 text-xs text-ink/60">In your banking app choose PayShap (or &ldquo;Pay to a cellphone number / ShapID&rdquo;), pay this ID and put your reference below in the reference box.</p>
+                    <BankDetails rows={[{ label: "PayShap ID", value: payOptions.payshap_id, copy: true }]} reference={eftReference(details.reference_prefix, me.id)} lastChanged="" />
+                  </div>
+                )}
+                {payOptions?.link_url && (
+                  <div className="mt-6">
+                    <p className="mb-2 text-sm font-semibold">{payOptions.link_label ?? "Payment link"}</p>
+                    <a href={payOptions.link_url} target="_blank" rel="noopener noreferrer" className="btn-secondary w-full justify-center">
+                      Pay with {payOptions.link_label ?? "our payment link"}
+                    </a>
+                    <p className="mt-2 text-xs text-ink/60">
+                      Add your reference <span className="tabular font-semibold">{eftReference(details.reference_prefix, me.id)}</span> as the note if it asks, then record your gift below.
+                    </p>
+                  </div>
+                )}
               </Section>
               <Section title="2. Record your gift" description="So it shows in your history. Your church confirms it once the money arrives.">
-                <TransferForm today={todayInAppZone()} />
+                <TransferForm today={todayInAppZone()} channels={[{ value: "bank", label: "Bank transfer" }, ...(payOptions?.payshap_id ? [{ value: "payshap", label: "PayShap" }] : []), ...(payOptions?.link_url ? [{ value: "link", label: payOptions.link_label ?? "Payment link" }] : [])]} />
               </Section>
             </>
           )}
@@ -167,7 +187,7 @@ export default async function GivingPage({ searchParams }: { searchParams: { car
                       <div className="min-w-0">
                         <p className="font-medium">{fundLabel(g.fund)}</p>
                         <p className="text-xs text-ink/60">
-                          {formatDate(when, { weekday: undefined })} · {g.method === "eft" ? "Bank transfer" : "Card"}
+                          {formatDate(when, { weekday: undefined })} · {g.method === "eft" ? channelLabel(g.channel, payOptions?.link_label) : "Card"}
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-1 text-right">

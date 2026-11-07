@@ -10,6 +10,8 @@ export interface WaitingGift {
   id: string;
   donor: string;
   reference: string;
+  /** How they paid: Bank transfer, PayShap, or the church's link. */
+  how?: string;
   amountLabel: string;
   /** Rand, e.g. "250.00", to pre-fill "amount that arrived". */
   amountRand: string;
@@ -44,7 +46,7 @@ function WaitingRow({ gift }: { gift: WaitingGift }) {
         <div className="min-w-0">
           <p className="font-semibold">{gift.donor}</p>
           <p className="text-xs text-ink/60">
-            Reference <span className="tabular font-semibold text-ink">{gift.reference}</span> · {gift.fund} · paid {gift.paidOn}
+            {gift.how ? `${gift.how} · ` : ""}Reference <span className="tabular font-semibold text-ink">{gift.reference}</span> · {gift.fund} · paid {gift.paidOn}
           </p>
         </div>
         <p className="tabular text-lg font-semibold">{gift.amountLabel}</p>

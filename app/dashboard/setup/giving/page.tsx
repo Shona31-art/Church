@@ -9,6 +9,7 @@ import { PermissionDenied } from "@/components/ui/Gates";
 import { Alert } from "@/components/ui/Alert";
 import { GivingDetailsForm } from "./GivingDetailsForm";
 import { CardGivingSection, type CardGivingState } from "./CardGivingSection";
+import { PaymentOptionsForm, type PaymentOptions } from "./PaymentOptionsForm";
 import { bankForBranchCode } from "@/lib/banks-za";
 import { paystackConfigured } from "@/lib/paystack";
 
@@ -24,7 +25,7 @@ export default async function GivingDetailsPage() {
   }
 
   const supabase = createClient();
-  const [{ data: details, error }, { data: church }, { data: card }] = await Promise.all([
+  const [{ data: details, error }, { data: church }, { data: card }, { data: options }] = await Promise.all([
     supabase
       .from("church_giving_details")
       .select("account_name, bank_name, account_number, branch_code, account_type, reference_prefix, updated_at, app_users!church_giving_details_updated_by_fkey(name)")
@@ -33,6 +34,8 @@ export default async function GivingDetailsPage() {
     supabase.from("churches").select("name").eq("id", me.church_id).maybeSingle(),
     // Before migration #31 this table doesn't exist; card giving then just shows as off.
     supabase.from("church_card_giving").select("enabled, account_ending, bank_code").eq("church_id", me.church_id).maybeSingle(),
+    // giving_v2.sql (#65): before it runs this simply comes back empty.
+    supabase.from("church_payment_options").select("payshap_id, link_label, link_url").eq("church_id", me.church_id).maybeSingle(),
   ]);
 
   const bank = details ? bankForBranchCode(details.branch_code) : undefined;
@@ -75,6 +78,7 @@ export default async function GivingDetailsPage() {
           lastChange={lastChange}
         />
       )}
+      {!error && <PaymentOptionsForm options={(options as PaymentOptions | null) ?? null} />}
       {!error && <CardGivingSection state={cardState} />}
     </div>
   );

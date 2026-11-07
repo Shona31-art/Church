@@ -8,7 +8,7 @@ import { checkModuleAccess } from "@/lib/paywall";
 import { randomUUID } from "node:crypto";
 import { initializeTransaction, paystackConfigured } from "@/lib/paystack";
 import { cardReference } from "@/lib/card-giving";
-import { GIVING_FUNDS, MAX_GIFT_RAND, MIN_GIFT_RAND, cardFeeRateFromEnv, coverFeeCents, randToCents, transferReportSchema } from "@/lib/giving";
+import { GIVING_CHANNELS, GIVING_FUNDS, MAX_GIFT_RAND, MIN_GIFT_RAND, cardFeeRateFromEnv, coverFeeCents, randToCents, transferReportSchema } from "@/lib/giving";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { can } from "@/lib/permissions";
@@ -121,8 +121,11 @@ export async function reportTransfer(_prev: FormState, formData: FormData): Prom
   const { data: details } = await supabase.from("church_giving_details").select("church_id").eq("church_id", me.church_id).maybeSingle();
   if (!details) return { error: "Your church hasn't added its bank details yet, so transfers can't be recorded.", values: formValues(formData) };
 
+  // How they paid (giving_v2.sql): bank transfer, PayShap or the church's link.
+  const channel = (GIVING_CHANNELS as readonly string[]).includes(String(formData.get("channel"))) ? String(formData.get("channel")) : "bank";
+
   // The reference is filled in by the database (it can't be chosen here).
-  const { error } = await supabase.from("givings").insert({
+  const gift = {
     church_id: me.church_id,
     user_id: me.id,
     method: "eft",
@@ -131,7 +134,10 @@ export async function reportTransfer(_prev: FormState, formData: FormData): Prom
     currency: "zar",
     fund: parsed.data.fund,
     paid_on: parsed.data.paid_on,
-  });
+  };
+  let { error } = await supabase.from("givings").insert({ ...gift, channel });
+  // Before giving_v2.sql (#65) there's no channel column: record it without.
+  if (error?.code === "42703" || error?.code === "PGRST204") ({ error } = await supabase.from("givings").insert(gift));
   if (error) {
     console.error("[giving] transfer report failed:", error.message);
     return { error: "Couldn't record your gift — please try again. Nothing was saved.", values: formValues(formData) };

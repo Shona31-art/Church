@@ -138,3 +138,32 @@ export function cardFeeRateFromEnv(env: Record<string, string | undefined> = pro
   if (!Number.isInteger(flatCents) || flatCents < 0) return null;
   return { percent, flatCents };
 }
+
+// ---------------------------------------------------------------------------
+// Other ways to pay (giving_v2.sql): PayShap and the church's own payment link.
+// ---------------------------------------------------------------------------
+
+/** How a recorded (manually confirmed) gift was paid. */
+export const GIVING_CHANNELS = ["bank", "payshap", "link"] as const;
+export type GivingChannel = (typeof GIVING_CHANNELS)[number];
+
+export function channelLabel(channel: string | null | undefined, linkLabel?: string | null): string {
+  if (channel === "payshap") return "PayShap";
+  if (channel === "link") return linkLabel || "Payment link";
+  return "Bank transfer";
+}
+
+/** The church admin's PayShap ID and payment link. */
+export const paymentOptionsSchema = z
+  .object({
+    payshap_id: z.string().trim().max(60, "Keep the PayShap ID to 60 characters.").transform((v) => v || null),
+    link_label: z.string().trim().max(40, "Keep the name to 40 characters.").transform((v) => v || null),
+    link_url: z
+      .string()
+      .trim()
+      .max(500)
+      .transform((v) => v || null)
+      .refine((v) => v === null || /^https:\/\/\S{4,}$/.test(v), "Use the full link, starting with https://"),
+  })
+  .refine((v) => !v.payshap_id || v.payshap_id.length >= 3, { message: "That PayShap ID looks too short.", path: ["payshap_id"] })
+  .refine((v) => !v.link_url || Boolean(v.link_label && v.link_label.length >= 2), { message: "Name the link, e.g. SnapScan.", path: ["link_label"] });

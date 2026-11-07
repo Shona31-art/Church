@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
 import { can } from "@/lib/permissions";
-import { GIVING_FUNDS, fundLabel } from "@/lib/giving";
+import { GIVING_FUNDS, channelLabel, fundLabel } from "@/lib/giving";
 import { formatDate, formatMoney, todayInAppZone } from "@/lib/format";
 import { PAGE_SIZE, buildQuery, pageFrom } from "@/lib/list";
 import { PageHeader, Section } from "@/components/ui/PageHeader";
@@ -54,13 +54,23 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
     .eq("status", "reported")
     .order("paid_on", { ascending: true })
     .limit(51);
-  const [{ data: totals, error }, { data: rows }, { data: waitingRows, error: waitingError }] = await Promise.all([totalsQuery, listQuery, waitingQuery]);
+  const [{ data: totals, error }, { data: rows }, { data: waitingRows, error: waitingError }, { data: channelRows }, { data: options }] = await Promise.all([
+    totalsQuery,
+    listQuery,
+    waitingQuery,
+    // How recorded gifts were paid (giving_v2.sql); before that, all bank transfers.
+    supabase.from("givings").select("id, channel").eq("church_id", me.church_id).eq("method", "eft").not("channel", "is", null).order("created_at", { ascending: false }).limit(20000),
+    supabase.from("church_payment_options").select("link_label").eq("church_id", me.church_id).maybeSingle(),
+  ]);
+  const channelOf = new Map(((channelRows ?? []) as { id: string; channel: string }[]).map((r) => [r.id, r.channel]));
+  const how = (id: string) => channelLabel(channelOf.get(id) ?? "bank", (options as { link_label?: string | null } | null)?.link_label);
   // Before migration #30 there's no "reported" status yet; that's not an error worth showing.
   if (waitingError && !/status|column/i.test(waitingError.message)) console.error("[giving] waiting list failed:", waitingError.message);
   const waiting: WaitingGift[] = (waitingRows ?? []).slice(0, 50).map((g: any) => ({
     id: g.id,
     donor: g.app_users?.name ?? "Former member",
     reference: g.reference ?? "—",
+    how: how(g.id),
     amountLabel: formatMoney(g.amount_cents),
     amountRand: (g.amount_cents / 100).toFixed(2),
     fund: fundLabel(g.fund),
@@ -137,7 +147,7 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
                         <p className="truncate font-medium">{g.app_users?.name ?? <span className="text-ink/60">Former member</span>}</p>
                         <p className="mt-0.5 text-xs text-ink/60">
                           {formatDate(g.method === "eft" && g.paid_on ? g.paid_on : g.created_at, { weekday: undefined })} · {fundLabel(g.fund)} ·{" "}
-                          {g.method === "eft" ? <>Transfer <span className="tabular">{g.reference}</span></> : "Card"}
+                          {g.method === "eft" ? <>{how(g.id)} <span className="tabular">{g.reference}</span></> : "Card"}
                         </p>
                       </div>
                       <p className="shrink-0 font-semibold tabular-nums">{formatMoney(g.amount_cents)}</p>
@@ -165,7 +175,7 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
                           <td className="py-2 pr-4 whitespace-nowrap">
                             {g.method === "eft" ? (
                               <>
-                                Transfer <span className="tabular text-xs text-ink/60">{g.reference}</span>
+                                {how(g.id)} <span className="tabular text-xs text-ink/60">{g.reference}</span>
                               </>
                             ) : (
                               "Card"

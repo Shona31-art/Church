@@ -10,8 +10,8 @@ import { GIVING_FUNDS, FUND_LABELS, MAX_GIFT_RAND } from "@/lib/giving";
 
 const QUICK_AMOUNTS = [100, 250, 500, 1000];
 
-/** Member: record a bank transfer they've made. It shows as "waiting" until a church admin confirms it. */
-export function TransferForm({ today }: { today: string }) {
+/** Member: record a gift they've paid (bank transfer, PayShap or the church's link). It shows as "waiting" until a church admin confirms it. */
+export function TransferForm({ today, channels = [{ value: "bank", label: "Bank transfer" }] }: { today: string; channels?: { value: string; label: string }[] }) {
   const [state, action] = useFormState(reportTransfer, null);
   const fe = state?.fieldErrors ?? {};
   const [amount, setAmount] = useState(state?.values?.amount ?? "");
@@ -77,8 +77,24 @@ export function TransferForm({ today }: { today: string }) {
         </FormField>
       </div>
 
+      {channels.length > 1 ? (
+        <fieldset>
+          <legend className="label">How did you pay?</legend>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {channels.map((c, i) => (
+              <label key={c.value} className="flex cursor-pointer items-center gap-2 rounded-xl border border-line px-3 py-2 text-sm has-[:checked]:border-ember has-[:checked]:bg-ember/10">
+                <input type="radio" name="channel" value={c.value} defaultChecked={(state?.values?.channel ?? channels[0].value) === c.value || (!state?.values?.channel && i === 0)} className="h-4 w-4" />
+                {c.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ) : (
+        <input type="hidden" name="channel" value="bank" />
+      )}
+
       <PendingButton className="btn-primary w-full" pendingLabel="Recording…">
-        I&apos;ve made this transfer
+        I&apos;ve paid — record my gift
       </PendingButton>
       <p className="text-center text-xs text-ink/60">This only records your gift. The money moves in your own banking app; no card details are involved.</p>
     </form>

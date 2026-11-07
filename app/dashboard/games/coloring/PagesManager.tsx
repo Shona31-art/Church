@@ -7,26 +7,7 @@ import { showToast } from "@/components/ui/Toaster";
 import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
 import { deleteColoringPage, uploadColoringPage } from "./actions";
 import type { ColoringPage } from "@/lib/coloring/pages";
-
-/** Shrinks a picked page to at most 1600px and returns it as PNG base64. */
-async function prepare(file: File): Promise<{ mimeType: string; data: string }> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
-  const c = document.createElement("canvas");
-  c.width = Math.round(bitmap.width * scale);
-  c.height = Math.round(bitmap.height * scale);
-  const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, c.width, c.height);
-  ctx.drawImage(bitmap, 0, 0, c.width, c.height);
-  // PNG keeps the outlines crisp, so fills stop exactly at the lines.
-  const blob = await new Promise<Blob | null>((resolve) => c.toBlob(resolve, "image/png"));
-  if (!blob) throw new Error("no image");
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  let bin = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return { mimeType: "image/png", data: btoa(bin) };
-}
+import { prepareColoringPage as prepare } from "@/lib/coloring/prepare";
 
 /** Pastors and church admins: add printable colouring pages, or remove them. */
 export function PagesManager({ pages }: { pages: ColoringPage[] }) {
@@ -36,6 +17,7 @@ export function PagesManager({ pages }: { pages: ColoringPage[] }) {
   const mine = pages.filter((p) => p.mine);
 
   async function add(files: FileList) {
+    let done = 0;
     for (const [i, file] of [...files].entries()) {
       setBusy(`Adding ${i + 1} of ${files.length}…`);
       try {
@@ -43,11 +25,14 @@ export function PagesManager({ pages }: { pages: ColoringPage[] }) {
         const title = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").slice(0, 120) || "Colouring page";
         const r = await callAction(() => uploadColoringPage({ ...image, title }), { ok: false as const, error: CONNECTION_FAILED });
         if (!r.ok) showToast(`${file.name}: ${r.error}`, "error");
+        else done++;
       } catch {
         showToast(`${file.name}: that picture couldn't be read.`, "error");
       }
     }
     setBusy(null);
+    if (done) showToast(done === 1 ? "Colouring page added." : `${done} colouring pages added.`);
+    if (input.current) input.current.value = "";
     router.refresh();
   }
 

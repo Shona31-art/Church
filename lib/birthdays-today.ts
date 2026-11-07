@@ -97,19 +97,20 @@ export async function sendBirthdayGreetings(today = todayInAppZone(), onlyChurch
 
     // Notifications: the church, and the birthday people (or a child's parents).
     const rows = birthdays.flatMap((b) => {
-      const first = b.name.trim().split(/\s+/)[0];
+      // The whole name: some names (e.g. "Dol Ma") don't shorten.
+      const who = b.name.trim();
       const skip = new Set(b.skip);
       const base = { church_id: churchId, category: "church_news", type: "birthday.today", link: "/dashboard/chat" };
       return [
         ...members
           .filter((m) => !skip.has(m.id))
-          .map((m) => ({ ...base, user_id: m.id, title: `🎂 It's ${b.name}'s birthday today`, body: b.child ? `Wish ${first} a happy birthday!` : `Send ${first} a blessing!` })),
+          .map((m) => ({ ...base, user_id: m.id, title: `🎂 It's ${b.name}'s birthday today`, body: b.child ? `Wish ${who} a happy birthday!` : `Send ${who} a blessing!` })),
         ...b.greet
           .filter((id) => inApp.has(id))
           .map((id) =>
             b.child
-              ? { ...base, user_id: id, title: `🎂 Happy birthday to ${first}!`, body: `Your church family at ${churchName} is celebrating ${first} today.` }
-              : { ...base, user_id: id, title: `🎂 Happy birthday, ${first}!`, body: `From your church family at ${churchName} — we're celebrating you today.` },
+              ? { ...base, user_id: id, title: `🎂 Happy birthday to ${who}!`, body: `Your church family at ${churchName} is celebrating ${who} today.` }
+              : { ...base, user_id: id, title: `🎂 Happy birthday, ${who}!`, body: `From your church family at ${churchName} — we're celebrating you today.` },
           ),
       ];
     });
@@ -145,13 +146,12 @@ export async function sendBirthdayGreetings(today = todayInAppZone(), onlyChurch
         const path = `${churchId}/${general.id}/${sender.id}/${crypto.randomUUID()}.png`;
         const { error: upErr } = await admin.storage.from(CHAT_MEDIA_BUCKET).upload(path, png, { contentType: "image/png" });
         if (upErr) throw new Error(upErr.message);
-        const first = b.name.trim().split(/\s+/)[0];
         const message = {
           channel_id: general.id,
           sender_id: sender.id,
           kind: "image",
           media_path: path,
-          content: `🎂 Happy birthday, ${first}! Today we celebrate ${b.name} — send your blessings below 🎉`,
+          content: `🎂 Happy birthday, ${b.name.trim()}! Today we celebrate you — send your blessings below 🎉`,
         };
         let { error: msgErr } = await admin.from("chat_messages").insert({ ...message, from_church: true });
         // Before record_members.sql adds from_church, post it the old way.

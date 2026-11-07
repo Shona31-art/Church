@@ -208,9 +208,10 @@ export async function birthdayPoster({
     : { width: 580, height: 700, borderTopLeftRadius: 290, borderTopRightRadius: 290, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 };
   const inner = round ? { borderRadius: 308 } : { borderTopLeftRadius: 278, borderTopRightRadius: 278, borderBottomLeftRadius: 18, borderBottomRightRadius: 18 };
   const BOLD = bold ? { fontFamily: "Bold" } : {};
+  // The whole church name, however long — smaller and on two lines if need be.
+  const churchFont = churchName.length > 48 ? 20 : churchName.length > 32 ? 23 : 26;
   const trimmed = name.trim();
   const bigNameSize = trimmed.length > 26 ? 56 : trimmed.length > 18 ? 68 : 84;
-  const first = name.trim().split(/\s+/)[0] ?? name;
   const upper = name.trim().toUpperCase();
   // One line on the ribbon wherever possible.
   const nameSize = upper.length > 30 ? 34 : upper.length > 25 ? 38 : upper.length > 20 ? 46 : upper.length > 15 ? 54 : 64;
@@ -244,7 +245,7 @@ export async function birthdayPoster({
               <img src={logoDataUrl} width={76} height={76} style={{ objectFit: "contain" }} alt="" />
             </div>
           )}
-          <div style={{ display: "flex", ...BOLD, fontSize: 26, letterSpacing: 5, color: t.sparkle, maxWidth: 760 }}>{churchName.toUpperCase().slice(0, 40)}</div>
+          <div style={{ display: "flex", ...BOLD, fontSize: churchFont, letterSpacing: churchName.length > 32 ? 3 : 5, lineHeight: 1.25, color: t.sparkle, maxWidth: 820 }}>{churchName.toUpperCase().slice(0, 90)}</div>
         </div>
 
         <div style={{ display: "flex", ...(script ? { fontFamily: "Script" } : BOLD), fontSize: script ? 150 : 90, color: t.sparkle, lineHeight: 1, marginTop: 18, textShadow: t.dark ? "0 4px 18px rgba(0,0,0,0.5)" : "0 3px 10px rgba(255,255,255,0.6)" }}>
@@ -305,7 +306,7 @@ export async function birthdayPoster({
         </div>
         <div style={{ display: "flex", ...BOLD, fontSize: 22, letterSpacing: 3, color: t.sparkle, marginTop: 10 }}>NUMBERS 6:24–25</div>
         <div style={{ display: "flex", marginTop: "auto", marginBottom: 34, fontSize: 24, color: t.soft }}>
-          With love, your church family · Celebrating you, {first}
+          With love, your church family · Celebrating you, {name.trim()}
         </div>
       </div>
     ),

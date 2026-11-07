@@ -30,11 +30,15 @@ export async function uploadColoringPage(input: { mimeType: string; data: string
   const path = `${me.church_id}/${randomUUID()}.${EXT[parsed.data.mimeType]}`;
   const admin = createAdminClient();
   const { error: upErr } = await admin.storage.from(COLORING_BUCKET).upload(path, Buffer.from(parsed.data.data, "base64"), { contentType: parsed.data.mimeType });
-  if (upErr) return { ok: false, error: /not.*found/i.test(upErr.message) ? "Colouring pages need a database update (#63)." : "Couldn't save the page — please try again." };
+  if (upErr) {
+    console.error("[coloring] upload failed:", upErr.message);
+    return { ok: false, error: /not.*found/i.test(upErr.message) ? "Colouring pages need a database update: run #63 in Supabase." : /size|large/i.test(upErr.message) ? "That picture is too big — try a smaller one." : "Couldn't save the page — please try again." };
+  }
   const { error } = await createClient().from("coloring_pages").insert({ church_id: me.church_id, title: parsed.data.title, storage_path: path, created_by: me.id });
   if (error) {
+    console.error("[coloring] save failed:", error.message);
     await admin.storage.from(COLORING_BUCKET).remove([path]);
-    return { ok: false, error: "Couldn't save the page — please try again." };
+    return { ok: false, error: error.code === "42P01" ? "Colouring pages need a database update: run #63 in Supabase." : "Couldn't save the page — please try again." };
   }
   revalidatePath("/dashboard/games/coloring");
   return { ok: true };

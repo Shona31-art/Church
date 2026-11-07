@@ -3,17 +3,19 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { ImageOff } from "lucide-react";
+import { ImageViewer } from "@/components/ui/ImageViewer";
 import { createClient } from "@/lib/supabase/client";
 import { CHAT_MEDIA_BUCKET } from "@/lib/chat";
 
 /**
  * A photo in a chat bubble. Photos are private: a short-lived signed link is
  * fetched when the bubble appears (Storage checks the viewer is in this chat).
- * Opens full size in a new tab.
+ * Tapping opens it full screen inside the app (ImageViewer), like WhatsApp.
  */
 export function ChatImage({ path, caption }: { path: string; caption: string }) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,11 +42,12 @@ export function ChatImage({ path, caption }: { path: string; caption: string }) 
 
   return (
     <div className="-mx-1.5 -mt-0.5 mb-1">
+      {open && url && <ImageViewer src={url} caption={caption || undefined} title="Photo" fileName={`grace-photo-${path.split("/").pop()?.split(".")[0]?.slice(0, 8) ?? "chat"}`} onClose={() => setOpen(false)} />}
       {url ? (
-        <a href={url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-xl">
+        <button type="button" onClick={() => setOpen(true)} className="block overflow-hidden rounded-xl" aria-label={caption ? `Open photo: ${caption}` : "Open photo"}>
           {/* unoptimized: already compressed on upload; signed links expire. */}
           <Image src={url} alt={caption ? `Photo: ${caption}` : "Photo"} width={320} height={320} unoptimized className="max-h-80 w-auto max-w-full object-cover" />
-        </a>
+        </button>
       ) : (
         <div className="h-48 w-64 animate-pulse rounded-xl bg-ink/10" role="img" aria-label="Loading photo" />
       )}

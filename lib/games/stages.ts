@@ -8,6 +8,9 @@ import type { GameKey, Level } from "./catalog";
 export const STAGE_COUNT = 100;
 export const PASS_RATIO = 0.7;
 
+/** Kids mode has its own path of numbered levels (all kids' content, no clock). */
+export const KIDS_STAGE_COUNT = 30;
+
 export function isStage(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= STAGE_COUNT;
 }
@@ -48,8 +51,8 @@ export function bestStars(attempts: readonly { stage: number | null; score: numb
 }
 
 /** The highest level you can play: 1, or one past the furthest level passed in a row. */
-export function highestUnlocked(best: Record<number, number>): number {
+export function highestUnlocked(best: Record<number, number>, count = STAGE_COUNT): number {
   let stage = 1;
-  while (stage < STAGE_COUNT && (best[stage] ?? 0) > 0) stage++;
+  while (stage < count && (best[stage] ?? 0) > 0) stage++;
   return stage;
 }

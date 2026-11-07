@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Award, BookOpenText, CalendarCheck, Flame, Grid3x3, Library, ListOrdered, Medal, MessageSquareQuote, Route, Shuffle, Smile, SmilePlus, SquarePen, TextCursorInput, type LucideIcon, Puzzle, ScanSearch, ChevronDown, ChevronRight, Swords } from "lucide-react";
+import { Award, BookOpenText, Palette, CalendarCheck, Flame, Grid3x3, Library, ListOrdered, Medal, MessageSquareQuote, Route, Shuffle, Smile, SmilePlus, SquarePen, TextCursorInput, type LucideIcon, Puzzle, ScanSearch, ChevronDown, ChevronRight, Swords } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/current-user";
 import { moduleGate } from "@/lib/gate";
@@ -221,6 +221,18 @@ export default async function GamesHubPage({ searchParams }: { searchParams: { k
 
       {/* All games */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <section className="card-elevated flex flex-col rounded-2xl p-5" aria-labelledby="game-coloring">
+          <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-2xl border border-line bg-parchment text-gold">
+            <Palette className="h-5 w-5" strokeWidth={1.75} />
+          </span>
+          <h2 id="game-coloring" className="mt-4 text-xl font-semibold">
+            Bible colouring
+          </h2>
+          <p className="mt-1.5 flex-1 text-sm text-ink/60">Colour in Bible pictures — Noah&apos;s ark, Jonah, the empty tomb and more — and save them. Just for fun: no scores.</p>
+          <Link href="/dashboard/games/coloring" className="btn-primary btn-sm mt-5">
+            Start colouring
+          </Link>
+        </section>
         {GAME_KEYS.map((key) => {
           const game = GAMES[key];
           const Icon = ICONS[key];
@@ -330,6 +342,15 @@ function KidsHub() {
         }
       />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Link href="/dashboard/games/coloring?mode=kids" className="card-interactive flex items-center gap-4 rounded-3xl p-6">
+          <span aria-hidden className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-line bg-parchment text-gold">
+            <Palette className="h-8 w-8" strokeWidth={1.75} />
+          </span>
+          <span>
+            <span className="block font-display text-2xl font-semibold">Colouring</span>
+            <span className="mt-0.5 block text-sm text-ink/60">Colour in Bible pictures and save them.</span>
+          </span>
+        </Link>
         {GAME_KEYS.map((key) => {
           const Icon = ICONS[key];
           return (

@@ -10,6 +10,7 @@ import { parseReference } from "@/lib/bible/reference";
 import { readerHref } from "@/lib/bible/books";
 import { fetchVerse } from "@/lib/bible/text";
 import { upcomingBirthdays, describeDaysUntil } from "@/lib/birthdays";
+import { BirthdayCatchUp } from "@/components/birthdays/BirthdayCatchUp";
 import { APP_TIMEZONE, formatDate, formatMoney, formatTime, todayInAppZone } from "@/lib/format";
 import { PLAN_LABELS, type ModuleKey } from "@/lib/subscription";
 import { Section } from "@/components/ui/PageHeader";
@@ -50,6 +51,9 @@ interface Attention {
   href: string;
   tone: "warning" | "info" | "danger";
 }
+
+// The birthday catch-up may draw posters (a few seconds each); give the server action room.
+export const maxDuration = 60;
 
 export default async function DashboardHomePage() {
   const me = await getCurrentAppUser();
@@ -235,6 +239,7 @@ export default async function DashboardHomePage() {
 
   return (
     <div className="max-w-6xl space-y-8">
+      <BirthdayCatchUp />
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="eyebrow">{formatDate(now, { weekday: "long", month: "long", year: undefined })}</p>

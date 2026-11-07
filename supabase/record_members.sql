@@ -125,3 +125,70 @@ create trigger trg_notify_chat_message after insert on chat_messages
 -- same "celebrate with the church" switch.
 alter table member_children add column if not exists photo_path text;
 alter table member_children add column if not exists announce boolean not null default true;
+
+-- The morning's jobs (birthdays, verse of the day) run once per church per
+-- day: the 07:00 job and the catch-up (when someone opens the app and the job
+-- hasn't run) claim the day here first, so nothing is ever sent twice.
+-- Server only.
+create table if not exists daily_runs (
+  church_id uuid not null references churches(id) on delete cascade,
+  day       date not null,
+  kind      text not null check (kind in ('birthdays', 'verse')),
+  ran_at    timestamptz not null default now(),
+  primary key (church_id, day, kind)
+);
+alter table daily_runs enable row level security;
+
+-- Bible duels only count when both people played. Duels that were scored
+-- after one person never accepted or never started (a "30–0 win") are
+-- cancelled instead: nobody won or lost.
+do $$
+begin
+  if to_regclass('public.game_duels') is not null then
+    update game_duels
+       set status = 'cancelled', winner_id = null
+     where status = 'finished'
+       and (challenger_started_at is null or opponent_started_at is null);
+  end if;
+end $$;
+
+-- Built-in jigsaw pictures: every picture uploaded by a church marked as the
+-- source is part of every church's jigsaw (in place of the six drawings),
+-- alongside each church's own pictures. Set by the platform owner:
+--   update churches set jigsaw_source = true where name = '…';
+alter table churches add column if not exists jigsaw_source boolean not null default false;
+
+-- ---------------------------------------------------------------------------
+-- Colouring pages: pastors and church admins upload printable black-and-white
+-- pages; members colour them in the app (tap to fill, up to the lines). Like
+-- the jigsaw, the source church's pages (churches.jigsaw_source) are part of
+-- every church's colouring book. Files live in a private bucket the server
+-- reads for players.
+-- ---------------------------------------------------------------------------
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('coloring-pages', 'coloring-pages', false, 5242880, array['image/webp', 'image/jpeg', 'image/png'])
+on conflict (id) do update
+  set public = false,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+create table if not exists coloring_pages (
+  id            uuid primary key default gen_random_uuid(),
+  church_id     uuid not null references churches(id) on delete cascade,
+  title         text not null check (char_length(btrim(title)) between 1 and 120),
+  storage_path  text not null check (storage_path like church_id::text || '/%'),
+  created_by    uuid references app_users(id) on delete set null,
+  created_at    timestamptz not null default now()
+);
+create index if not exists idx_coloring_pages_church on coloring_pages (church_id, created_at);
+alter table coloring_pages enable row level security;
+
+drop policy if exists coloring_pages_select on coloring_pages;
+create policy coloring_pages_select on coloring_pages
+  for select using (is_super_admin() or church_id = current_church_id());
+drop policy if exists coloring_pages_insert on coloring_pages;
+create policy coloring_pages_insert on coloring_pages
+  for insert with check (is_church_shepherd(church_id));
+drop policy if exists coloring_pages_delete on coloring_pages;
+create policy coloring_pages_delete on coloring_pages
+  for delete using (is_church_shepherd(church_id));

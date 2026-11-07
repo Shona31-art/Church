@@ -13,15 +13,17 @@ export async function renderGamePage(game: GameKey, searchParams: { level?: stri
 
   // Your best stars on each numbered level. Before games_jigsaw.sql adds the
   // column, this errors and the level map is simply not shown.
+  // Kids mode has its own levels (attempts saved with mode "kids").
   let stageStars: Record<number, number> | null = null;
-  if (mode === "practice") {
+  if (mode === "practice" || mode === "kids") {
     const me = (await getCurrentAppUser())!;
-    const { data, error } = await createClient()
+    const base = createClient()
       .from("bible_quiz_attempts")
       .select("stage, score, total_questions")
       .eq("user_id", me.id)
       .eq("game_type", game)
       .not("stage", "is", null);
+    const { data, error } = await (mode === "kids" ? base.eq("mode", "kids") : base.neq("mode", "kids"));
     if (!error) stageStars = bestStars(data ?? []);
   }
   return <GameScreen game={game} initialLevel={isLevel(searchParams.level) ? searchParams.level : undefined} mode={mode} stageStars={stageStars} />;

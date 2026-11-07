@@ -149,7 +149,7 @@ export function PictureManager({ pictures, aiAvailable }: { pictures: PictureRow
           <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={onUpload} aria-label="Upload a picture" />
         </div>
         {pictures.length === 0 ? (
-          <p className="text-sm text-ink/60">No pictures yet — the jigsaw uses its built-in drawings until you add some.</p>
+          <p className="text-sm text-ink/60">No pictures of your own yet — the jigsaw uses the built-in pictures. Pictures you add join them.</p>
         ) : (
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {pictures.map((p) => (

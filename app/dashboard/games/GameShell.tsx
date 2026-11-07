@@ -9,7 +9,7 @@ import { formatDuration } from "@/lib/chat";
 import { Alert } from "@/components/ui/Alert";
 import { ReviewList } from "./ReviewList";
 import { LevelMap } from "./LevelMap";
-import { STAGE_COUNT } from "@/lib/games/stages";
+import { KIDS_STAGE_COUNT, STAGE_COUNT } from "@/lib/games/stages";
 import { finishGame, startGame, type FinishResult, type GameMode } from "./actions";
 import { callAction, CONNECTION_FAILED } from "@/lib/call-action";
 
@@ -60,7 +60,7 @@ export function GameShell<View>({
   const [finishError, setFinishError] = useState<string | null>(null);
   // Quitting a game in progress asks first, so a stray tap doesn't throw a game away.
   const [confirmQuit, setConfirmQuit] = useState(false);
-  const [stars, setStars] = useState<Record<number, number> | null>(mode === "practice" ? stageStars : null);
+  const [stars, setStars] = useState<Record<number, number> | null>(mode === "practice" || mode === "kids" ? stageStars : null);
 
   /** `stage`: a numbered level (always the same puzzle); null: free play at the chosen difficulty. */
   async function start(stage: number | null = null) {
@@ -114,12 +114,12 @@ export function GameShell<View>({
             </Alert>
           )}
 
-          {stars && <LevelMap stars={stars} onPick={(stage) => start(stage)} busy={phase.kind === "starting"} />}
+          {stars && <LevelMap stars={stars} kids={mode === "kids"} onPick={(stage) => start(stage)} busy={phase.kind === "starting"} />}
 
           {stars ? (
             <details className="rounded-xl border border-line p-4 [&_summary::-webkit-details-marker]:hidden">
               <summary className="cursor-pointer list-none font-semibold">
-                Free play <span className="font-normal text-ink/60">· a new random puzzle at Easy, Medium or Hard</span>
+                Free play <span className="font-normal text-ink/60">· {mode === "kids" ? "a new random puzzle" : "a new random puzzle at Easy, Medium or Hard"}</span>
               </summary>
               <div className="mt-4 space-y-6">
           {!fixedLevel && (
@@ -247,7 +247,7 @@ export function GameShell<View>({
           mode={mode}
           stage={phase.stage}
           onReplay={() => start(phase.stage)}
-          onNext={phase.stage !== null && phase.stage < STAGE_COUNT ? () => start(phase.stage! + 1) : undefined}
+          onNext={phase.stage !== null && phase.stage < (mode === "kids" ? KIDS_STAGE_COUNT : STAGE_COUNT) ? () => start(phase.stage! + 1) : undefined}
           onChangeLevel={() => setPhase({ kind: "intro" })}
         />
       )}

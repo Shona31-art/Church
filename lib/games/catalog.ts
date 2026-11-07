@@ -124,13 +124,14 @@ export const GAMES: Record<GameKey, GameInfo> = {
 const POINTS_PER_CORRECT: Record<Level, number> = { easy: 1, medium: 2, hard: 3 };
 
 /**
- * Points for a finished game. Timed mode adds up to 50% for a perfect game
- * finished at or under par time (shrinking to nothing at twice par); an
- * untimed game is never penalised for being slow.
+ * Points for a finished game. Timed mode adds up to 50% of what you scored
+ * for finishing at or under par time (shrinking to nothing at twice par) — so
+ * one wrong answer costs that answer's points and its share of the bonus, not
+ * the whole bonus. An untimed game is never penalised for being slow.
  */
 export function pointsFor({ correct, max, level, timed, durationMs, parSeconds }: { correct: number; max: number; level: Level; timed: boolean; durationMs: number; parSeconds: number }): number {
   const base = correct * POINTS_PER_CORRECT[level];
-  if (!timed || correct < max || max === 0) return base;
+  if (!timed || correct === 0 || max === 0) return base;
   const par = parSeconds * 1000;
   const speed = Math.max(0, Math.min(1, (2 * par - durationMs) / par)); // 1 at ≤ par, 0 at ≥ 2×par
   return base + Math.round(base * 0.5 * speed);

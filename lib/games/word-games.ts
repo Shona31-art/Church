@@ -2,7 +2,7 @@
 // verse) and books-in-order: seeded building and marking (pure — unit-tested).
 
 import type { Level } from "./catalog";
-import { shuffle, type Rng } from "./random";
+import { freshFirst, shuffle, type Rng, type Seen } from "./random";
 import { CROSSWORD_CLUES } from "./content/crossword-clues";
 import { EMOJI_STORIES } from "./content/emoji-stories";
 import { BIBLE_QUOTES } from "./content/quotes";
@@ -45,10 +45,10 @@ function scrambleWord(word: string, rng: Rng): string {
   return word.slice(1) + word[0];
 }
 
-export function buildScramble(level: Level, rng: Rng, kids = false): { puzzle: ScramblePuzzle; view: ScrambleView } {
+export function buildScramble(level: Level, rng: Rng, kids = false, seen?: Seen): { puzzle: ScramblePuzzle; view: ScrambleView } {
   const rule = SCRAMBLE_LEVELS[level];
   const pool = CROSSWORD_CLUES.filter((c) => rule.pool.includes(c.level) && (!kids || c.kids));
-  const words = shuffle(pool, rng)
+  const words = freshFirst(pool, rng, (c) => c.answer, seen)
     .slice(0, rule.count)
     .map((c) => ({ answer: c.answer, clue: c.clue, reference: c.reference }));
   return {
@@ -95,10 +95,10 @@ function withChoices(answer: string, pool: readonly string[], rng: Rng): { choic
   return { choices, answerIndex: choices.indexOf(answer) };
 }
 
-export function buildEmojiSet(level: Level, rng: Rng, kids = false): SetQuestion[] {
+export function buildEmojiSet(level: Level, rng: Rng, kids = false, seen?: Seen): SetQuestion[] {
   const atLevel = EMOJI_STORIES.filter((s) => (kids ? s.kids : s.level === level));
   const typed = level === "hard" && !kids;
-  return shuffle(atLevel, rng)
+  return freshFirst(atLevel, rng, (s) => s.answer, seen)
     .slice(0, SET_LENGTH.emoji)
     .map((s) => ({
       prompt: s.emoji,
@@ -108,11 +108,11 @@ export function buildEmojiSet(level: Level, rng: Rng, kids = false): SetQuestion
     }));
 }
 
-export function buildWhoSaidSet(level: Level, rng: Rng, kids = false): SetQuestion[] {
+export function buildWhoSaidSet(level: Level, rng: Rng, kids = false, seen?: Seen): SetQuestion[] {
   const atLevel = BIBLE_QUOTES.filter((q) => (kids ? q.kids : q.level === level));
   // Distractor speakers come from every level, so even a short level has variety.
   const speakers = BIBLE_QUOTES.map((q) => q.speaker);
-  return shuffle(atLevel, rng)
+  return freshFirst(atLevel, rng, (q) => `“${q.quote}”`, seen)
     .slice(0, SET_LENGTH.who_said)
     .map((q) => ({ prompt: `“${q.quote}”`, ...withChoices(q.speaker, speakers, rng), answer: q.speaker, reference: q.reference }));
 }
@@ -127,11 +127,13 @@ function blankable(word: string): boolean {
  * Easy: one blank, four choices. Medium: two blanks, four choices (pairs).
  * Hard: two blanks, typed.
  */
-export function buildVerseFillSet(level: Level, rng: Rng, kids = false): SetQuestion[] {
+export function buildVerseFillSet(level: Level, rng: Rng, kids = false, seen?: Seen): SetQuestion[] {
   const blanks = level === "easy" || kids ? 1 : 2;
-  const verses = shuffle(
+  const verses = freshFirst(
     PUZZLE_VERSES.filter((v) => tokenize(v.text).filter(blankable).length >= blanks),
-    rng
+    rng,
+    (v) => v.reference,
+    seen
   ).slice(0, SET_LENGTH.verse_fill);
   const allWords = PUZZLE_VERSES.flatMap((v) => tokenize(v.text).filter(blankable).map((w) => w.replace(/[^A-Za-z']/g, "")));
 

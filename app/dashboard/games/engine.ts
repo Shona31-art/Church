@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { GameKey, Level } from "@/lib/games/catalog";
-import { createRng, shuffle } from "@/lib/games/random";
+import { createRng, freshFirst, shuffle, type Seen } from "@/lib/games/random";
 import { QUIZ_LENGTH, checkQuiz, type QuizKey, type QuizProgress } from "@/lib/games/quiz";
 import { buildWordSearch, checkWordSearch, type WordSearchPuzzle } from "@/lib/games/word-search";
 import { buildCrossword, buildStageCrossword, checkCrossword, entryCells, type CrosswordPuzzle, type Direction } from "@/lib/games/crossword";
@@ -24,7 +24,7 @@ import {
 } from "@/lib/games/word-games";
 import { MAZE_POINTS, MAZE_THEMES, buildMaze, checkMaze, type Maze } from "@/lib/games/maze";
 import { buildDifferences, checkDifferences, differenceScene, markTaps, type Background, type DifferencePuzzle, type PictureObject } from "@/lib/games/differences";
-import { JIGSAW_BUCKET, JIGSAW_SCENES, buildJigsaw, checkJigsaw, type JigsawPuzzle, type JigsawSceneKey } from "@/lib/games/jigsaw";
+import { JIGSAW_BUCKET, JIGSAW_SCENES, buildJigsaw, checkJigsaw, scoreJigsawSwaps, type JigsawPuzzle, type JigsawSceneKey } from "@/lib/games/jigsaw";
 
 // One entry per game: how to build a puzzle (the full answer key, kept in
 // the server-only game_sessions row, plus the "view" the player is sent),
@@ -50,7 +50,7 @@ export interface ReviewItem {
 
 interface GameEngine {
   /** `kids`: Kids mode — simpler content only (the level is always Easy). */
-  build(level: Level, seed: number, ctx: { supabase: SupabaseClient; churchId: string; kids: boolean; stage?: number | null }): Promise<BuiltGame | { error: string }>;
+  build(level: Level, seed: number, ctx: { supabase: SupabaseClient; churchId: string; kids: boolean; stage?: number | null; seen?: Seen }): Promise<BuiltGame | { error: string }>;
   answers: z.ZodTypeAny;
   check(puzzle: any, progress: any, answers: any): number;
   /** Optional: answers to show once the game is over. */
@@ -64,7 +64,7 @@ export interface QuizView {
 }
 
 const quiz: GameEngine = {
-  async build(level, seed, { supabase, churchId, kids }) {
+  async build(level, seed, { supabase, churchId, kids, seen }) {
     // Global bank + this church's own questions.
     const { data, error } = await supabase
       .from("bible_quiz_questions")
@@ -76,8 +76,9 @@ const quiz: GameEngine = {
     const rng = createRng(seed);
     // This level's questions first; top up from other levels if the bank is thin.
     const fits = (q: (typeof data)[number]) => (kids ? q.kids_ok : q.difficulty === level);
-    const atLevel = shuffle(data.filter(fits), rng);
-    const others = shuffle(data.filter((q) => !fits(q) && (!kids || q.difficulty === "easy")), rng);
+    // Questions this player hasn't had come first (seen: their past games).
+    const atLevel = freshFirst(data.filter(fits), rng, (q) => String(q.id), seen);
+    const others = freshFirst(data.filter((q) => !fits(q) && (!kids || q.difficulty === "easy")), rng, (q) => String(q.id), seen);
     const chosen = [...atLevel, ...others].slice(0, QUIZ_LENGTH);
 
     // Shuffle each question's choices so the right answer isn't always in the same place.
@@ -122,9 +123,9 @@ export interface VersePuzzleView {
 }
 
 const versePuzzle: GameEngine = {
-  async build(level, seed) {
+  async build(level, seed, { seen }) {
     const rng = createRng(seed);
-    const verses = pickRoundForLevel(level, rng);
+    const verses = pickRoundForLevel(level, rng, seen);
     const view: VersePuzzleView = {
       verses: verses.map((v) => {
         const words = tokenize(v.text);
@@ -188,10 +189,10 @@ export interface SetPuzzle {
   exact: boolean;
 }
 
-function questionSet(make: (level: Level, rng: ReturnType<typeof createRng>, kids: boolean) => SetQuestion[], exact = false): GameEngine {
+function questionSet(make: (level: Level, rng: ReturnType<typeof createRng>, kids: boolean, seen?: Seen) => SetQuestion[], exact = false): GameEngine {
   return {
-    async build(level, seed, { kids }) {
-      const questions = make(level, createRng(seed), kids);
+    async build(level, seed, { kids, seen }) {
+      const questions = make(level, createRng(seed), kids, seen);
       if (!questions.length) return { error: "No puzzles are available for this level yet." };
       return { puzzle: { questions, exact } satisfies SetPuzzle, view: setQuestionView(questions), maxCorrect: questions.length };
     },
@@ -208,8 +209,8 @@ export type SetView = ReturnType<typeof setQuestionView>;
 // --- Word scramble ---------------------------------------------------------------
 
 const scramble: GameEngine = {
-  async build(level, seed, { kids }) {
-    const { puzzle, view } = buildScramble(level, createRng(seed), kids);
+  async build(level, seed, { kids, seen }) {
+    const { puzzle, view } = buildScramble(level, createRng(seed), kids, seen);
     return { puzzle, view, maxCorrect: puzzle.words.length };
   },
   answers: z.array(z.string().max(40)).max(20),
@@ -265,17 +266,37 @@ export interface JigsawView {
 }
 
 const jigsaw: GameEngine = {
-  async build(level, seed, { supabase, churchId }) {
+  async build(level, seed, { supabase, churchId, stage }) {
     const puzzle = buildJigsaw(level, createRng(seed));
     const info = JIGSAW_SCENES.find((s) => s.key === puzzle.scene)!;
     const view: JigsawView = { scene: puzzle.scene, title: info.title, reference: info.reference, size: puzzle.size, order: puzzle.order };
 
-    // The church's own pictures (jigsaw_pictures.sql), when it has any. The same
-    // seed picks the same picture, so numbered levels stay the same puzzle.
-    const { data: pictures } = await supabase.from("jigsaw_pictures").select("id, title, reference, storage_path").eq("church_id", churchId).order("created_at");
-    if (pictures?.length) {
-      const picture = pictures[Math.floor(createRng(seed ^ 0x5bd1e995)() * pictures.length)];
-      const { data: signed } = await createAdminClient().storage.from(JIGSAW_BUCKET).createSignedUrl(picture.storage_path, 4 * 3600);
+    // The pool: the built-in pictures — every picture of the church(es) marked
+    // as the source (record_members.sql: churches.jigsaw_source), or the six
+    // drawings until there is one — plus this church's own pictures. Adding
+    // pictures never takes the built-in ones away. The same seed picks the same
+    // picture, so numbered levels stay the same puzzle.
+    type Pic = { id: string; title: string; reference: string | null; storage_path: string };
+    const admin = createAdminClient();
+    const columns = "id, title, reference, storage_path";
+    const [{ data: own }, { data: sources }] = await Promise.all([
+      supabase.from("jigsaw_pictures").select(columns).eq("church_id", churchId).order("created_at"),
+      admin.from("churches").select("id").eq("jigsaw_source", true),
+    ]);
+    const sourceIds = ((sources ?? []) as { id: string }[]).map((c) => c.id);
+    const { data: builtIn } = sourceIds.length ? await admin.from("jigsaw_pictures").select(columns).in("church_id", sourceIds).order("created_at") : { data: [] };
+    const builtInPics = (builtIn ?? []) as Pic[];
+    const inBuiltIn = new Set(builtInPics.map((p) => p.id));
+    // The church's own first, so its pictures come up in the early levels.
+    const pictures = [...((own ?? []) as Pic[]).filter((p) => !inBuiltIn.has(p.id)), ...builtInPics];
+    const drawings = builtInPics.length ? 0 : JIGSAW_SCENES.length;
+    // Numbered levels go through the pictures in turn (level 1 = the first, …),
+    // so every level is a different picture; free play picks one at random.
+    const poolSize = drawings + pictures.length;
+    const pick = !pictures.length ? 0 : stage && stage > 0 ? (stage - 1) % poolSize : Math.floor(createRng(seed ^ 0x5bd1e995)() * poolSize);
+    if (pictures.length && pick >= drawings) {
+      const picture = pictures[pick - drawings];
+      const { data: signed } = await admin.storage.from(JIGSAW_BUCKET).createSignedUrl(picture.storage_path, 4 * 3600);
       if (signed?.signedUrl) {
         puzzle.pictureId = picture.id;
         Object.assign(view, { imageUrl: signed.signedUrl, title: picture.title, reference: picture.reference ?? "" });
@@ -283,9 +304,13 @@ const jigsaw: GameEngine = {
     }
     return { puzzle, view, maxCorrect: puzzle.size * puzzle.size };
   },
-  // The final arrangement: arrangement[slot] = piece.
-  answers: z.array(z.number().int().min(0).max(99)).max(100),
-  check: (puzzle: JigsawPuzzle, _progress, arrangement) => checkJigsaw(puzzle, arrangement),
+  // Every swap made, in order (replayed here, so moves count); an older app
+  // sends just the final arrangement (arrangement[slot] = piece).
+  answers: z.union([
+    z.object({ swaps: z.array(z.tuple([z.number().int().min(0).max(99), z.number().int().min(0).max(99)])).max(4000) }),
+    z.array(z.number().int().min(0).max(99)).max(100),
+  ]),
+  check: (puzzle: JigsawPuzzle, _progress, answer) => (Array.isArray(answer) ? checkJigsaw(puzzle, answer) : scoreJigsawSwaps(puzzle, answer.swaps)),
 };
 
 // --- Spot the difference ---------------------------------------------------------

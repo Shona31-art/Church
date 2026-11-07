@@ -13,14 +13,31 @@ import type { BoardProps } from "../GameShell";
 function Picture({ view }: { view: JigsawView }) {
   return view.imageUrl ? (
     // eslint-disable-next-line @next/next/no-img-element -- short-lived signed link to the church's picture
-    <img src={view.imageUrl} alt="" draggable={false} className="block h-full w-full select-none object-cover" />
+    <img
+      src={view.imageUrl}
+      alt=""
+      draggable={false}
+      className="block h-full w-full select-none object-cover"
+    />
   ) : (
     <JigsawArt scene={view.scene} />
   );
 }
 
 /** One jigsaw-shaped piece: the picture cut along the piece's outline. */
-function Piece({ view, piece, uid, home, selected }: { view: JigsawView; piece: number; uid: string; home: boolean; selected: boolean }) {
+function Piece({
+  view,
+  piece,
+  uid,
+  home,
+  selected,
+}: {
+  view: JigsawView;
+  piece: number;
+  uid: string;
+  home: boolean;
+  selected: boolean;
+}) {
   const n = view.size;
   const pr = Math.floor(piece / n);
   const pc = piece % n;
@@ -32,7 +49,15 @@ function Piece({ view, piece, uid, home, selected }: { view: JigsawView; piece: 
       aria-hidden
       viewBox={`${-TAB} ${-TAB} ${100 + 2 * TAB} ${100 + 2 * TAB}`}
       className="pointer-events-none absolute overflow-visible"
-      style={{ left: `${-TAB}%`, top: `${-TAB}%`, width: `${100 + 2 * TAB}%`, height: `${100 + 2 * TAB}%`, filter: selected ? "drop-shadow(0 6px 10px rgb(0 0 0 / 0.35))" : "drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.3))" }}
+      style={{
+        left: `${-TAB}%`,
+        top: `${-TAB}%`,
+        width: `${100 + 2 * TAB}%`,
+        height: `${100 + 2 * TAB}%`,
+        filter: selected
+          ? "drop-shadow(0 6px 10px rgb(0 0 0 / 0.35))"
+          : "drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.3))",
+      }}
     >
       <defs>
         <clipPath id={clip}>
@@ -40,9 +65,28 @@ function Piece({ view, piece, uid, home, selected }: { view: JigsawView; piece: 
         </clipPath>
       </defs>
       <g clipPath={`url(#${clip})`}>
-        {view.imageUrl ? <image href={view.imageUrl} {...frame} preserveAspectRatio="xMidYMid slice" /> : <JigsawArt scene={view.scene} frame={frame} />}
+        {view.imageUrl ? (
+          <image
+            href={view.imageUrl}
+            {...frame}
+            preserveAspectRatio="xMidYMid slice"
+          />
+        ) : (
+          <JigsawArt scene={view.scene} frame={frame} />
+        )}
       </g>
-      <path d={d} fill="none" stroke={home ? "rgb(246 205 106 / 0.95)" : selected ? "#ffffff" : "rgb(255 255 255 / 0.6)"} strokeWidth={home || selected ? 2.4 : 1.4} />
+      <path
+        d={d}
+        fill="none"
+        stroke={
+          home
+            ? "rgb(246 205 106 / 0.95)"
+            : selected
+              ? "#ffffff"
+              : "rgb(255 255 255 / 0.6)"
+        }
+        strokeWidth={home || selected ? 2.4 : 1.4}
+      />
     </svg>
   );
 }
@@ -51,10 +95,16 @@ function Piece({ view, piece, uid, home, selected }: { view: JigsawView; piece: 
  * Tap two pieces to swap them, or drag one onto another. Pieces in their
  * right place lock with a gold glow. Done when every piece is home.
  */
-export function JigsawBoard({ view, finish, finishing }: BoardProps<JigsawView>) {
+export function JigsawBoard({
+  view,
+  finish,
+  finishing,
+}: BoardProps<JigsawView>) {
   const [order, setOrder] = useState<number[]>(view.order);
   const [selected, setSelected] = useState<number | null>(null);
   const [moves, setMoves] = useState(0);
+  // Every swap, sent with the result: the server replays them and scores the moves.
+  const swaps = useRef<[number, number][]>([]);
   const [peek, setPeek] = useState(false);
   const drag = useRef<{ from: number; moved: boolean } | null>(null);
   const n = view.size;
@@ -67,14 +117,18 @@ export function JigsawBoard({ view, finish, finishing }: BoardProps<JigsawView>)
     const next = swapPieces(order, a, b);
     setOrder(next);
     setMoves((m) => m + 1);
+    swaps.current.push([a, b]);
     setSelected(null);
     const nowHome = (next[a] === a ? 1 : 0) + (next[b] === b ? 1 : 0);
     haptic(nowHome ? "success" : "tap");
-    if (next.every((p, i) => p === i)) setTimeout(() => finish(next), 900);
+    if (next.every((p, i) => p === i))
+      setTimeout(() => finish({ swaps: swaps.current }), 900);
   }
 
   function slotAt(x: number, y: number) {
-    const el = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-slot]");
+    const el = document
+      .elementFromPoint(x, y)
+      ?.closest<HTMLElement>("[data-slot]");
     return el ? Number(el.dataset.slot) : null;
   }
 
@@ -95,7 +149,8 @@ export function JigsawBoard({ view, finish, finishing }: BoardProps<JigsawView>)
     drag.current = null;
     if (!d) return;
     const over = slotAt(e.clientX, e.clientY);
-    if (d.moved && over !== null && over !== d.from && order[over] !== over) return swap(d.from, over);
+    if (d.moved && over !== null && over !== d.from && order[over] !== over)
+      return swap(d.from, over);
     // A tap: choose, or swap with the chosen piece.
     if (selected === null) {
       setSelected(d.from);
@@ -126,58 +181,90 @@ export function JigsawBoard({ view, finish, finishing }: BoardProps<JigsawView>)
             <span className="tabular font-semibold text-ink">
               {placed} / {n * n}
             </span>{" "}
-            in place · <span className="tabular">{moves}</span> {moves === 1 ? "move" : "moves"}
+            in place · <span className="tabular">{moves}</span>{" "}
+            {moves === 1 ? "move" : "moves"}
           </p>
         </div>
       </div>
-      <p className="mb-3 text-sm text-ink/60">Tap two pieces to swap them, or drag one onto another. Hold the small picture to peek.</p>
+      <p className="mb-3 text-sm text-ink/60">
+        Tap two pieces to swap them, or drag one onto another. Hold the small
+        picture to peek.
+      </p>
 
-      <div className="relative mx-auto aspect-square w-full max-w-[26rem]">
-        <div
-          className="relative h-full w-full touch-none select-none rounded-xl bg-ink/10"
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={() => (drag.current = null)}
-          role="grid"
-          aria-label="Jigsaw"
-        >
-          {order.map((piece, slot) => {
-            const home = piece === slot;
-            const isSelected = selected === slot;
-            return (
-              <button
-                key={slot}
-                type="button"
-                data-slot={slot}
-                onPointerDown={(e) => onPointerDown(e, slot)}
-                onClick={(e) => {
-                  // Keyboard: Enter/Space picks and swaps like a tap.
-                  if (e.detail !== 0 || home || done) return;
-                  if (selected === null) setSelected(slot);
-                  else swap(selected, slot);
-                }}
-                aria-label={`Piece ${piece + 1} in space ${slot + 1}${home ? ", in the right place" : ""}${isSelected ? ", chosen" : ""}`}
-                className={`absolute transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${isSelected ? "z-20 scale-[1.08]" : home ? "z-0" : "z-10"} ${home ? "cursor-default" : "cursor-grab"}`}
-                style={{ left: `${((slot % n) * 100) / n}%`, top: `${(Math.floor(slot / n) * 100) / n}%`, width: `${100 / n}%`, height: `${100 / n}%` }}
-              >
-                <Piece view={view} piece={piece} uid={uid} home={home && !done} selected={isSelected} />
-              </button>
-            );
-          })}
-        </div>
-        {peek && (
-          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl shadow-xl">
-            <Picture view={view} />
+      {/* A margin round the board as deep as a piece's knob: a piece out of
+          place on the edge pokes its knob outwards, and it mustn't cover the
+          words above or the button below. */}
+      <div
+        className="mx-auto w-full max-w-[28rem]"
+        style={{ padding: `${(TAB / (n * 100 + 2 * TAB)) * 100}%` }}
+      >
+        <div className="relative aspect-square w-full">
+          <div
+            className="relative h-full w-full touch-none select-none rounded-xl bg-ink/10"
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={() => (drag.current = null)}
+            role="grid"
+            aria-label="Jigsaw"
+          >
+            {order.map((piece, slot) => {
+              const home = piece === slot;
+              const isSelected = selected === slot;
+              return (
+                <button
+                  key={slot}
+                  type="button"
+                  data-slot={slot}
+                  onPointerDown={(e) => onPointerDown(e, slot)}
+                  onClick={(e) => {
+                    // Keyboard: Enter/Space picks and swaps like a tap.
+                    if (e.detail !== 0 || home || done) return;
+                    if (selected === null) setSelected(slot);
+                    else swap(selected, slot);
+                  }}
+                  aria-label={`Piece ${piece + 1} in space ${slot + 1}${home ? ", in the right place" : ""}${isSelected ? ", chosen" : ""}`}
+                  className={`absolute transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${isSelected ? "z-20 scale-[1.08]" : home ? "z-0" : "z-10"} ${home ? "cursor-default" : "cursor-grab"}`}
+                  style={{
+                    left: `${((slot % n) * 100) / n}%`,
+                    top: `${(Math.floor(slot / n) * 100) / n}%`,
+                    width: `${100 / n}%`,
+                    height: `${100 / n}%`,
+                  }}
+                >
+                  <Piece
+                    view={view}
+                    piece={piece}
+                    uid={uid}
+                    home={home && !done}
+                    selected={isSelected}
+                  />
+                </button>
+              );
+            })}
           </div>
-        )}
+          {peek && (
+            <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl shadow-xl">
+              <Picture view={view} />
+            </div>
+          )}
+        </div>
       </div>
 
       {done ? (
-        <p role="status" className="mt-4 flex items-center justify-center gap-2 font-semibold text-success">
-          <CheckCircle2 aria-hidden className="h-5 w-5" /> Complete in {moves} moves!
+        <p
+          role="status"
+          className="mt-4 flex items-center justify-center gap-2 font-semibold text-success"
+        >
+          <CheckCircle2 aria-hidden className="h-5 w-5" /> Complete in {moves}{" "}
+          moves!
         </p>
       ) : (
-        <button type="button" className="btn-ghost btn-sm mt-6" onClick={() => finish(order)} disabled={finishing}>
+        <button
+          type="button"
+          className="btn-ghost btn-sm mt-6"
+          onClick={() => finish({ swaps: swaps.current })}
+          disabled={finishing}
+        >
           {finishing ? "Saving…" : "Finish with what I've placed"}
         </button>
       )}

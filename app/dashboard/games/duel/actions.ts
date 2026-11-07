@@ -68,7 +68,7 @@ export async function createDuel(opponentId: string, level: string, length: numb
   if ((open ?? 0) >= 10) return { error: "You have 10 challenges waiting for an answer — wait for some replies first." };
 
   // The same questions for both.
-  const picked = await pickQuizQuestions(me.church_id!, lvl.data, length);
+  const picked = await pickQuizQuestions(me.church_id!, lvl.data, length, [me.id, opponent.data]);
   if ("error" in picked) return picked;
 
   const { data: duel, error } = await admin
@@ -128,49 +128,62 @@ export async function startDuel(duelId: string): Promise<{ ok?: true; error?: st
  * what the right answer was. Answers go in order; the first one counts.
  */
 export async function answerDuel(duelId: string, index: number, choice: number): Promise<{ correctIndex?: number; correct?: boolean; finished?: boolean; error?: string }> {
-  const ctx = await myDuel(duelId);
-  if ("error" in ctx) return ctx;
-  const { me, duel, side } = ctx;
+  // Speed matters here (the player is waiting to see if they were right), so
+  // everything is fetched at once: who I am, the duel, its answer key and my
+  // earlier answers. Plan access was checked when the duel started.
+  if (!z.string().uuid().safeParse(duelId).success) return { error: "That duel couldn't be found." };
+  const admin = createAdminClient();
+  const [{ data: auth }, { data: duelRow }, { data: key }, { data: earlier }] = await Promise.all([
+    createClient().auth.getUser(),
+    admin.from("game_duels").select("*").eq("id", duelId).maybeSingle(),
+    admin.from("game_duel_keys").select("correct").eq("duel_id", duelId).maybeSingle(),
+    admin.from("game_duel_answers").select("user_id, idx, answered_at, correct, ms").eq("duel_id", duelId),
+  ]);
+  const userId = auth.user?.id;
+  if (!userId) return { error: "Your session has expired — sign in again." };
+  const duel = duelRow as DuelRow | null;
+  const side = duel ? sideOf(duel, userId) : null;
+  if (!duel || !side) return { error: "That duel couldn't be found." };
   const total = duel.questions.length;
   if (!Number.isInteger(index) || index < 0 || index >= total || !Number.isInteger(choice) || choice < -1 || choice > 3) return { error: "That answer didn't look right." };
   if (!["pending", "active"].includes(duel.status) || !duel[`${side}_started_at`] || duel[`${side}_finished_at`]) return { error: "This duel isn't open to play." };
   if (index !== duel[`${side}_done`]) return { error: "Answer the questions in order." };
-
-  const admin = createAdminClient();
-  const [{ data: key }, { data: previous }] = await Promise.all([
-    admin.from("game_duel_keys").select("correct").eq("duel_id", duelId).maybeSingle(),
-    index > 0 ? admin.from("game_duel_answers").select("answered_at").eq("duel_id", duelId).eq("user_id", me.id).eq("idx", index - 1).maybeSingle() : Promise.resolve({ data: null }),
-  ]);
   if (!key) return { error: "This duel is missing its answers." };
+
+  const mine = ((earlier ?? []) as { user_id: string; idx: number; answered_at: string; correct: boolean; ms: number }[]).filter((a) => a.user_id === userId);
   const correctIndex = (key.correct as number[])[index];
   // The question appeared when the previous one was answered (or when I started).
-  const shownAt = new Date((previous as { answered_at?: string } | null)?.answered_at ?? duel[`${side}_started_at`]!);
+  const shownAt = new Date(mine.find((a) => a.idx === index - 1)?.answered_at ?? duel[`${side}_started_at`]!);
   const { ms, inTime } = timeAnswer(shownAt, new Date());
   const correct = inTime && choice === correctIndex;
 
-  const { error } = await admin.from("game_duel_answers").insert({ duel_id: duelId, user_id: me.id, idx: index, choice, correct, ms });
+  const done = index + 1;
+  const patch: Record<string, unknown> = { [`${side}_done`]: done };
+  if (done === total) {
+    const all = [...mine.filter((a) => a.idx !== index), { correct, ms }];
+    patch[`${side}_finished_at`] = new Date().toISOString();
+    patch[`${side}_score`] = all.filter((a) => a.correct).length;
+    patch[`${side}_ms`] = all.reduce((sum, a) => sum + a.ms, 0);
+  }
+  // Save the answer and move my place on together (the unique answer per
+  // question stops a double tap counting twice).
+  const [{ error }] = await Promise.all([
+    admin.from("game_duel_answers").insert({ duel_id: duelId, user_id: userId, idx: index, choice, correct, ms }),
+    admin.from("game_duels").update(patch).eq("id", duelId).eq(`${side}_done`, index),
+  ]);
   if (error) {
     if (error.code === "23505") return { error: "You've already answered that one." };
     console.error("[duel] answer failed:", error.message);
     return { error: "Couldn't save your answer — check your connection." };
   }
-
-  const done = index + 1;
-  const patch: Record<string, unknown> = { [`${side}_done`]: done };
-  if (done === total) {
-    const { data: mine } = await admin.from("game_duel_answers").select("correct, ms").eq("duel_id", duelId).eq("user_id", me.id);
-    patch[`${side}_finished_at`] = new Date().toISOString();
-    patch[`${side}_score`] = (mine ?? []).filter((a) => a.correct).length;
-    patch[`${side}_ms`] = (mine ?? []).reduce((sum, a) => sum + (a.ms as number), 0);
-  }
-  await admin.from("game_duels").update(patch).eq("id", duelId);
   if (done === total) await settle(duelId);
   return { correctIndex, correct, finished: done === total };
 }
 
 /**
  * Over when both have finished — or when time ran out: unanswered questions
- * count as wrong, and a challenge nobody played is simply cancelled.
+ * count as wrong. A duel only counts if BOTH played: if one of them never
+ * accepted or never started, it's cancelled — nobody wins or loses.
  * Safe to call any time; does nothing until the duel is over.
  */
 export async function settleDuel(duelId: string): Promise<void> {
@@ -188,7 +201,7 @@ async function settle(duelId: string): Promise<void> {
   const bothDone = Boolean(duel.challenger_finished_at && duel.opponent_finished_at);
   if (!bothDone && !expired) return;
 
-  if (!duel.challenger_started_at && !duel.opponent_started_at) {
+  if (!duel.challenger_started_at || !duel.opponent_started_at) {
     await admin.from("game_duels").update({ status: "cancelled" }).eq("id", duelId).in("status", ["pending", "active"]);
     return;
   }

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { Lock, Star } from "lucide-react";
-import { STAGE_COUNT, highestUnlocked } from "@/lib/games/stages";
+import { KIDS_STAGE_COUNT, STAGE_COUNT, highestUnlocked } from "@/lib/games/stages";
 
 const BANDS = [
   { label: "Easy", from: 1, to: 30 },
@@ -10,9 +10,13 @@ const BANDS = [
   { label: "Hard", from: 66, to: STAGE_COUNT },
 ] as const;
 
-/** Levels 1–100: passed levels show their stars, the next one glows, the rest are locked. */
-export function LevelMap({ stars, onPick, busy }: { stars: Record<number, number>; onPick: (stage: number) => void; busy: boolean }) {
-  const next = highestUnlocked(stars);
+const KIDS_BANDS = [{ label: "Kids", from: 1, to: KIDS_STAGE_COUNT }] as const;
+
+/** Levels 1–100 (Kids mode: 1–30): passed levels show their stars, the next one glows, the rest are locked. */
+export function LevelMap({ stars, onPick, busy, kids = false }: { stars: Record<number, number>; onPick: (stage: number) => void; busy: boolean; kids?: boolean }) {
+  const count = kids ? KIDS_STAGE_COUNT : STAGE_COUNT;
+  const bands = kids ? KIDS_BANDS : BANDS;
+  const next = highestUnlocked(stars, count);
   const total = Object.values(stars).reduce((sum, s) => sum + s, 0);
   const passed = Object.values(stars).filter((s) => s > 0).length;
   const currentRef = useRef<HTMLButtonElement>(null);
@@ -29,11 +33,11 @@ export function LevelMap({ stars, onPick, busy }: { stars: Record<number, number
           Levels
         </h2>
         <p className="tabular text-sm text-ink/60">
-          {passed} of {STAGE_COUNT} passed · <Star aria-hidden className="inline h-3.5 w-3.5 -translate-y-px fill-gold text-gold" /> {total}
+          {passed} of {count} passed · <Star aria-hidden className="inline h-3.5 w-3.5 -translate-y-px fill-gold text-gold" /> {total}
         </p>
       </div>
       <div className="max-h-[22rem] space-y-4 overflow-y-auto rounded-xl border border-line p-3">
-        {BANDS.map((band) => (
+        {bands.map((band) => (
           <div key={band.label}>
             <p className="eyebrow mb-2">
               {band.label} · {band.from}–{band.to}

@@ -31,7 +31,11 @@ type ChildRaw = { id: string; name: string; church_id: string; birth_date: strin
 
 const isLeap = (y: number) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
 
-export async function sendBirthdayGreetings(today = todayInAppZone()): Promise<{ churches: number; people: number; posters: number }> {
+/**
+ * `onlyChurch`: just that church (a pastor's "Celebrate now" button);
+ * otherwise every church (the morning job). Each church is done once a day.
+ */
+export async function sendBirthdayGreetings(today = todayInAppZone(), onlyChurch?: string): Promise<{ churches: number; people: number; posters: number; alreadySent?: boolean }> {
   const admin = createAdminClient();
   const md = today.slice(5);
   // Leap-day birthdays are celebrated on 28 February in other years.
@@ -40,7 +44,9 @@ export async function sendBirthdayGreetings(today = todayInAppZone()): Promise<{
   const celebrants: Celebrant[] = [];
 
   // Members.
-  const { data, error } = await admin.from("member_birthdays").select("*, person:app_users!member_birthdays_user_id_fkey(*)").limit(20000);
+  let membersQuery = admin.from("member_birthdays").select("*, person:app_users!member_birthdays_user_id_fkey(*)");
+  if (onlyChurch) membersQuery = membersQuery.eq("church_id", onlyChurch);
+  const { data, error } = await membersQuery.limit(20000);
   if (error) console.error("[birthdays] members failed:", error.message);
   for (const b of (data ?? []) as { birth_date: string; announce?: boolean; person: Person | null }[]) {
     const p = b.person;
@@ -49,7 +55,9 @@ export async function sendBirthdayGreetings(today = todayInAppZone()): Promise<{
   }
 
   // Children (their parents get the greeting).
-  const { data: kids, error: kidsErr } = await admin.from("member_children").select("*").not("birth_date", "is", null).limit(20000);
+  let kidsQuery = admin.from("member_children").select("*").not("birth_date", "is", null);
+  if (onlyChurch) kidsQuery = kidsQuery.eq("church_id", onlyChurch);
+  const { data: kids, error: kidsErr } = await kidsQuery.limit(20000);
   if (kidsErr && kidsErr.code !== "42P01") console.error("[birthdays] children failed:", kidsErr.message);
   for (const c of (kids ?? []) as ChildRaw[]) {
     if (!isToday(c.birth_date) || c.announce === false) continue;
@@ -58,15 +66,26 @@ export async function sendBirthdayGreetings(today = todayInAppZone()): Promise<{
   }
 
   const byChurch = new Map<string, Celebrant[]>();
-  for (const c of celebrants) byChurch.set(c.churchId, [...(byChurch.get(c.churchId) ?? []), c]);
+  let alreadySent = false;
+  for (const c of celebrants) if (!onlyChurch || c.churchId === onlyChurch) byChurch.set(c.churchId, [...(byChurch.get(c.churchId) ?? []), c]);
 
   let people = 0;
   let posters = 0;
   let churches = 0;
   for (const [churchId, birthdays] of byChurch) {
     // Once a day per church.
-    const { count } = await admin.from("notifications").select("id", { count: "exact", head: true }).eq("church_id", churchId).eq("type", "birthday.today").gte("created_at", `${today}T00:00:00+02:00`);
-    if (count) continue;
+    // Claim the day for this church first (record_members.sql: daily_runs), so
+    // the 07:00 job and the catch-up from someone opening the app can't both post.
+    const { error: claimErr } = await admin.from("daily_runs").insert({ church_id: churchId, day: today, kind: "birthdays" });
+    let count = claimErr?.code === "23505" ? 1 : 0;
+    if (claimErr && claimErr.code !== "23505") {
+      // Before record_members.sql: fall back to "has anyone been told today?".
+      ({ count } = (await admin.from("notifications").select("id", { count: "exact", head: true }).eq("church_id", churchId).eq("type", "birthday.today").gte("created_at", `${today}T00:00:00+02:00`)) as { count: number });
+    }
+    if (count) {
+      alreadySent = true;
+      continue;
+    }
     churches++;
     const [{ data: church }, { data: everyone }] = await Promise.all([
       admin.from("churches").select("name, logo_url").eq("id", churchId).maybeSingle(),
@@ -144,7 +163,7 @@ export async function sendBirthdayGreetings(today = todayInAppZone()): Promise<{
       }
     }
   }
-  return { churches, people, posters };
+  return { churches, people, posters, alreadySent };
 }
 
 /** The church logo as a data URL for the poster (null if there isn't one or it won't load). */

@@ -18,28 +18,74 @@ export default async function JigsawPicturesPage() {
   const gate = await moduleGate("bible_games");
   if (gate) return gate;
   const me = (await getCurrentAppUser())!;
-  if (!can(me.role, "manageQuizQuestions")) return <PermissionDenied message="Pastors and church admins choose the jigsaw pictures." backHref="/dashboard/games" />;
+  if (!can(me.role, "manageQuizQuestions"))
+    return (
+      <PermissionDenied
+        message="Pastors and church admins choose the jigsaw pictures."
+        backHref="/dashboard/games"
+      />
+    );
 
-  const { data, error } = await createClient().from("jigsaw_pictures").select("id, title, reference, storage_path, source").eq("church_id", me.church_id).order("created_at");
+  const { data, error } = await createClient()
+    .from("jigsaw_pictures")
+    .select("id, title, reference, storage_path, source")
+    .eq("church_id", me.church_id)
+    .order("created_at");
   const notSetUp = Boolean(error);
+  // record_members.sql: this church's pictures are the built-in set for every church.
+  const { data: churchRow } = await createAdminClient()
+    .from("churches")
+    .select("jigsaw_source")
+    .eq("id", me.church_id!)
+    .maybeSingle();
+  const isSource = Boolean(
+    (churchRow as { jigsaw_source?: boolean } | null)?.jigsaw_source,
+  );
   const paths = (data ?? []).map((p) => p.storage_path);
-  const { data: signed } = paths.length ? await createAdminClient().storage.from(JIGSAW_BUCKET).createSignedUrls(paths, 3600) : { data: [] };
+  const { data: signed } = paths.length
+    ? await createAdminClient()
+        .storage.from(JIGSAW_BUCKET)
+        .createSignedUrls(paths, 3600)
+    : { data: [] };
   const urlFor = new Map((signed ?? []).map((s) => [s.path, s.signedUrl]));
-  const pictures: PictureRow[] = (data ?? []).map((p) => ({ id: p.id, title: p.title, reference: p.reference, source: p.source, url: urlFor.get(p.storage_path) ?? null }));
+  const pictures: PictureRow[] = (data ?? []).map((p) => ({
+    id: p.id,
+    title: p.title,
+    reference: p.reference,
+    source: p.source,
+    url: urlFor.get(p.storage_path) ?? null,
+  }));
 
   return (
     <div className="max-w-3xl">
       <PageHeader
         back={{ href: "/dashboard/games", label: "Games" }}
         title="Jigsaw pictures"
-        description="The pictures your church's Bible jigsaw uses. Paint them with AI or upload your own."
+        description="Add your own pictures to your church's Bible jigsaw — they join the built-in pictures. Paint them with AI or upload your own."
       />
       {notSetUp ? (
         <Alert tone="warning" title="Needs a database update">
-          Run supabase/jigsaw_pictures.sql in the Supabase SQL Editor, then refresh this page.
+          Run supabase/jigsaw_pictures.sql in the Supabase SQL Editor, then
+          refresh this page.
         </Alert>
       ) : (
-        <PictureManager pictures={pictures} aiAvailable={isPosterAiConfigured() && (await planIncludes("ai_assist"))} />
+        <>
+          {isSource && (
+            <div className="mb-5">
+              <Alert tone="info" title="These are the built-in pictures">
+                Every church&apos;s Bible jigsaw uses your pictures, level by
+                level — anything you add here is included for everyone, and
+                deleting one removes it for everyone.
+              </Alert>
+            </div>
+          )}
+          <PictureManager
+            pictures={pictures}
+            aiAvailable={
+              isPosterAiConfigured() && (await planIncludes("ai_assist"))
+            }
+          />
+        </>
       )}
     </div>
   );

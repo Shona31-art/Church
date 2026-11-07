@@ -15,7 +15,8 @@ export const W = 8;
 export const MAZE_SIZES: Record<Level, number> = { easy: 8, medium: 13, hard: 19 };
 
 /** A solved maze is worth this many "answers", so it scores like other games. */
-export const MAZE_POINTS = 5;
+/** Points for reaching the goal by the shortest way; wrong turns cost points (checkMaze). */
+export const MAZE_POINTS = 10;
 
 export const MAZE_THEMES = [
   { title: "Lead the Israelites through the Red Sea", start: "🚶", goal: "🏕️", reference: "Exodus 14:21-22" },
@@ -66,9 +67,32 @@ export function canMove(maze: Maze, index: number, move: keyof typeof MOVES): bo
   return (maze.cells[index] & MOVES[move][2]) !== 0;
 }
 
+/** The fewest moves from the start (top left) to the goal (bottom right). */
+export function shortestRoute(maze: Maze): number {
+  const goal = maze.size * maze.size - 1;
+  const dist = new Array<number>(maze.cells.length).fill(-1);
+  dist[0] = 0;
+  const queue = [0];
+  while (queue.length) {
+    const at = queue.shift()!;
+    if (at === goal) return dist[at];
+    for (const m of Object.keys(MOVES) as (keyof typeof MOVES)[]) {
+      if (!canMove(maze, at, m)) continue;
+      const next = at + MOVES[m][0] * maze.size + MOVES[m][1];
+      if (dist[next] === -1) {
+        dist[next] = dist[at] + 1;
+        queue.push(next);
+      }
+    }
+  }
+  return 0;
+}
+
 /**
  * Follows a route of moves (U/R/D/L) from the start. Walking into a wall
- * makes the route invalid. Returns MAZE_POINTS if it reaches the goal.
+ * makes the route invalid. Reaching the goal the shortest way scores
+ * MAZE_POINTS; every wrong turn (two wasted steps: in and back out) costs one,
+ * down to 1 for getting there at all. Not reaching the goal scores 0.
  */
 export function checkMaze(maze: Maze, route: string): number {
   if (route.length > maze.size * maze.size * 4) return 0;
@@ -79,7 +103,9 @@ export function checkMaze(maze: Maze, route: string): number {
     if (!canMove(maze, at, m)) return 0;
     at += MOVES[m][0] * maze.size + MOVES[m][1];
   }
-  return at === maze.size * maze.size - 1 ? MAZE_POINTS : 0;
+  if (at !== maze.size * maze.size - 1) return 0;
+  const wasted = Math.max(0, route.length - shortestRoute(maze));
+  return Math.max(1, MAZE_POINTS - Math.ceil(wasted / 2));
 }
 
 export { MOVES };

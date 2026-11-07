@@ -37,3 +37,23 @@ export function shuffle<T>(items: readonly T[], rng: Rng): T[] {
 export function newSeed(): number {
   return Math.floor(Math.random() * 2 ** 31);
 }
+
+/**
+ * What a player has had before: item key → how recently (higher = more
+ * recent). Built from their past games (lib/games/seen.ts).
+ */
+export type Seen = ReadonlyMap<string, number>;
+
+/**
+ * Shuffles `items` with the ones the player hasn't had first, then the ones
+ * they have, oldest first — so nothing repeats until they've been through
+ * everything, and then the longest-ago come back first. Without `seen`, a
+ * plain shuffle (the same seed still gives the same order).
+ */
+export function freshFirst<T>(items: readonly T[], rng: Rng, key: (item: T) => string, seen?: Seen): T[] {
+  const mixed = shuffle(items, rng);
+  if (!seen?.size) return mixed;
+  const fresh = mixed.filter((i) => !seen.has(key(i)));
+  const old = mixed.filter((i) => seen.has(key(i))).sort((a, b) => seen.get(key(a))! - seen.get(key(b))!);
+  return [...fresh, ...old];
+}

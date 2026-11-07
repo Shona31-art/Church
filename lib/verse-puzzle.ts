@@ -82,7 +82,7 @@ export function pickRound(count: number, random: () => number = Math.random): Pu
 // ---------------------------------------------------------------------------
 
 import type { Level } from "@/lib/games/catalog";
-import { shuffle, type Rng } from "@/lib/games/random";
+import { freshFirst, type Rng, type Seen } from "@/lib/games/random";
 
 const LEVEL_RULES: Record<Level, { count: number; minWords: number; maxWords: number }> = {
   easy: { count: 3, minWords: 4, maxWords: 9 },
@@ -91,13 +91,13 @@ const LEVEL_RULES: Record<Level, { count: number; minWords: number; maxWords: nu
 };
 
 /** Verses for one round at this level, chosen by the seeded generator. */
-export function pickRoundForLevel(level: Level, rng: Rng): PuzzleVerse[] {
+export function pickRoundForLevel(level: Level, rng: Rng, seen?: Seen): PuzzleVerse[] {
   const { count, minWords, maxWords } = LEVEL_RULES[level];
   const fitting = PUZZLE_VERSES.filter((v) => {
     const n = tokenize(v.text).length;
     return n >= minWords && n <= maxWords;
   });
-  return shuffle(fitting, rng).slice(0, count);
+  return freshFirst(fitting, rng, (v) => v.reference, seen).slice(0, count);
 }
 
 /** Tries allowed per verse before it must be revealed. */

@@ -67,10 +67,12 @@ describe("points", () => {
     expect(pointsFor({ ...base, level: "easy", timed: false, durationMs: 0 })).toBe(10);
     expect(pointsFor({ ...base, level: "hard", timed: false, durationMs: 0 })).toBe(30);
   });
-  test("timed bonus: +50% at par, shrinking to nothing at twice par, perfect games only", () => {
+  test("timed bonus: +50% at par, shrinking to nothing at twice par, in proportion to what you got right", () => {
     expect(pointsFor({ ...base, timed: true, durationMs: 90_000 })).toBe(30);
     expect(pointsFor({ ...base, timed: true, durationMs: 150_000 })).toBe(25);
     expect(pointsFor({ ...base, timed: true, durationMs: 250_000 })).toBe(20);
-    expect(pointsFor({ ...base, correct: 9, timed: true, durationMs: 1_000 })).toBe(18);
+    // One wrong (9 of 10 on Medium): 18 + 9 bonus, not 18 with no bonus.
+    expect(pointsFor({ ...base, correct: 9, timed: true, durationMs: 1_000 })).toBe(27);
+    expect(pointsFor({ ...base, correct: 0, timed: true, durationMs: 1_000 })).toBe(0);
   });
 });

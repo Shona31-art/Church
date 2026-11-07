@@ -12,7 +12,8 @@ import { isSetAnswerCorrect } from "@/lib/games/word-games";
 import { localInputToUtcIso, todayInAppZone } from "@/lib/format";
 import type { QuizKey, QuizProgress } from "@/lib/games/quiz";
 import { VERSE_TRIES, isCorrectOrder, tokenize, type PuzzleVerse, type VerseProgress } from "@/lib/verse-puzzle";
-import { bestStars, isStage, stageLevel, stageSeed, starsFor } from "@/lib/games/stages";
+import { KIDS_STAGE_COUNT, bestStars, isStage, stageLevel, stageSeed, starsFor } from "@/lib/games/stages";
+import { seenFrom } from "@/lib/games/seen";
 import { ENGINES, type ReviewItem, type SetProgress, type SetPuzzle } from "./engine";
 import { CROSSWORD_HINTS, crosswordLetterAt, type CrosswordPuzzle } from "@/lib/games/crossword";
 
@@ -78,7 +79,7 @@ export async function startGame(game: string, level: string, timed: boolean, mod
     level = "easy";
     timed = false;
   }
-  if (stage !== null && (mode !== "practice" || !isStage(stage))) return { error: "That level doesn't exist." };
+  if (stage !== null && (mode === "daily" || !isStage(stage) || (mode === "kids" && stage > KIDS_STAGE_COUNT))) return { error: "That level doesn't exist." };
 
   const admin = createAdminClient();
   const { count } = await admin
@@ -109,19 +110,30 @@ export async function startGame(game: string, level: string, timed: boolean, mod
   if (stage !== null) {
     // Numbered level: always the same puzzle; open once the level before it is passed.
     if (stage > 1) {
-      const { data: prev } = await createClient()
+      const prevQuery = createClient()
         .from("bible_quiz_attempts")
         .select("stage, score, total_questions")
         .eq("user_id", me.id)
         .eq("game_type", game)
         .eq("stage", stage - 1);
+      // Kids' levels and grown-ups' levels are separate paths.
+      const { data: prev } = await (mode === "kids" ? prevQuery.eq("mode", "kids") : prevQuery.neq("mode", "kids"));
       if (!(bestStars(prev ?? [])[stage - 1] > 0)) return { error: `Pass level ${stage - 1} first to unlock level ${stage}.` };
     }
-    level = stageLevel(stage);
-    seed = stageSeed(game, stage);
+    level = mode === "kids" ? "easy" : stageLevel(stage);
+    seed = stageSeed(game, mode === "kids" ? 1000 + stage : stage);
   }
 
-  const built = await ENGINES[game].build(level as Level, seed, { supabase: createClient(), churchId: me.church_id!, kids: mode === "kids", stage });
+  // Questions this player has had before (their recent games of this kind), so
+  // a new game gives them ones they haven't seen. Not for the daily challenge:
+  // that's the same puzzle for the whole church.
+  let seen: Map<string, number> | undefined;
+  if (mode !== "daily") {
+    const { data: past } = await admin.from("game_sessions").select("puzzle").eq("user_id", me.id).eq("game_type", game).order("started_at", { ascending: false }).limit(150);
+    seen = seenFrom(game, ((past ?? []) as { puzzle: unknown }[]).map((p) => p.puzzle));
+  }
+
+  const built = await ENGINES[game].build(level as Level, seed, { supabase: createClient(), churchId: me.church_id!, kids: mode === "kids", stage, seen });
   if ("error" in built) return { error: built.error };
 
   const row: Record<string, unknown> = { church_id: me.church_id, user_id: me.id, game_type: game, level, timed, mode, seed, puzzle: built.puzzle, max_correct: built.maxCorrect };

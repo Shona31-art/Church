@@ -148,6 +148,16 @@ describe("maze", () => {
     expect(checkMaze(maze, "XYZ")).toBe(0);
     expect(checkMaze(maze, "R".repeat(10_000))).toBe(0);
   });
+
+  test("wrong turns cost points: in and back out again is one point", () => {
+    const maze = buildMaze("medium", createRng(5));
+    const route = solve(maze);
+    // A detour off the start square and straight back (whichever way is open).
+    const out = (["R", "D"] as const).find((m) => maze.cells[0] & (m === "R" ? E : S))!;
+    const back = out === "R" ? "L" : "U";
+    expect(checkMaze(maze, out + back + route)).toBe(MAZE_POINTS - 1);
+    expect(checkMaze(maze, (out + back).repeat(30) + route)).toBe(1);
+  });
 });
 
 describe("daily challenge, streaks, badges", () => {

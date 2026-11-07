@@ -45,7 +45,11 @@ export default async function DuelsPage() {
   const forMe = rows.filter((r) => r.phase === "respond");
   const myTurn = rows.filter((r) => r.phase === "ready" || r.phase === "playing");
   const waiting = rows.filter((r) => r.phase === "waiting");
-  const done = rows.filter((r) => r.phase === "finished");
+  // Only duels both people played count (a "win" over someone who never
+  // accepted isn't one); older results like that show as "Not played".
+  const played = (d: Listed) => Boolean(d.challenger_started_at && d.opponent_started_at);
+  const done = rows.filter((r) => r.phase === "finished" && played(r.d));
+  const unplayed = rows.filter((r) => (r.phase === "finished" && !played(r.d)) || (r.phase === "cancelled" && r.d[`${r.side}_started_at`]));
   const record = done.reduce((t, r) => (r.d.winner_id === me.id ? { ...t, w: t.w + 1 } : r.d.winner_id ? { ...t, l: t.l + 1 } : { ...t, d: t.d + 1 }), { w: 0, l: 0, d: 0 });
 
   const Row = ({ r, children }: { r: (typeof rows)[number]; children?: React.ReactNode }) => (
@@ -153,6 +157,19 @@ export default async function DuelsPage() {
                 </Row>
               );
             })}
+          </ul>
+        </section>
+      )}
+
+      {unplayed.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-3 text-lg font-semibold">Not played</h2>
+          <ul className="space-y-2">
+            {unplayed.slice(0, 10).map((r) => (
+              <Row key={r.d.id} r={r}>
+                <span className="shrink-0 text-xs text-ink/60">{r.d[`${r.them}_started_at`] ? "You didn't play — not counted" : "They didn't play — not counted"}</span>
+              </Row>
+            ))}
           </ul>
         </section>
       )}

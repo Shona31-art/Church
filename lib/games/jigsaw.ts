@@ -32,7 +32,7 @@ export const JIGSAW_BUCKET = "jigsaw-pictures";
 
 export interface JigsawPuzzle {
   scene: JigsawSceneKey;
-  /** A church picture used instead of the built-in drawing. */
+  /** A church picture (they share the pool with the built-in drawings). */
   pictureId?: string;
   size: number;
   /** order[slot] = the piece shown in that slot at the start. Piece i belongs in slot i. */
@@ -47,6 +47,39 @@ export function buildJigsaw(level: Level, rng: Rng): JigsawPuzzle {
   let order = shuffle(pieces, rng);
   for (let tries = 0; tries < 50 && order.filter((p, i) => p === i).length > Math.floor(size / 2); tries++) order = shuffle(pieces, rng);
   return { scene, size, order };
+}
+
+/** The fewest swaps that solve a shuffled order (pieces minus cycles). */
+export function fewestSwaps(order: readonly number[]): number {
+  const seen = new Array<boolean>(order.length).fill(false);
+  let cycles = 0;
+  for (let i = 0; i < order.length; i++) {
+    if (seen[i]) continue;
+    cycles++;
+    for (let j = i; !seen[j]; j = order[j]) seen[j] = true;
+  }
+  return order.length - cycles;
+}
+
+/**
+ * Score for a played jigsaw: replays the swaps from the starting order, counts
+ * pieces home, then takes off one piece for every two moves beyond the fewest
+ * possible (with a little slack: a quarter more, at least two). A finished
+ * jigsaw done with far too many moves can still fail.
+ */
+export function scoreJigsawSwaps(puzzle: JigsawPuzzle, swaps: readonly (readonly [number, number])[]): number {
+  const n = puzzle.size * puzzle.size;
+  if (swaps.length > n * 40) return 0;
+  let order = [...puzzle.order];
+  for (const [a, b] of swaps) {
+    if (![a, b].every((i) => Number.isInteger(i) && i >= 0 && i < n)) return 0;
+    order = swapPieces(order, a, b);
+  }
+  const home = order.filter((p, i) => p === i).length;
+  const best = fewestSwaps(puzzle.order);
+  const slack = Math.max(2, Math.ceil(best / 4));
+  const extra = Math.max(0, swaps.length - best - slack);
+  return Math.max(0, home - Math.ceil(extra / 2));
 }
 
 /** Pieces in their home slot. `arrangement` must be a full arrangement of the pieces, else 0. */

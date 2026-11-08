@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useCanPickMultiple } from "@/lib/use-multi-pick";
 import { useRouter } from "next/navigation";
 import { ImagePlus, LoaderCircle, Trash2 } from "lucide-react";
 import { deletePicture, uploadPicture } from "./actions";
@@ -32,26 +33,34 @@ export function PictureManager({ pictures }: { pictures: PictureRow[] }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Several at once in browsers and newer Android apps (lib/use-multi-pick.ts).
+  const multi = useCanPickMultiple();
   const [confirm, confirmDialog] = useConfirm();
 
+  /** Uploads every picked picture, one after another, and says how many made it. */
   async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const files = [...(e.target.files ?? [])];
     e.target.value = "";
-    if (!file) return;
+    if (!files.length) return;
     setError(null);
-    setBusy("Uploading…");
-    try {
-      const small = await toCompressedImage(file, 1600, 1.6 * 1024 * 1024);
-      const r = await uploadPicture({ mimeType: small.blob.type, data: await toBase64(small.blob), title: file.name.replace(/\.[^.]+$/, "").slice(0, 120) || "Picture" });
-      if (!r.ok) setError(r.error);
-      else {
-        showToast("Picture added to the jigsaw.", "success");
-        router.refresh();
+    let added = 0;
+    const failed: string[] = [];
+    for (const [i, file] of files.entries()) {
+      setBusy(files.length > 1 ? `Uploading ${i + 1} of ${files.length}…` : "Uploading…");
+      try {
+        const small = await toCompressedImage(file, 1600, 1.6 * 1024 * 1024);
+        const r = await uploadPicture({ mimeType: small.blob.type, data: await toBase64(small.blob), title: file.name.replace(/\.[^.]+$/, "").slice(0, 120) || "Picture" });
+        if (r.ok) added++;
+        else failed.push(`${file.name}: ${r.error}`);
+      } catch {
+        failed.push(`${file.name}: couldn't read that picture (try a JPG or PNG)`);
       }
-    } catch {
-      setError("Couldn't read that picture. Try a JPG or PNG.");
-    } finally {
-      setBusy(null);
+    }
+    setBusy(null);
+    if (failed.length) setError(failed.slice(0, 5).join(" · ") + (failed.length > 5 ? ` · and ${failed.length - 5} more` : ""));
+    if (added) {
+      showToast(added === 1 ? "Picture added to the jigsaw." : `${added} pictures added to the jigsaw.`, "success");
+      router.refresh();
     }
   }
 
@@ -78,9 +87,9 @@ export function PictureManager({ pictures }: { pictures: PictureRow[] }) {
             Your jigsaw pictures <span className="font-normal text-ink/60">({pictures.length})</span>
           </h2>
           <button type="button" onClick={() => fileRef.current?.click()} disabled={busy !== null} className="btn-secondary btn-sm">
-            <ImagePlus aria-hidden className="h-4 w-4" /> Upload a picture
+            <ImagePlus aria-hidden className="h-4 w-4" /> {multi ? "Upload pictures" : "Upload a picture"}
           </button>
-          <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={onUpload} aria-label="Upload a picture" />
+          <input ref={fileRef} type="file" accept="image/*" multiple={multi} className="sr-only" onChange={onUpload} aria-label={multi ? "Upload pictures" : "Upload a picture"} />
         </div>
         {pictures.length === 0 ? (
           <p className="text-sm text-ink/60">No pictures of your own yet — the jigsaw uses the built-in pictures. Pictures you add join them.</p>

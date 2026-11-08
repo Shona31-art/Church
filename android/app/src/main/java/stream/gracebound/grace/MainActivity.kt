@@ -54,7 +54,14 @@ class MainActivity : ComponentActivity() {
     }
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
     private val pickFiles = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        fileCallback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data))
+        // Several files chosen at once come back as ClipData, which parseResult ignores.
+        val clip = result.data?.clipData
+        val uris = if (result.resultCode == android.app.Activity.RESULT_OK && clip != null && clip.itemCount > 0) {
+            Array(clip.itemCount) { clip.getItemAt(it).uri }
+        } else {
+            WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data)
+        }
+        fileCallback?.onReceiveValue(uris)
         fileCallback = null
     }
 

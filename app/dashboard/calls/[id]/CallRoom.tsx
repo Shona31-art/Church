@@ -39,6 +39,8 @@ type Signal =
 interface PresenceMeta {
   userId: string;
   name: string;
+  /** Their profile photo (a short-lived link), so others see who joined. */
+  photoUrl?: string | null;
   muted?: boolean;
   cameraOff?: boolean;
 }
@@ -47,6 +49,7 @@ interface Remote {
   peerId: string;
   userId: string;
   name: string;
+  photoUrl: string | null;
   stream: MediaStream | null;
   muted: boolean;
   cameraOff: boolean;
@@ -73,7 +76,7 @@ export function CallRoom({
   autoJoin = false,
 }: {
   callId: string;
-  me: { id: string; name: string };
+  me: { id: string; name: string; photoUrl?: string | null };
   capacity: number;
   iceServers: RTCIceServer[];
   back: { href: string; label: string };
@@ -100,6 +103,11 @@ export function CallRoom({
   const [title, setTitle] = useState(startTitle);
   const [adding, setAdding] = useState(false);
   const [remotes, setRemotes] = useState<Record<string, Remote>>({});
+  // The latest remotes, for callbacks that need a name (e.g. "Thandi left the call").
+  const remotesRef = useRef<Record<string, Remote>>({});
+  useEffect(() => {
+    remotesRef.current = remotes;
+  }, [remotes]);
   const [muted, setMuted] = useState(false);
   // Grace's Android app: voice calls start on the earpiece, video on the loudspeaker.
   const [android, setAndroid] = useState(false);
@@ -117,7 +125,7 @@ export function CallRoom({
   const channelRef = useRef<RealtimeChannel | null>(null);
   const peersRef = useRef(new Map<string, RTCPeerConnection>());
   const pendingRef = useRef(new Map<string, RTCIceCandidateInit[]>());
-  const metaRef = useRef<PresenceMeta>({ userId: me.id, name: me.name, muted: false, cameraOff: audioOnly });
+  const metaRef = useRef<PresenceMeta>({ userId: me.id, name: me.name, photoUrl: me.photoUrl ?? null, muted: false, cameraOff: audioOnly });
   // Each person's incoming sound and video, gathered into one stream.
   const remoteStreamsRef = useRef(new Map<string, MediaStream>());
   const everConnectedRef = useRef(false);
@@ -133,6 +141,8 @@ export function CallRoom({
   }, []);
 
   const closePeer = useCallback((id: string) => {
+    const leaving = remotesRef.current[id];
+    if (leaving && !oneToOneRef.current && !endingRef.current) showToast(`${leaving.name.split(" ")[0]} left the call`, "info");
     peersRef.current.get(id)?.close();
     peersRef.current.delete(id);
     pendingRef.current.delete(id);
@@ -222,7 +232,9 @@ export function CallRoom({
       if (peersRef.current.has(theirId) || !localRef.current) return peersRef.current.get(theirId);
       const pc = new RTCPeerConnection({ iceServers });
       peersRef.current.set(theirId, pc);
-      setRemotes((all) => ({ ...all, [theirId]: { peerId: theirId, userId: meta.userId, name: meta.name, stream: null, muted: Boolean(meta.muted), cameraOff: Boolean(meta.cameraOff), state: "new" } }));
+      setRemotes((all) => ({ ...all, [theirId]: { peerId: theirId, userId: meta.userId, name: meta.name, photoUrl: meta.photoUrl ?? null, stream: null, muted: Boolean(meta.muted), cameraOff: Boolean(meta.cameraOff), state: "new" } }));
+      // Group calls: say who joined, like WhatsApp.
+      if (!oneToOneRef.current && meta.name) showToast(`${meta.name.split(" ")[0]} joined the call`, "info");
       localRef.current.getTracks().forEach((track) => pc.addTrack(track, localRef.current!));
       // Voice call: an empty video lane from the start, so either person can
       // turn their camera on later without reconnecting.
@@ -450,7 +462,7 @@ export function CallRoom({
           if (!peersRef.current.has(id)) {
             if (shouldInitiate(peerId, id)) connectTo(id, meta, true);
           } else {
-            updateRemote(id, { muted: Boolean(meta.muted), cameraOff: Boolean(meta.cameraOff), name: meta.name });
+            updateRemote(id, { muted: Boolean(meta.muted), cameraOff: Boolean(meta.cameraOff), name: meta.name, photoUrl: meta.photoUrl ?? null });
           }
         }
         for (const id of [...peersRef.current.keys()]) if (!state[id]) closePeer(id);
@@ -692,7 +704,7 @@ export function CallRoom({
       </header>
 
       <main className="relative z-10 flex flex-1 flex-col items-center justify-center gap-4 px-4">
-        {!remoteVideo && (oneToOne || !videoLayout || !someoneHere) && phase.kind !== "error" && (
+        {!remoteVideo && (oneToOne || !someoneHere) && phase.kind !== "error" && (
           <span className={!connected && phase.kind !== "ended" ? "motion-safe:animate-pulse" : ""}>
             <span className="block scale-[2.2]">
               <Avatar name={oneToOne ? other?.name ?? title : title} src={oneToOne ? other?.photoUrl ?? null : null} size="lg" />
@@ -700,7 +712,23 @@ export function CallRoom({
           </span>
         )}
         {!oneToOne && !videoLayout && someoneHere && (
-          <p className="text-sm text-white/80">{people.map((p) => p.name + (p.muted ? " (muted)" : "")).join(", ")}</p>
+          // Group voice call: everyone in the call, with their photo, like WhatsApp.
+          <ul className="grid w-full max-w-md grid-cols-3 gap-x-2 gap-y-5 sm:grid-cols-4" aria-label="In the call">
+            {[{ key: "me", name: "You", photoUrl: me.photoUrl ?? null, muted, connecting: false }, ...people.map((p) => ({ key: p.peerId, name: p.name, photoUrl: p.photoUrl, muted: p.muted, connecting: p.state !== "connected" }))].map((p) => (
+              <li key={p.key} className="flex flex-col items-center gap-1.5 text-center">
+                <span className={`relative rounded-full ring-2 ${p.connecting ? "ring-white/20 motion-safe:animate-pulse" : "ring-[#1f94a0]/70"}`}>
+                  <Avatar name={p.name} src={p.photoUrl} size="lg" />
+                  {p.muted && (
+                    <span className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full bg-black/70" aria-label="Muted">
+                      <MicOff aria-hidden className="h-4 w-4" />
+                    </span>
+                  )}
+                </span>
+                <span className="w-full truncate text-sm font-medium">{p.key === "me" ? "You" : p.name.split(" ")[0]}</span>
+                <span className="-mt-1 text-[11px] text-white/60">{p.connecting ? "Connecting…" : p.muted ? "Muted" : "In the call"}</span>
+              </li>
+            ))}
+          </ul>
         )}
         {oneToOne && people.some((p) => p.muted) && <p className="flex items-center gap-1 text-sm text-white/80"><MicOff aria-hidden className="h-4 w-4" /> {other?.name ?? "They"} muted their microphone</p>}
         {phase.kind === "error" && <p role="alert" className="max-w-sm text-center text-sm text-red-200">{phase.message}</p>}

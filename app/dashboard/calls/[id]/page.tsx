@@ -82,12 +82,14 @@ export default async function CallPage({ params, searchParams }: { params: { id:
     oneToOne = false;
     other = null;
   }
-  const photo = other?.id ? (await getAvatarUrls([other.id])).get(other.id) ?? null : null;
+  // My photo goes to the others when I join (so a group call shows who's in it), and the other person's for a two-person call.
+  const photos = await getAvatarUrls([me.id, ...(other?.id ? [other.id] : [])]);
+  const photo = other?.id ? photos.get(other.id) ?? null : null;
 
   return (
     <CallRoom
       callId={call.id}
-      me={{ id: me.id, name: me.name }}
+      me={{ id: me.id, name: me.name, photoUrl: photos.get(me.id) ?? null }}
       capacity={callCapacity(call.room_url)}
       iceServers={iceServersFrom({ TURN_URLS: process.env.TURN_URLS, TURN_USERNAME: process.env.TURN_USERNAME, TURN_CREDENTIAL: process.env.TURN_CREDENTIAL })}
       back={back}

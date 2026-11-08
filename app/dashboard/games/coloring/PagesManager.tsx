@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useCanPickMultiple } from "@/lib/use-multi-pick";
 import { useRouter } from "next/navigation";
 import { ImagePlus, Trash2 } from "lucide-react";
 import { showToast } from "@/components/ui/Toaster";
@@ -14,6 +15,7 @@ export function PagesManager({ pages }: { pages: ColoringPage[] }) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const multi = useCanPickMultiple();
   const mine = pages.filter((p) => p.mine);
 
   async function add(files: FileList) {
@@ -46,9 +48,9 @@ export function PagesManager({ pages }: { pages: ColoringPage[] }) {
           <p className="text-sm text-ink/60">Upload printable black-and-white pages you&apos;re allowed to use. Clear, closed outlines colour best.</p>
         </div>
         <button type="button" className="btn-secondary" disabled={Boolean(busy)} onClick={() => input.current?.click()}>
-          <ImagePlus aria-hidden className="h-4 w-4" /> {busy ?? "Upload pages"}
+          <ImagePlus aria-hidden className="h-4 w-4" /> {busy ?? (multi ? "Upload pages" : "Upload a page")}
         </button>
-        <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" multiple className="sr-only" onChange={(e) => e.target.files?.length && add(e.target.files)} />
+        <input ref={input} type="file" accept="image/*" multiple={multi} className="sr-only" onChange={(e) => e.target.files?.length && add(e.target.files)} />
       </div>
       {mine.length > 0 && (
         <ul className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-6">

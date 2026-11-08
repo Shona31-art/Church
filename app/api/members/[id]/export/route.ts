@@ -4,6 +4,8 @@ import { getCurrentAppUser } from "@/lib/current-user";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 import { AVATAR_BUCKET } from "@/lib/avatar-path";
+import { buildExportPdf, type ExportSection } from "@/lib/export-pdf";
+import { formatMoney } from "@/lib/format";
 
 /**
  * GET /api/members/:id/export — POPIA "access to personal information".
@@ -67,7 +69,64 @@ const NO_CHURCH_COLUMN = new Set([
   "chat_blocks",
 ]);
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+// Readable names for the PDF (the JSON keeps the table names).
+const TITLES: Record<string, string> = {
+  member_birthdays: "Your birthday",
+  member_children: "Your children",
+  prayer_board_items: "Your prayers",
+  prayer_comments: "Your comments on prayers",
+  prayer_intercessions: "Prayers you prayed for others",
+  givings: "Your giving",
+  event_rsvps: "Events you replied to",
+  sermon_notes: "Your sermon notes",
+  bible_bookmarks: "Bible bookmarks",
+  bible_notes: "Bible notes",
+  bible_highlights: "Bible highlights",
+  notifications: "Notifications",
+  notification_preferences: "Notification settings",
+  poster_assets: "Pictures you uploaded for posters",
+  bible_quiz_attempts: "Bible game scores",
+  pastor_bookings: "Pastor appointments",
+  support_tickets: "Support requests",
+  counseling_conversations: "Counselling conversations",
+  pastoral_care_logs: "Pastoral care records",
+  chat_messages: "Your chat messages",
+  chat_message_reactions: "Your reactions to messages",
+  chat_member_settings: "Chat settings",
+  chat_blocks: "People you blocked",
+  member_chat_restrictions: "Chat restrictions",
+};
+/** Most recent records shown in the PDF for the busiest tables (the JSON has them all). */
+const PDF_LIMIT: Record<string, number> = { notifications: 200, chat_messages: 1000, chat_message_reactions: 300 };
+// Internal columns that mean nothing to a person.
+const HIDDEN = /^(id|church_id|user_id|updated_by|created_by|uploaded_by|member_id|requested_by|blocker_id|sender_id|actor_id|session_id|group_key|channel_id|message_id|reply_to_id|deleted_by|stripe_.*|provider_reference|.*_path|.*_encrypted|ciphertext|iv|search_vector|count)$/;
+
+const humanKey = (k: string) => {
+  const t = k.replace(/_cents$/, "").replace(/_at$/, "").replace(/_/g, " ");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
+function humanValue(key: string, v: unknown): string | null {
+  if (v === null || v === undefined || v === "") return null;
+  if (typeof v === "boolean") return v ? "Yes" : "No";
+  if (typeof v === "number") return key.endsWith("_cents") ? formatMoney(v) : String(v);
+  if (typeof v === "string") {
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) return new Date(v).toLocaleString("en-ZA", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" });
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return new Date(`${v}T12:00:00Z`).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+    return v;
+  }
+  if (Array.isArray(v)) return v.length ? v.map((x) => (typeof x === "object" ? JSON.stringify(x) : String(x))).join(", ") : null;
+  return JSON.stringify(v);
+}
+function rowItems(row: Record<string, unknown>): { label: string; value: string }[] {
+  return Object.entries(row)
+    .filter(([k]) => !HIDDEN.test(k))
+    .map(([k, v]) => ({ label: humanKey(k), value: humanValue(k, v) }))
+    .filter((x): x is { label: string; value: string } => x.value !== null);
+}
+
+export async function GET(request: Request, { params }: { params: { id: string } }) {
+  // ?format=json: the machine-readable copy. Otherwise a readable PDF.
+  const format = new URL(request.url).searchParams.get("format") === "json" ? "json" : "pdf";
   const me = await getCurrentAppUser();
   if (!me) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
 
@@ -135,7 +194,74 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       action: isSelf ? "member.self_export" : "member.exported",
       targetTable: "app_users",
       targetId: id.data,
+      metadata: { format },
     });
+
+    if (format === "pdf") {
+      const { data: church } = await admin.from("churches").select("name").eq("id", me.church_id).maybeSingle();
+      const p = profile as unknown as { name: string; email: string; phone: string | null; role: string; status: string; created_at: string; departments?: { name: string } | null };
+      const sections: ExportSection[] = [
+        {
+          title: "Your profile",
+          items: [
+            [
+              { label: "Name", value: p.name },
+              { label: "Email", value: p.email?.endsWith("@no-login.grace.app") ? "(no app login)" : p.email },
+              ...(p.phone ? [{ label: "Phone", value: p.phone }] : []),
+              { label: "Role", value: humanKey(p.role) },
+              { label: "Department", value: p.departments?.name ?? "None" },
+              { label: "Joined", value: humanValue("created_at", p.created_at)! },
+            ],
+          ],
+        },
+      ];
+      const cp = records.chat_profile as { about?: string | null; dm_privacy?: string | null; share_read_receipts?: boolean | null; profile_photo_download?: { url: string } | null; unavailable?: boolean };
+      if (cp && !cp.unavailable) {
+        sections.push({
+          title: "Chat profile",
+          items: [
+            [
+              ...(cp.about ? [{ label: "About", value: cp.about }] : []),
+              ...(cp.dm_privacy ? [{ label: "Who can message you", value: humanKey(cp.dm_privacy) }] : []),
+              { label: "Read receipts", value: cp.share_read_receipts === false ? "Off" : "On" },
+              { label: "Profile photo", value: cp.profile_photo_download ? `Download (link works for 1 hour): ${cp.profile_photo_download.url}` : "None" },
+            ],
+          ],
+        });
+      }
+      for (const [table] of SOURCES) {
+        const rows = records[table];
+        if (!Array.isArray(rows)) continue; // module not in use
+        const limit = PDF_LIMIT[table];
+        const sorted = [...(rows as Record<string, unknown>[])].sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+        const shown = limit ? sorted.slice(0, limit) : sorted;
+        sections.push({
+          title: TITLES[table] ?? humanKey(table),
+          note: limit && rows.length > limit ? `The newest ${limit} of ${rows.length} are listed here; the machine-readable copy has them all.` : undefined,
+          empty: "Nothing.",
+          items: shown.map(rowItems).filter((i) => i.length),
+        });
+      }
+      sections.push({
+        title: "Journal",
+        note: "Your journal is encrypted: nobody at your church can read it, so only the dates of your entries are listed.",
+        empty: "No entries.",
+        items: (journal ?? []).map((j: { entry_date: string }) => [{ label: "Entry", value: humanValue("entry_date", j.entry_date)! }]),
+      });
+      const pdf = await buildExportPdf({
+        churchName: (church as { name?: string } | null)?.name ?? "your church",
+        personName: p.name,
+        exportedAt: humanValue("at", new Date().toISOString())!,
+        sections,
+      });
+      return new NextResponse(Buffer.from(pdf), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="grace-my-information.pdf"`,
+          "Cache-Control": "no-store",
+        },
+      });
+    }
 
     const body = JSON.stringify(
       { exported_at: new Date().toISOString(), exported_by: me.id, profile, records },

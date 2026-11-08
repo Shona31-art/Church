@@ -21,6 +21,10 @@ class Bridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun fcmToken(): String = Push.token(activity)
 
+    /** This app version returns every file when several are picked at once (MainActivity.pickFiles). */
+    @JavascriptInterface
+    fun canPickMultiple(): Boolean = true
+
     @JavascriptInterface
     fun setBadge(count: Int) = Badge.set(activity, count)
 

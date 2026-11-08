@@ -10,7 +10,13 @@ import { showToast } from "@/components/ui/Toaster";
  * fails in the Android app, which hands downloads to a signed-out browser).
  */
 export function DownloadDataButton({ memberId, label = "Download my data" }: { memberId: string; label?: string }) {
-  return <DownloadButton href={`/api/members/${memberId}/export`} label={label} fallbackName="grace-data.json" done="Your data has been downloaded." />;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-2">
+      {/* A readable PDF; the JSON copy is for moving the data to another system. */}
+      <DownloadButton href={`/api/members/${memberId}/export`} label={label} fallbackName="grace-my-information.pdf" done="Saved — open it from your Downloads." />
+      <DownloadButton href={`/api/members/${memberId}/export?format=json`} label="Machine-readable copy (JSON)" fallbackName="grace-data.json" done="Downloaded." className="btn-ghost btn-sm" />
+    </span>
+  );
 }
 
 /** Any file from the app's own API (exports, reports), downloaded with the signed-in session. */
